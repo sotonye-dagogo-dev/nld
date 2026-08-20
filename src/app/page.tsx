@@ -1,0 +1,79 @@
+import type { Metadata } from "next";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { DevotionalCard } from "@/components/devotionals/devotional-card";
+import { getPublishedDevotionals } from "@/lib/catalog";
+import { getSiteSettings } from "@/config/site";
+import { clampInt } from "@/lib/utils";
+
+export const metadata: Metadata = {
+  title: "Devotionals",
+};
+
+export const dynamic = "force-dynamic";
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const params = await searchParams;
+  const page = clampInt(Number(params.page ?? 1) || 1, 1, 1_000_000);
+  const { value: settings } = await getSiteSettings();
+
+  let result;
+  let error = false;
+  try {
+    result = await getPublishedDevotionals(page);
+  } catch {
+    error = true;
+  }
+
+  return (
+    <div className="page-shell section-gap">
+      <section>
+        <h1 className="text-3xl font-bold text-text-primary">{settings.platformName}</h1>
+        {settings.tagline && <p className="mt-2 text-text-muted">{settings.tagline}</p>}
+      </section>
+
+      {error ? (
+        <ErrorState
+          title="Could not load devotionals"
+          message="The devotional catalog is temporarily unavailable. Please try again shortly."
+        />
+      ) : result && result.rows.length === 0 ? (
+        <EmptyState
+          title="No devotionals yet"
+          description="Devotionals uploaded by the platform team will appear here."
+        />
+      ) : result ? (
+        <>
+          <section className="card-grid">
+            {result.rows.map((devotional) => (
+              <DevotionalCard key={devotional.id} devotional={devotional} />
+            ))}
+          </section>
+          {result.total > result.pageSize && (
+            <nav className="flex-between" aria-label="Pagination">
+              <p className="text-sm text-text-muted">
+                Page {result.page} of {Math.ceil(result.total / result.pageSize)}
+              </p>
+              <div className="flex gap-2">
+                {result.page > 1 && (
+                  <a href={`/?page=${result.page - 1}`} className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm">
+                    Previous
+                  </a>
+                )}
+                {result.page * result.pageSize < result.total && (
+                  <a href={`/?page=${result.page + 1}`} className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm">
+                    Next
+                  </a>
+                )}
+              </div>
+            </nav>
+          )}
+        </>
+      ) : null}
+    </div>
+  );
+}

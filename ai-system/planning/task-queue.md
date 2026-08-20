@@ -1,9 +1,9 @@
 # Development Task Queue
 
 > **Metadata**
-> - last-updated-by: (set on first update)
-> - last-verified-against-code: (set after task-list review)
-> - last-synced: [timestamp of the last `checkpoints/in-progress.md` write or `session-log.md` entry covering this queue] — keeps `audit-drift.md` able to catch a queue that drifted from its checkpoint without a human noticing manually
+> - last-updated-by: execute-feature (issue 1)
+> - last-verified-against-code: 2026-08-20
+> - last-synced: 2026-08-20 (execute-feature issue 1)
 > - staleness-policy: re-verify before each session
 
 > **Overview:** Sprint-level task queue with complexity tagging. Agents execute tasks top to bottom within the current sprint. Each task is sized so it can be completed in a single session.
@@ -25,19 +25,41 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 
 ---
 
-## Current Sprint
+## Current Sprint — Sprint 0: Foundation
 
 | Size | Task | Status |
 |------|------|--------|
-| [XS/S/M/L/XL/BUG] | [Task description — be specific] | [ ] / [x] |
+| [XL] | Bootstrap ai-system docs for this project + scaffold config-driven Next.js foundation (this session) | [x] |
+| [M] | Config-driven settings store (DB-backed with fallbacks) | [ ] |
+| [M] | Drizzle schema + migrations for all core tables | [ ] |
+| [M] | Integration wrappers: Paystack, Resend, Supabase | [ ] |
+| [M] | Universal component catalog baseline (Button, Input, Card, Navbar, Logo, ThemeToggle, Toast, Empty/Error, Modal, Table) | [ ] |
+| [S] | PWA manifest + service worker + theme | [ ] |
+| [S] | Root README + deployment/env documentation | [ ] |
 
 ---
 
-## Up Next
+## Up Next — Sprint 1: Public Platform (MVP)
 
 | Size | Task |
 |------|------|
-| [tag] | [task description] |
+| [L] | Devotional browse listing (metadata-driven, paginated) |
+| [L] | Devotional reader page + configurable free preview + paywall |
+| [XL] | Purchase flow: email → Paystack init → webhook verify → access grant + email |
+| [M] | Access verification page + reader unlock |
+| [M] | Anti-screenshot / asset-protection (admin-configurable) |
+| [M] | Event analytics collection (visits, opens, page views) |
+| [M] | Audit trail writer + payment/access records |
+
+## Up Next — Sprint 2: Admin Panel (MVP)
+
+| Size | Task |
+|------|------|
+| [L] | Admin auth (Supabase Auth, admin-only routes) |
+| [XL] | Devotional upload/edit admin module |
+| [L] | Records views: payments, access grants, audit log |
+| [L] | Analytics dashboard |
+| [M] | Settings editor (name, logo, copy, toggles, payment config) |
 
 ---
 
@@ -45,9 +67,17 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 
 | Size | Task |
 |------|------|
-| [tag] | [task description] |
-| [XL] | Package the `ai-system` kit for versioned install (npm / GitHub Releases) for distribution beyond "clone the template repo" — deferred stretch goal from template v3 |
-| [XL] | Optional `integrations/opencode/` adapter mapping `ai-system` commands to opencode-specific slash-commands (multi-manifest pattern, `AGENTS.md` + `opencode.json`), clearly labeled so the core kit stays vendor-neutral — deferred stretch goal from template v3 |
+| [XL] | Live Q&A with real-time answers (Word brief) |
+| [L] | Share learnings/summaries with comments + likes (Word brief) |
+| [L] | Reading buddies pairing (Word brief) |
+| [M] | Sermon of the day per devotional day (Word brief) |
+| [XL] | Subscription / time-duration access modes (admin-configurable) |
+| [L] | Devotional bundles / collections |
+| [L] | Templated email preview workflow (§18) |
+| [L] | Stronger DRM: watermarking, streaming rendering, device binding |
+| [M] | Content publishing calendar / scheduling |
+| [XL] | Package the `ai-system` kit for versioned install (npm / GitHub Releases) — deferred stretch goal from template v3 |
+| [XL] | Optional `integrations/opencode/` adapter mapping `ai-system` commands to opencode slash-commands — deferred stretch goal from template v3 |
 
 ---
 
@@ -55,10 +85,13 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 
 | Task | Completed |
 |------|-----------|
-| [task] | [x] |
+| Ingest requirement artifacts (genesis directive, Word brief → MD, zip context) | [x] |
+| Bootstrap ai-system project docs + foundation scaffold | [x] |
 
 ---
 
 ## Notes
 
-[Any context agents need to know about current sprint constraints, blockers, or priorities]
+- Work is tracked in the ai-system flow; the app lives under `src/`.
+- Paystack/Resend/Supabase keys are never committed — use `.env` / Vercel env vars; `.env.example` lists all required vars.
+- The client's vibecoded zip is reference context only, not a codebase to merge.
