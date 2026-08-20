@@ -2,7 +2,7 @@
 
 > **Metadata**
 >
-> - last-updated-by: execute-feature (issue 1)
+> - last-updated-by: execute-feature (issue 5)
 > - last-verified-against-code: 2026-08-20
 > - staleness-policy: auto-regenerable — can be derived from `Get-ChildItem -Recurse` or `tree` command. Manual content only where intent cannot be derived from structure.
 
@@ -50,16 +50,16 @@ project-root/
 | Directory           | Purpose                                     | Key Files                         |
 | ------------------- | ------------------------------------------- | --------------------------------- |
 | `src/app`           | Next.js App Router routes                    | layout.tsx, page.tsx, admin/*, api/* |
-| `src/components/ui` | Universal component catalog (baseline §13)   | button.tsx, navbar.tsx, table.tsx |
-| `src/components/admin` | Admin feature components (forms, editors, tables, analytics) | devotional-form.tsx, email-template-editor.tsx, records-table.tsx, analytics-bars.tsx |
+| `src/components/ui` | Universal component catalog (baseline §13)   | button.tsx, navbar.tsx, table.tsx, pagination.tsx, back-to-top.tsx, theme-toggle.tsx |
+| `src/components/admin` | Admin feature components (forms, editors, tables, analytics, sidebar) | devotional-form.tsx, email-template-editor.tsx, records-table.tsx, analytics-bars.tsx, sidebar.tsx |
 | `src/config`        | Config-driven settings + defaults            | site.ts, defaults.ts              |
 | `src/data`          | Drizzle schema and DB client                 | db/schema.ts, db/index.ts         |
 | `src/integrations`  | SDK isolation wrappers (§17)                 | paystack/*, resend/*, supabase/*  |
-| `src/lib`           | Business logic (access, audit, email, admin auth) | access.ts, audit.ts, email-templates.ts, email-render.ts, email-blocks.ts, admin-auth.ts, analytics.ts |
+| `src/lib`           | Business logic (access, audit, email, admin auth, pagination) | access.ts, audit.ts, email-templates.ts, email-render.ts, email-blocks.ts, admin-auth.ts, analytics.ts, pagination.ts |
 | `src/types`         | Global TS types (no import needed)           | global.d.ts                       |
 | `drizzle/`          | Generated migrations                         | (generated)                       |
 | `artifacts`         | Client requirement briefs                    | genesis-directive.txt, Next-Level-Devotional-App.md, next-level-devotional.zip |
-| `tests`             | Vitest suites                                | access, config, utils, email-templates, admin-auth, analytics |
+| `tests`             | Vitest suites                                | access, config, utils, email-templates, admin-auth, analytics, pagination |
 | `scripts`           | Bootstrap/seed scripts                       | seed-admin.mjs                    |
 
 ---
@@ -72,6 +72,7 @@ project-root/
 | Public browse          | `src/app/page.tsx`              |
 | Admin panel            | `src/app/admin/(panel)/layout.tsx` |
 | Admin login            | `src/app/admin/login/page.tsx`  |
+| Admin sidebar          | `src/components/admin/sidebar.tsx` |
 | Config loading         | `src/config/site.ts`            |
 | Email template store   | `src/lib/email-templates.ts`    |
 | Admin RBAC             | `src/lib/admin-auth.ts`         |

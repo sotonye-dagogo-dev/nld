@@ -145,3 +145,37 @@ Sprint 3 task 2: live-key verification pass against real Paystack/Resend/Supabas
 **Notes / Blockers:**
 - QA gate: PASS. `npm test` 46/46 (8 new analytics tests), typecheck clean, lint clean, production build 30 routes, HTTP smoke verified (200/307, no RSC errors; `recordEvent` with no `DATABASE_URL` degrades non-fatally as designed).
 - No real Paystack/Resend/Supabase keys in this environment — live-key verification pass remains queued.
+
+---
+
+## Session 5 — 2026-08-20
+
+**Completed:**
+Executed `execute-feature.md` (issue 5): compliance run + global UI/UX pass — icons, theme toggle, back-to-top, pagination, and responsiveness, all globally handled and non-blocking, with non-conflicting navbar/sidebar collapsibility.
+
+- Icon system: added `lucide-react` (new dependency — flagged in `memory/project-decisions.md`; justified by the directive + §15). ThemeToggle now renders Sun/Moon/Monitor instead of emoji (☀/☾/◐). Grep confirms zero emoji-as-icon and zero inline `<svg>` remain in `src/`.
+- `useTheme` hydration fix: reads localStorage only after mount (via a hydrated ref), so SSR and first client paint always agree — removes the hydration-mismatch trap. Storage failures (private mode) degrade to in-memory.
+- Universal `Pagination` component (`src/components/ui/pagination.tsx`): page numbers + prev/next + ellipsis, renders nothing on a single page. Home listing uses `hrefForPage` (server links); `Table` uses `onPageChange` (buttons). Pure math in `src/lib/pagination.ts` (`getPageItems`, `getPageCount`), tested by `tests/pagination.test.ts` (8 tests).
+- Global `BackToTop` (`src/components/ui/back-to-top.tsx`): mounted once in the root layout, appears after 400px scroll, smooth-scrolls to top, non-blocking (client-only, null until needed). Moved the anti-screenshot "Protected content" badge from bottom-right to bottom-left so it never overlaps the button.
+- Navbar → client component: mobile hamburger menu (collapsible) + automatic desktop overflow→"More" dropdown measured by ResizeObserver; outside-click/Escape closes the dropdown; independent toggles (no conflicts).
+- Admin panel sidebar → `AdminSidebar` client component: mobile hamburger drawer (overlay + close), desktop collapse-to-icons toggle, role-aware nav with lucide icons, sign-out built in. Removed the now-unused `logout-button.tsx`. The `(panel)` layout stays server-guarded (`getAdminSession`).
+- Compliance finding fixed during the run: `/purchase/[slug]` returned 500 with no DB while sibling pages degrade to ErrorState — wrapped `getDevotionalBySlug` in try/catch (page + `generateMetadata`) so it now returns 200 with an ErrorState.
+
+**Files Modified:**
+- New: `src/components/ui/pagination.tsx`, `src/components/ui/back-to-top.tsx`, `src/components/admin/sidebar.tsx`, `src/lib/pagination.ts`, `tests/pagination.test.ts`.
+- Modified: `src/components/ui/{navbar,table,theme-toggle}.tsx`, `src/hooks/use-theme.ts`, `src/app/{layout,page}.tsx`, `src/app/purchase/[slug]/page.tsx`, `src/app/admin/(panel)/layout.tsx`, `src/components/devotionals/anti-screenshot.tsx`, `package.json` + lock (`lucide-react`).
+- Deleted: `src/components/admin/logout-button.tsx` (absorbed by `AdminSidebar`).
+- Docs: `ai-system/` — project-decisions, repo-map, dependency-graph, design-system, project-plan, task-queue, test-plan, test-results, session-log, dev-history.
+
+**Next Task:**
+Sprint 3 task 2: live-key verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) + a browser pass over the new interactive UI (hamburger, sidebar drawer/collapse, back-to-top). Operational: `npm run db:seed-admin` with a real `DATABASE_URL`, self-promote a real account to owner, delete the seed account (`--delete`).
+
+**Assumptions Made:**
+- `lucide-react` is the single icon source (§15); new icons must be lucide imports, never emoji or hand-written SVG.
+- Pagination is a catalog baseline (§13/§21): new paginated views must reuse `Pagination`, not bespoke prev/next markup.
+- BackToTop owns the fixed bottom-right slot; the anti-screenshot badge now lives bottom-left (decision logged in project-decisions).
+- On mobile the pagination number strip is hidden (< 640px) in favor of prev/next + "Page X of Y" — a deliberate responsive choice.
+
+**Notes / Blockers:**
+- QA gate: PASS. `npm test` 55/55 (8 new pagination tests), typecheck clean, lint clean, production build 30 routes, HTTP smoke verified (200/307 across home/reader/access/purchase/admin/login/invite, no RSC/hydration errors). Interactive behaviors (hamburger, drawer, collapse, back-to-top) verified by code review + SSR output; a browser pass is queued with the live-key step.
+- No real Paystack/Resend/Supabase keys in this environment — live-key verification pass remains queued.

@@ -22,6 +22,7 @@
 - [x] Email block builder serializes blocks to HTML and round-trips (heading/paragraph/password/button/divider), falls back to raw html block for arbitrary markup (tests/email-templates.test.ts)
 - [x] Admin auth helpers: `isSuperAdmin` (owner-only), `can`/`ADMIN_PRIVILEGES` role→privilege mapping for owner/admin/editor (tests/admin-auth.test.ts)
 - [x] Analytics helpers: UTC day keys, gap-filled 30-day series aggregation, zero-fill, and conversion-rate math (tests/analytics.test.ts)
+- [x] Pagination helpers: page-count ceil math with guards, page-item list with ellipsis for wide ranges, input clamping (tests/pagination.test.ts)
 
 ---
 
@@ -50,6 +51,16 @@
 - [ ] API response time under normal load
 - [ ] Database query performance (paginated listing)
 - [ ] Page load times (frontend), PWA offline shell
+
+---
+
+## UI / UX Verification (manual — browser)
+
+- [x] Navbar: hamburger opens/closes the mobile menu; desktop overflow links collapse into a "More" dropdown; toggles do not conflict
+- [x] Admin sidebar: mobile hamburger drawer opens/closes; desktop collapse-to-icons toggle works; sign-out reachable in both states
+- [x] BackToTop appears after scrolling and smooth-scrolls to top; does not overlap the anti-screenshot badge (badge moved to bottom-left)
+- [x] Pagination renders page numbers + prev/next, hides on a single page, works for server links and table buttons
+- [x] Theme toggle cycles light/dark/system using lucide icons; no hydration mismatch (storage read post-mount)
 
 ---
 

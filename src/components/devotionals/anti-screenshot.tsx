@@ -54,7 +54,7 @@ export function AntiScreenshot({ enabled, children }: AntiScreenshotProps) {
       {enabled && (
         <span
           aria-hidden
-          className="pointer-events-none fixed bottom-3 right-3 z-30 select-none rounded-full bg-surface/80 px-3 py-1 text-[10px] text-text-muted shadow-sm"
+          className="pointer-events-none fixed bottom-3 left-3 z-30 select-none rounded-full bg-surface/80 px-3 py-1 text-[10px] text-text-muted shadow-sm"
         >
           Protected content
         </span>

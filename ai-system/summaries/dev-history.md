@@ -95,3 +95,27 @@ Completed the analytics dashboard — the first remaining Sprint 3 task. The adm
 
 **Next Sprint Focus:**
 Sprint 3 (part 2) — live-key verification pass against real Paystack/Resend/Supabase accounts (payment → email → unlock e2e), then owner bootstrap (seed-admin → self-promote → delete seed).
+
+---
+
+## 2026-08-20 — Compliance run + global UI/UX pass (icons, theme, back-to-top, pagination, responsiveness)
+
+**Summary:**
+Ran the QA gate and delivered the global UI/UX pass: icons now come from lucide-react (§15, no emoji/raw SVG), the theme toggle is hydration-safe, a universal Pagination component powers every list/table, a global back-to-top is mounted once in the root layout, and the navbar + admin sidebar are fully responsive with hamburger menus, overflow dropdowns, and non-conflicting collapsibility.
+
+**Completed:**
+- Added `lucide-react` icon library (flagged in project-decisions); replaced the ThemeToggle emoji (☀/☾/◐) with Sun/Moon/Monitor; grep confirms no emoji or `<svg>` remains in UI code
+- `useTheme` hardened — reads localStorage post-mount, eliminating the hydration-mismatch trap
+- Universal `Pagination` (`src/components/ui/pagination.tsx`) + pure helpers (`src/lib/pagination.ts`) used by the home listing (href links) and every `Table` (buttons); hidden on single page; 8 unit tests
+- Global `BackToTop` mounted in the root layout; anti-screenshot "Protected content" badge moved bottom-left to avoid overlap
+- Navbar: client component with mobile hamburger menu and a desktop overflow→"More" dropdown (ResizeObserver-measured)
+- Admin sidebar: extracted to `AdminSidebar` client component — mobile hamburger drawer + desktop collapse-to-icons + sign-out; old `logout-button.tsx` removed
+- Fixed a compliance-run finding: `/purchase/[slug]` 500'd without a DB → now degrades to `ErrorState` like sibling pages
+
+**Key Changes:**
+- Engineering principle §15 now actually enforced (icon library over emoji/SVG)
+- Pagination is a single catalog baseline component (§13/§21) instead of two bespoke implementations
+- Navbar/sidebar toggles are independent — opening one never conflicts with another
+
+**Next Sprint Focus:**
+Sprint 3 (part 2) — live-key verification pass with real Paystack/Resend/Supabase keys, including a browser pass over the new interactive UI (hamburger, drawer/collapse, back-to-top).

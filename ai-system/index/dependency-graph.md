@@ -1,7 +1,7 @@
 # Dependency Graph
 
 > **Metadata**
-> - last-updated-by: execute-feature (issue 1)
+> - last-updated-by: execute-feature (issue 5)
 > - last-verified-against-code: 2026-08-20
 > - staleness-policy: auto-regenerable — can be derived from import analysis tools. Manual content only for conventions and rules that cannot be inferred from code.
 
@@ -20,7 +20,7 @@ Public pages (src/app, src/app/devotionals, src/app/purchase, src/app/access)
 
 Admin pages (src/app/admin/*)
   → src/components/ui
-  → src/components/admin (forms, editors, tables, analytics bars)
+  → src/components/admin (forms, editors, tables, analytics bars, sidebar)
   → src/config
   → src/data
   → src/lib/admin-auth (session + RBAC: requireAdmin, isSuperAdmin, can)
@@ -58,6 +58,12 @@ src/lib/email-templates
 src/lib/email-render → pure functions (client-safe, used by editor preview)
 src/lib/email-blocks → pure block builder/serializer (client-safe, used by editor)
 src/lib/analytics → pure day-series/conversion helpers (client-safe, used by dashboard)
+src/lib/pagination → pure page-range/count helpers (client-safe, used by Pagination + Table)
+
+Universal UI catalog (src/components/ui)
+  → lucide-react (icons per §15)
+  → src/lib/pagination, src/lib/utils
+  → Navbar/BackToTop/ThemeToggle are client components mounted in src/app/layout
 
 src/config/site
   → src/data (settings table reads)
@@ -82,6 +88,7 @@ src/data/db
 | ------------------- | ------------------------------------ | ----------------------- |
 | next, react         | App framework                        | src/app                 |
 | tailwindcss         | Styling                              | global CSS, components  |
+| lucide-react        | Icon library (no emoji / raw SVG)    | src/components/ui, src/components/admin |
 | drizzle-orm         | Typed SQL                            | src/data                |
 | postgres            | Postgres driver (Supabase)           | src/data/db             |
 | @supabase/supabase-js | Admin auth + client helpers        | src/integrations/supabase |

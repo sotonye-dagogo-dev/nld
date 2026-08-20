@@ -14,7 +14,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const devotional = await getDevotionalBySlug(slug);
+  const devotional = await getDevotionalBySlug(slug).catch(() => null);
   return { title: devotional ? `Purchase — ${devotional.title}` : "Purchase" };
 }
 
@@ -25,7 +25,25 @@ export default async function PurchasePage({
 }) {
   const { slug } = await params;
   const { value: settings } = await getSiteSettings();
-  const devotional = await getDevotionalBySlug(slug);
+
+  let devotional: Devotional | null = null;
+  let loadError = false;
+  try {
+    devotional = await getDevotionalBySlug(slug);
+  } catch {
+    loadError = true;
+  }
+
+  if (loadError) {
+    return (
+      <div className="page-shell">
+        <ErrorState
+          title="Could not load this devotional"
+          message="The checkout is temporarily unavailable. Please try again shortly."
+        />
+      </div>
+    );
+  }
 
   if (!devotional) notFound();
   if (devotional.priceMinor <= 0) {

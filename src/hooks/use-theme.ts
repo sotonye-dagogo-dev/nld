@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Theme = "light" | "dark" | "system";
 
@@ -15,26 +15,57 @@ function resolveTheme(pref: Theme): "light" | "dark" {
   return pref;
 }
 
-/** Theme hook — light / dark / system, persisted in localStorage (§13 baseline). */
+function readStored(): Theme {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw === "light" || raw === "dark" || raw === "system" ? raw : "system";
+  } catch {
+    return "system";
+  }
+}
+
+function applyTheme(pref: Theme) {
+  const root = document.documentElement;
+  root.classList.toggle("dark", resolveTheme(pref) === "dark");
+  root.style.colorScheme = resolveTheme(pref);
+}
+
+/** Theme hook — light / dark / system, persisted in localStorage (§13 baseline).
+ * Reads storage only after mount so SSR/hydration never differ on the first
+ * paint (avoids the hydration-mismatch trap in repair-system.md). */
 export function useTheme() {
-  const [preference, setPreference] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "system";
-    return (localStorage.getItem(STORAGE_KEY) as Theme) ?? "system";
-  });
+  const [preference, setPreference] = useState<Theme>("system");
+  const hydratedRef = useRef(false);
 
   useEffect(() => {
-    const apply = () => {
-      const root = document.documentElement;
-      root.classList.toggle("dark", resolveTheme(preference) === "dark");
-      root.style.colorScheme = resolveTheme(preference);
-    };
-    apply();
-    localStorage.setItem(STORAGE_KEY, preference);
+    const stored = readStored();
+    hydratedRef.current = true;
+    setPreference(stored);
+    applyTheme(stored);
+
+    if (stored === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      const onChange = () => applyTheme("system");
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    applyTheme(preference);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, preference);
+    } catch {
+      // Storage unavailable (private mode) — degrade to in-memory only.
+    }
 
     if (preference === "system") {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      mq.addEventListener("change", apply);
-      return () => mq.removeEventListener("change", apply);
+      const onChange = () => applyTheme("system");
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
     }
   }, [preference]);
 

@@ -34,6 +34,69 @@
 
 ## Decisions
 
+### Icon system: lucide-react (new external dependency)
+
+**Decision:** Add `lucide-react` as the project icon library. All UI icons (theme toggle, nav hamburger/overflow, pagination chevrons, back-to-top, admin sidebar/nav, logout) are imported from lucide-react. No emoji-as-icon and no hand-written inline SVG in component code (engineering principle §15).
+**Date:** 2026-08-20
+**Made by:** execute-feature (issue 5)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Directive: "ensure icons are used and not emojis or svgs" — principle §15 requires an icon library/component system. ThemeToggle previously rendered emoji (☀/☾/◐), a §15 violation. lucide-react is tree-shakeable, works with React 19 / Next 15, and matches Tailwind tokens.
+
+**Alternatives Considered:**
+- Inline hand-written SVG components — rejected: directive forbids raw SVG, and §15 says icons come from the icon system.
+- `@heroicons/react` — viable, but lucide-react offers the full glyph set (hamburger, panel collapse, logout, chevrons) with smaller per-icon payload.
+- Keeping emoji — rejected: violates §15 and the directive.
+
+**Implications:**
+- Any new icon must be a lucide-react import, not emoji or raw SVG.
+- lucide-react is tree-shaken; only used icons ship. Bundle impact measured in build output (shared JS ~103 kB, no material increase).
+
+---
+
+### Universal Pagination component (§13/§21 baseline)
+
+**Decision:** One `Pagination` component (`src/components/ui/pagination.tsx`) is the single pagination control for all views — the home listing (server-rendered links via `hrefForPage`) and every `Table` (client buttons via `onPageChange`). Page-range math lives in the pure helper `src/lib/pagination.ts` (`getPageItems`, `getPageCount`). The component renders nothing on a single page.
+**Date:** 2026-08-20
+**Made by:** execute-feature (issue 5)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Directive: "pagination ... globally handled and non-blocking." Home page previously hand-rolled prev/next links and `Table` had its own inline controls — two bespoke implementations of the same contract (§4/§13/§21).
+
+**Alternatives Considered:**
+- Keep the two bespoke implementations — rejected: duplicates the catalog baseline.
+- Infinite scroll — rejected: not asked for, and pagination remains the §21 default.
+
+**Implications:**
+- New paginated views must use `Pagination`, never bespoke prev/next markup.
+- Page-range logic is unit-tested (`tests/pagination.test.ts`, 8 tests).
+
+---
+
+### Global theme + back-to-top mounted once in the root layout
+
+**Decision:** `BackToTop` (`src/components/ui/back-to-top.tsx`) is mounted once in the root layout and is non-blocking — it renders nothing until the user scrolls past 400px, then shows a fixed bottom-right button. `ThemeToggle`/`useTheme` remain global via the Navbar. To avoid overlap, the anti-screenshot "Protected content" badge moved from bottom-right to bottom-left.
+**Date:** 2026-08-20
+**Made by:** execute-feature (issue 5)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Directive: "theme toggle, to the top, ... globally handled and non-blocking." BackToTop being fixed bottom-right would collide with the reader's bottom-right protection badge, so the badge relocated.
+
+**Alternatives Considered:**
+- Per-page back-to-top — rejected: directive asks for global, single-mount.
+- Leaving the badge bottom-right — rejected: direct overlap with the button on reader pages.
+
+**Implications:**
+- Any future fixed bottom-right control must consider BackToTop; bottom-left is now the badge slot.
+
+---
+
 ### Access password derived from the Paystack transaction reference
 
 **Decision:** The access password emailed to a purchaser is deterministically derived from the Paystack transaction reference using HMAC (`HMAC-SHA256(txn_reference, ACCESS_PASSWORD_SECRET)`), truncated to a readable group. Verification recomputes the same value from the stored reference — no password storage, no separate secret exchange.
