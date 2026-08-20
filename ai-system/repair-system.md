@@ -81,3 +81,31 @@
 - Cause: Variable defined in `.env.local` but not in production environment
 - Fix: Add to deployment environment variables
 - Prevention: Add a startup validation check that throws if required env vars are missing
+
+### Integration / Secrets
+
+**Secret Leaked to Client Bundle**
+- Symptom: `process.env.PAYSTACK_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` appears in browser JS
+- Cause: A server-only module imported from a client component; Next.js inlined the env value
+- Fix: Add `import "server-only"` at the top of server-only modules; import them only from route handlers / server components; move secret reads behind `src/integrations/*` wrappers
+- Prevention: Grep for `SECRET`/`SERVICE_ROLE` keys in client bundles after builds; §17 wrapper discipline; `NEXT_PUBLIC_` prefix only for truly public values
+
+**Paystack Webhook Signature Rejection**
+- Symptom: Webhook returns 403/401 and purchases stay `pending` despite successful payment
+- Cause: Secret key mismatch, or payload/headers not verified exactly as received (raw body hashing)
+- Fix: Verify `x-paystack-signature` over the raw request body with `PAYSTACK_SECRET_KEY` before parsing JSON
+- Prevention: Log verification failures to audit log; test with Paystack test mode before going live
+
+**Duplicate Webhook / Double Grant**
+- Symptom: User receives two access emails, or access_grant rows duplicated
+- Cause: Paystack retries webhooks on failure; handler not idempotent
+- Fix: Upsert purchase by `paystack_reference`; guard access-grant creation with a unique constraint; only send email when grant is newly created
+- Prevention: Treat every webhook as retryable; idempotency key = transaction reference
+
+### Database / Drizzle
+
+**RLS-Protected Tables Invisible to Service Role**
+- Symptom: Client queries return empty rows that exist in the database
+- Cause: Supabase RLS denies the `anon` key; tables enabled for RLS without matching policies
+- Fix: Add per-table policies for public reads; service-role bypass only in server wrappers
+- Prevention: Write the RLS policy block beside every table in `src/data/db/schema.ts` (raw SQL migration); test with the anon key, not just service role

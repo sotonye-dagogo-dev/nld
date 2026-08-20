@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Design tokens — single source of truth (§5). Components consume these via
+   the Tailwind theme mapping in tailwind.config.ts; hex values are declared
+   HERE ONLY. Light theme is the default; .dark swaps the variables.
+--------------------------------------------------------------------------- */
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --color-primary: 79 70 229;          /* indigo-600 */
+  --color-primary-hover: 67 56 202;    /* indigo-700 */
+  --color-secondary: 14 165 233;       /* sky-500 */
+  --color-background: 248 250 252;     /* slate-50 */
+  --color-surface: 255 255 255;        /* white */
+  --color-text-primary: 15 23 42;      /* slate-900 */
+  --color-text-muted: 100 116 139;     /* slate-500 */
+  --color-danger: 220 38 38;           /* red-600 */
+  --color-success: 22 163 74;          /* green-600 */
+  --color-border: 226 232 240;         /* slate-200 */
+}
+
+.dark {
+  --color-primary: 129 140 248;        /* indigo-400 */
+  --color-primary-hover: 99 102 241;   /* indigo-500 */
+  --color-secondary: 56 189 248;       /* sky-400 */
+  --color-background: 11 18 32;        /* deep navy */
+  --color-surface: 19 28 46;
+  --color-text-primary: 241 245 249;   /* slate-100 */
+  --color-text-muted: 148 163 184;     /* slate-400 */
+  --color-danger: 248 113 113;         /* red-400 */
+  --color-success: 74 222 128;         /* green-400 */
+  --color-border: 51 65 85;            /* slate-700 */
+}
+
+@layer base {
+  html {
+    @apply bg-background text-text-primary antialiased;
+  }
+  body {
+    @apply min-h-screen font-sans;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Named utility classes — recurring combinations lifted into named classes
+   (§14). Grep a repeated multi-utility string before adding to pages.
+--------------------------------------------------------------------------- */
+@layer components {
+  .page-shell {
+    @apply mx-auto w-full max-w-6xl px-4 py-8;
+  }
+  .section-gap {
+    @apply space-y-8;
+  }
+  .card-grid {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3;
+  }
+  .flex-between {
+    @apply flex items-center justify-between gap-2;
+  }
+  .prose-devotional {
+    @apply space-y-4 text-text-primary;
+  }
+}
