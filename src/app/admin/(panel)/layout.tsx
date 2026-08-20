@@ -12,12 +12,22 @@ import { LogoutButton } from "@/components/admin/logout-button";
 
 const BASE_NAV = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/devotionals", label: "Devotionals" },
+];
+
+const SUPERADMIN_NAV = [
+  { href: "/admin/invites", label: "Invite admins" },
+  { href: "/admin/email-templates", label: "Email templates" },
+];
+
+const RECORDS_NAV = [
   { href: "/admin/records/payments", label: "Payments" },
   { href: "/admin/records/grants", label: "Access grants" },
   { href: "/admin/records/audit", label: "Audit log" },
-  { href: "/admin/settings", label: "Settings" },
 ];
+
+const ADMIN_NAV = [{ href: "/admin/settings", label: "Settings" }];
 
 export default async function AdminPanelLayout({ children }: { children: ReactNode }) {
   const admin = await getAdminSession();
@@ -26,13 +36,8 @@ export default async function AdminPanelLayout({ children }: { children: ReactNo
   const { value: settings } = await getSiteSettings();
   const superadmin = isSuperAdmin(admin);
   const nav = superadmin
-    ? [
-        ...BASE_NAV.slice(0, 2),
-        { href: "/admin/invites", label: "Invite admins" },
-        { href: "/admin/email-templates", label: "Email templates" },
-        ...BASE_NAV.slice(2),
-      ]
-    : BASE_NAV;
+    ? [...BASE_NAV, ...SUPERADMIN_NAV, ...RECORDS_NAV, ...ADMIN_NAV]
+    : [...BASE_NAV, ...RECORDS_NAV, ...ADMIN_NAV];
 
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-6xl flex-col gap-6 px-4 py-8 md:flex-row">

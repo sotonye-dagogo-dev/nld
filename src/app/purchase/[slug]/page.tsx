@@ -4,6 +4,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { PurchaseCheckout } from "@/components/devotionals/purchase-checkout";
 import { getDevotionalBySlug } from "@/lib/catalog";
 import { getSiteSettings } from "@/config/site";
+import { recordEvent } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,11 @@ export default async function PurchasePage({
       </div>
     );
   }
+
+  // Fire-and-forget analytics (never blocks render).
+  recordEvent({ eventType: "page.view", slug: devotional.slug, meta: { path: "/purchase" } }).catch(
+    () => undefined,
+  );
 
   return (
     <div className="page-shell">

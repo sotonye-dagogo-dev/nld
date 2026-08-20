@@ -1,7 +1,7 @@
 # Test Plan
 
 > **Metadata**
-> - last-updated-by: execute-feature (issue 1)
+> - last-updated-by: execute-feature (issue 3)
 > - last-verified-against-code: 2026-08-20
 > - staleness-policy: re-verify if new features are added
 
@@ -21,6 +21,7 @@
 - [x] Email template subject renderer substitutes plain text
 - [x] Email block builder serializes blocks to HTML and round-trips (heading/paragraph/password/button/divider), falls back to raw html block for arbitrary markup (tests/email-templates.test.ts)
 - [x] Admin auth helpers: `isSuperAdmin` (owner-only), `can`/`ADMIN_PRIVILEGES` role→privilege mapping for owner/admin/editor (tests/admin-auth.test.ts)
+- [x] Analytics helpers: UTC day keys, gap-filled 30-day series aggregation, zero-fill, and conversion-rate math (tests/analytics.test.ts)
 
 ---
 
