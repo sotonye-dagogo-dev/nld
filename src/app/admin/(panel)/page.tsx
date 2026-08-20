@@ -58,10 +58,10 @@ export default async function AdminDashboardPage() {
             {stat(counts.events, "Events logged")}
           </div>
           <Card>
-            <CardTitle>Next steps (Sprint 2)</CardTitle>
+            <CardTitle>Sprint 2 complete</CardTitle>
             <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-text-muted">
-              <li>Wire Supabase Auth to guard this panel (only authorized admins).</li>
-              <li>Devotional upload/editor with content + pricing + preview days.</li>
+              <li>Admin auth via Supabase + seeded superadmin, invite flow for team members.</li>
+              <li>Devotional editor with content, pricing, and preview days.</li>
               <li>Records tables for payments, access grants, and audit log.</li>
               <li>Settings editor for platform name, logo, copy, and toggles.</li>
             </ul>

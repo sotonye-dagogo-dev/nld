@@ -19,6 +19,7 @@ export const paymentStatusEnum = pgEnum("payment_status", ["pending", "success",
 export const accessStatusEnum = pgEnum("access_status", ["active", "revoked", "expired"]);
 export const devotionalStatusEnum = pgEnum("devotional_status", ["draft", "published", "archived"]);
 export const adminRoleEnum = pgEnum("admin_role", ["owner", "admin", "editor"]);
+export const inviteStatusEnum = pgEnum("invite_status", ["pending", "accepted", "revoked", "expired"]);
 
 // ---------------------------------------------------------------------------
 // settings — admin-configurable platform values (name, logo, pricing, toggles)
@@ -171,8 +172,44 @@ export const admins = pgTable(
   "admins",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    authUserId: uuid("auth_user_id").unique(),
     email: text("email").notNull().unique(),
     role: adminRoleEnum("role").notNull().default("admin"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
+);
+
+// ---------------------------------------------------------------------------
+// email_templates — DB-backed email templates with code fallbacks (§18).
+// `variables` maps each supported placeholder name to a human label so the
+// admin editor can render variable chips without code knowledge.
+// ---------------------------------------------------------------------------
+export const emailTemplates = pgTable("email_templates", {
+  key: text("key").primaryKey(),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  bodyHtml: text("body_html").notNull(),
+  variables: jsonb("variables").$type<Record<string, string>>().notNull().default({}),
+  updatedBy: text("updated_by").notNull().default("system"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// admin_invites — invitation links that turn an email into an admin account.
+// Owner (superadmin) only creates these; the invitee signs up and is added as
+// a standard `admin` (no invite privilege).
+// ---------------------------------------------------------------------------
+export const adminInvites = pgTable(
+  "admin_invites",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: text("email").notNull(),
+    token: text("token").notNull().unique(),
+    role: adminRoleEnum("role").notNull().default("admin"),
+    invitedBy: uuid("invited_by").references(() => admins.id, { onDelete: "restrict" }),
+    status: inviteStatusEnum("status").notNull().default("pending"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("admin_invites_status_idx").on(table.status)],
 );

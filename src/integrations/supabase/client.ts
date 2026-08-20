@@ -46,3 +46,31 @@ export async function validateAdminToken(
     return { ok: false, error: err instanceof Error ? err.message : "auth error" };
   }
 }
+
+/**
+ * Sign an admin in with email + password against Supabase Auth. Returns the
+ * access token to store in the admin session cookie. Used only by the admin
+ * login route; never exposed to client components.
+ */
+export async function adminSignIn(
+  email: string,
+  password: string,
+): Promise<AdminSessionResult & { token?: string }> {
+  try {
+    const { data, error } = await getAdminClient().auth.signInWithPassword({ email, password });
+    if (error || !data.session) {
+      return { ok: false, error: error?.message ?? "Invalid email or password." };
+    }
+    return {
+      ok: true,
+      token: data.session.access_token,
+      user: {
+        id: data.user.id,
+        email: data.user.email ?? "",
+        emailVerified: Boolean(data.user.email_confirmed_at),
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Sign-in error." };
+  }
+}

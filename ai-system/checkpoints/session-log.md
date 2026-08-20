@@ -83,3 +83,34 @@ Sprint 1 (public platform): browse listing polish, reader paywall hardening, pur
 - Residual risk (minor, queued): locked devotional days currently ship in the client bundle until verified; hardened server-side fetch queued in project-plan Phase 4/5. Admin auth UI is Sprint 2.
 - `next lint` is deprecated in Next 15 — migrated to a static `.eslintrc.json` for CI; consider the ESLint CLI (`npx @next/codemod next-lint-to-eslint-cli`) in a later session.
 - No real Paystack/Resend/Supabase keys in this environment — payment/email paths verified via signature/validation error paths + unit tests, not a live charge.
+
+---
+
+## Session 3 — 2026-08-20
+
+**Completed:**
+Executed `execute-feature.md` (issue 2): MVP close-out across asset protection, admin auth + invites, email template editor, and Sprint 2 remainder.
+
+- Asset protection: reader SSR now ships preview days only; locked days fetched via `POST /api/devotionals/[slug]/unlock` after server-side verification; `AccessGate` rewritten as verifier+fetcher; `AntiScreenshot` client behavior added (admin-configurable). Fixed reader to fetch days by `devotional.id` (was passing slug).
+- Admin auth: `src/lib/admin-auth.ts` (cookie session `admin_session`, `requireAdmin`, `isSuperAdmin`, `ADMIN_PRIVILEGES`, `can`); `src/middleware.ts` cheap presence redirect; `/admin/login` + login/logout API; `(panel)` route group restructure with guarded layout + role-aware nav; `scripts/seed-admin.mjs` (env-driven owner bootstrap, `--delete` supported) + `db:seed-admin` npm script + `.env.example` seed vars.
+- Invite flow: invites API (list/create, superadmin-only, emails `admin_invite` template), accept API (creates Supabase auth user + `admins` row role=admin + auto-login → `/admin`), `/admin/invite/[token]` signup page, `/admin/(panel)/invites` manager.
+- Email templates: `email_templates` table + `src/lib/email-templates.ts` (DB store with code fallbacks), pure render helpers `src/lib/email-render.ts`, block builder `src/lib/email-blocks.ts`, `/admin/(panel)/email-templates` + `EmailTemplateEditor` (Blocks/HTML toggle, variable chips, live preview), superadmin-only API. Resend client now renders from the store.
+- Sprint 2 close: `/admin/settings` + `SettingsEditor`; `/admin/records/{payments,grants,audit}` paginated tables; `/api/admin/devotionals` (POST txn) + `[id]` (PUT/DELETE); `DevotionalForm` rewritten for create/edit persistence; edit page; dashboard "Sprint 2 complete" card.
+- Migration `drizzle/0001_clumsy_secret_warriors.sql` (invite_status enum, admin_invites, email_templates, admins.auth_user_id).
+
+**Files Modified:**
+- New: `src/lib/email-templates.ts`, `src/lib/email-render.ts`, `src/lib/email-blocks.ts`, `src/lib/admin-auth.ts`, `src/middleware.ts`, `src/app/api/admin/auth/{login,logout}/route.ts`, `src/app/api/admin/invites/route.ts`, `src/app/api/admin/invites/accept/route.ts`, `src/app/api/admin/email-templates/route.ts`, `src/app/api/admin/settings/route.ts`, `src/app/api/admin/devotionals/route.ts`, `src/app/api/admin/devotionals/[id]/route.ts`, `src/app/api/devotionals/[slug]/unlock/route.ts`, `src/app/admin/login/page.tsx`, `src/app/admin/invite/[token]/page.tsx`, `src/app/admin/(panel)/**` (dashboard, email-templates, invites, settings, records/*, devotionals/*), `src/components/admin/*` (login-form, invite-signup-form, invite-manager, email-template-editor, settings-editor, records-table, devotional-form), `src/components/devotionals/anti-screenshot.tsx`, `scripts/seed-admin.mjs`, `tests/email-templates.test.ts`, `tests/admin-auth.test.ts`, `drizzle/0001_*.sql`.
+- Modified: `src/data/db/schema.ts`, `src/config/defaults.ts`, `src/types/global.d.ts`, `src/integrations/resend/client.ts`, `src/app/devotionals/[slug]/page.tsx`, `src/components/devotionals/access-gate.tsx`, `src/app/admin/layout.tsx` (→(panel)), `src/app/api/access/verify/route.ts`, `src/app/access/page.tsx`, `.env.example`, `package.json`, `ai-system/*` docs (repo-map, dependency-graph, project-plan, task-queue, test-plan, test-results, session-log).
+
+**Next Task:**
+Sprint 3 (queued in task-queue): analytics dashboard (platform visits, devotional opens, purchases) + live-key verification pass (Paystack init/webhook, Resend delivery, Supabase auth/invite against real accounts). In the meantime, run `npm run db:seed-admin` with a real `DATABASE_URL` to bootstrap the owner, then delete the seed account after self-promoting.
+
+**Assumptions Made:**
+- Owner role is the only superadmin privilege; seeded owner account is temporary (self-promote a real account, then delete via `--delete` or direct DB delete).
+- Admin session is a signed Supabase access token in an HttpOnly cookie; middleware only redirects on absence — real authz happens in the guarded layout + API guards.
+- Email template `{{var}}` escaping applies to interpolated values; template markup itself is trusted (admin-authored).
+
+**Notes / Blockers:**
+- QA gate: PASS. `npm test` 38/38, typecheck clean, lint clean, production build 30 routes, HTTP smoke verified (200/307/401/400, no RSC errors).
+- Fixed a stale-reference pass after the block refactor (`BlockType→EmailBlockType`, `BLOCK_LABELS→EMAIL_BLOCK_LABELS`, inline type array → `EMAIL_BLOCK_TYPES`) and aligned password/button serializers between `email-blocks.ts` and the seeded defaults so editor round-trips preserve them.
+- No real Paystack/Resend/Supabase keys in this environment — payment/email/auth paths verified via error paths + unit tests, not live calls.

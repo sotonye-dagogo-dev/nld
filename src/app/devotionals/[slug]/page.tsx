@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { AccessGate } from "@/components/devotionals/access-gate";
+import { AntiScreenshot } from "@/components/devotionals/anti-screenshot";
 import { getDevotionalBySlug, getDevotionalDays } from "@/lib/catalog";
 import { getSiteSettings } from "@/config/site";
 import { recordEvent } from "@/lib/audit";
@@ -33,12 +34,10 @@ export default async function DevotionalPage({
   let days: DevotionalDay[] = [];
   let loadError = false;
   try {
-    const [d, ds] = await Promise.all([
-      getDevotionalBySlug(slug),
-      getDevotionalDays(slug).catch(() => []),
-    ]);
-    devotional = d;
-    days = ds;
+    devotional = await getDevotionalBySlug(slug);
+    if (devotional) {
+      days = await getDevotionalDays(devotional.id).catch(() => []);
+    }
   } catch {
     loadError = true;
   }
@@ -61,65 +60,64 @@ export default async function DevotionalPage({
 
   const previewDays = clampInt(devotional.previewDays > 0 ? devotional.previewDays : settings.freePreviewDays, 0, days.length);
   const visibleDays = days.slice(0, previewDays);
-  const lockedDays = days.slice(previewDays);
-  const hasAccessControl = devotional.priceMinor > 0 && lockedDays.length > 0;
+  const hasAccessControl = devotional.priceMinor > 0 && days.length > previewDays;
 
   return (
-    <div className="page-shell section-gap">
-      <section className="flex-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-text-primary">{devotional.title}</h1>
-          {devotional.subtitle && <p className="mt-2 text-text-muted">{devotional.subtitle}</p>}
-        </div>
-        {devotional.priceMinor > 0 && (
-          <span className="rounded-lg bg-surface px-4 py-2 text-lg font-semibold text-text-primary">
-            {formatPrice(devotional.priceMinor, devotional.currency)}
-          </span>
+    <AntiScreenshot enabled={settings.antiScreenshotEnabled}>
+      <div className="page-shell section-gap">
+        <section className="flex-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-text-primary">{devotional.title}</h1>
+            {devotional.subtitle && <p className="mt-2 text-text-muted">{devotional.subtitle}</p>}
+          </div>
+          {devotional.priceMinor > 0 && (
+            <span className="rounded-lg bg-surface px-4 py-2 text-lg font-semibold text-text-primary">
+              {formatPrice(devotional.priceMinor, devotional.currency)}
+            </span>
+          )}
+        </section>
+
+        {devotional.description && (
+          <p className="max-w-2xl text-text-muted">{devotional.description}</p>
         )}
-      </section>
 
-      {devotional.description && (
-        <p className="max-w-2xl text-text-muted">{devotional.description}</p>
-      )}
+        {days.length === 0 ? (
+          <ErrorState
+            title="No content yet"
+            message="This devotional has not been published yet. Check back soon."
+          />
+        ) : (
+          <div className="section-gap">
+            <section className="space-y-6">
+              {visibleDays.map((day) => (
+                <article key={day.id} className="rounded-xl border border-border bg-surface p-6">
+                  <h2 className="mb-2 text-xl font-semibold text-text-primary">
+                    Day {day.dayNumber} — {day.title}
+                  </h2>
+                  <div className="prose-devotional">{day.content}</div>
+                  {day.sermonUrl && (
+                    <div className="mt-4 aspect-video overflow-hidden rounded-lg">
+                      <iframe
+                        src={day.sermonUrl}
+                        title={`Day ${day.dayNumber} sermon`}
+                        className="h-full w-full"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+                </article>
+              ))}
+            </section>
 
-      {days.length === 0 ? (
-        <ErrorState
-          title="No content yet"
-          message="This devotional has not been published yet. Check back soon."
-        />
-      ) : (
-        <div className="section-gap">
-          <section className="space-y-6">
-            {visibleDays.map((day) => (
-              <article key={day.id} className="rounded-xl border border-border bg-surface p-6">
-                <h2 className="mb-2 text-xl font-semibold text-text-primary">
-                  Day {day.dayNumber} — {day.title}
-                </h2>
-                <div className="prose-devotional">{day.content}</div>
-                {day.sermonUrl && (
-                  <div className="mt-4 aspect-video overflow-hidden rounded-lg">
-                    <iframe
-                      src={day.sermonUrl}
-                      title={`Day ${day.dayNumber} sermon`}
-                      className="h-full w-full"
-                      loading="lazy"
-                    />
-                  </div>
-                )}
-              </article>
-            ))}
-          </section>
-
-          {hasAccessControl && (
-            <AccessGate devotional={devotional} lockedDays={lockedDays} settings={settings} />
-          )}
-          {hasAccessControl === false && (
-            <Card className="text-center">
-              <p className="text-sm text-text-muted">All {days.length} days are available for free.</p>
-            </Card>
-          )}
-        </div>
-      )}
-    </div>
+            {hasAccessControl && <AccessGate devotional={devotional} settings={settings} />}
+            {hasAccessControl === false && (
+              <Card className="text-center">
+                <p className="text-sm text-text-muted">All {days.length} days are available for free.</p>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
+    </AntiScreenshot>
   );
 }
