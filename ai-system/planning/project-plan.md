@@ -57,6 +57,7 @@
 
 ## Phase 5 — Quality & Polish
 
+- [x] Icons everywhere (lucide-react, no emoji/raw SVG — §15), global theme toggle, back-to-top, universal pagination, responsive navbar/sidebar (hamburger + overflow dropdowns + collapse)
 - [ ] Unit test coverage for core modules (config, access, pricing)
 - [ ] Integration tests for purchase + access flow
 - [ ] E2E tests for browse → purchase → unlock

@@ -1,9 +1,9 @@
 # Development Task Queue
 
 > **Metadata**
-> - last-updated-by: execute-feature (issue 3)
+> - last-updated-by: execute-feature (issue 5)
 > - last-verified-against-code: 2026-08-20
-> - last-synced: 2026-08-20 (execute-feature issue 3)
+> - last-synced: 2026-08-20 (execute-feature issue 5)
 > - staleness-policy: re-verify before each session
 
 > **Overview:** Sprint-level task queue with complexity tagging. Agents execute tasks top to bottom within the current sprint. Each task is sized so it can be completed in a single session.
@@ -71,12 +71,6 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 |------|------|
 | [L] | Analytics dashboard (platform visits, devotional opens, purchases) |
 
-## Up Next — Sprint 3: Analytics + Live verification
-
-| Size | Task |
-|------|------|
-| [M] | Live verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) |
-
 ---
 
 ## Backlog
@@ -106,10 +100,17 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 | Sprint 1 public platform (browse, reader+paywall, purchase, access, anti-screenshot, analytics, audit) | [x] |
 | Sprint 2 admin panel (auth + invite flow, devotional upload/edit, records views, settings editor, email template editor) | [x] |
 | Sprint 3 analytics dashboard (visits, opens, purchases, revenue, conversion, trends, top devotionals, recent events) | [x] |
+| Compliance run + global UI/UX pass (issue 5): lucide icons (§15), theme-toggle hydration fix, universal Pagination + back-to-top, responsive navbar/sidebar with hamburger + overflow dropdowns + collapsibility | [x] |
 
 ---
 
-## Notes
+## Up Next — Sprint 3: Live verification
+
+| Size | Task |
+|------|------|
+| [M] | Live verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) + browser pass over the new interactive UI (hamburger, sidebar drawer/collapse, back-to-top) |
+
+---
 
 - Work is tracked in the ai-system flow; the app lives under `src/`.
 - Paystack/Resend/Supabase keys are never committed — use `.env` / Vercel env vars; `.env.example` lists all required vars.

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { Navbar } from "@/components/ui/navbar";
+import { BackToTop } from "@/components/ui/back-to-top";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { getSiteSettings } from "@/config/site";
 
@@ -47,6 +48,7 @@ export default async function RootLayout({
               © {new Date().getFullYear()} {settings.platformName}
             </footer>
           </div>
+          <BackToTop />
         </ToastProvider>
       </body>
     </html>

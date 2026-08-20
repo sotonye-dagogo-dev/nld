@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { Pagination } from "@/components/ui/pagination";
 import { DevotionalCard } from "@/components/devotionals/devotional-card";
 import { getPublishedDevotionals } from "@/lib/catalog";
 import { getSiteSettings } from "@/config/site";
@@ -57,25 +58,13 @@ export default async function HomePage({
               <DevotionalCard key={devotional.id} devotional={devotional} />
             ))}
           </section>
-          {result.total > result.pageSize && (
-            <nav className="flex-between" aria-label="Pagination">
-              <p className="text-sm text-text-muted">
-                Page {result.page} of {Math.ceil(result.total / result.pageSize)}
-              </p>
-              <div className="flex gap-2">
-                {result.page > 1 && (
-                  <a href={`/?page=${result.page - 1}`} className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm">
-                    Previous
-                  </a>
-                )}
-                {result.page * result.pageSize < result.total && (
-                  <a href={`/?page=${result.page + 1}`} className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm">
-                    Next
-                  </a>
-                )}
-              </div>
-            </nav>
-          )}
+          <Pagination
+            page={result.page}
+            pageSize={result.pageSize}
+            total={result.total}
+            hrefForPage={(p) => `/?page=${p}`}
+            className="mt-6"
+          />
         </>
       ) : null}
     </div>

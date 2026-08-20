@@ -1,7 +1,7 @@
 # Design System
 
 > **Metadata**
-> - last-updated-by: bootstrap-project (execute-feature, issue 1)
+> - last-updated-by: execute-feature (issue 5)
 > - last-verified-against-code: 2026-08-20
 > - staleness-policy: re-verify if UI components or styling dependencies change
 
@@ -57,7 +57,10 @@ The universal component catalog (per §13 required baseline) lives in `src/compo
 - Error messages: `text-danger text-sm` under the field, with a summarized alert at the top of the form
 
 ### Navigation
-- `Navbar`: responsive topnav with collapsible menu on mobile; logo from admin config (fallback wordmark); ThemeToggle in nav
+- `Navbar`: responsive topnav with collapsible mobile menu (hamburger) and a desktop overflow "More" dropdown when links exceed the available width; logo from admin config (fallback wordmark); ThemeToggle in nav. Toggles are independent — opening one never conflicts with another.
+- `AdminSidebar`: admin panel shell with mobile hamburger drawer (overlay + close), desktop collapse-to-icons toggle, role-aware links, and sign-out.
+- `BackToTop`: global fixed bottom-right button, mounted once in the root layout; appears after 400px scroll, smooth-scrolls to top. Non-blocking (client-only, renders null until scrolled).
+- `Pagination`: universal pagination control (page numbers + prev/next, ellipsis for wide ranges); renders nothing on a single page. Server lists pass `hrefForPage`, client tables pass `onPageChange`.
 
 ### Cards / Containers
 - `Card`: `bg-surface rounded-xl border shadow-sm p-6`, used for devotional cards, admin records, forms
@@ -67,6 +70,9 @@ The universal component catalog (per §13 required baseline) lives in `src/compo
 
 ### Empty / Error States
 - `EmptyState` and `ErrorState` are shared components — no per-screen implementations
+
+### Icons
+- Icons come from the `lucide-react` library (§15) — imported per glyph, tree-shaken, no emoji-as-icon and no hand-written inline SVG in component code. Theme toggle uses Sun/Moon/Monitor; pagination uses ChevronLeft/ChevronRight; BackToTop uses ArrowUp; the navbar uses Menu/X/MoreHorizontal/ChevronDown; the admin sidebar uses Menu/X/PanelLeftClose/PanelLeftOpen/LogOut plus per-link icons.
 
 ### Toast / Notifications
 - `Toast`/`toast()` helper for async feedback (purchase success, copy-password, errors)
@@ -91,7 +97,7 @@ The universal component catalog (per §13 required baseline) lives in `src/compo
 | lg         | 1024px | Desktop   |
 | xl         | 1280px | Wide      |
 
-Reader layout collapses to single column on mobile; admin tables scroll horizontally on small screens.
+Reader layout collapses to single column on mobile; admin tables scroll horizontally on small screens; navbar collapses to a hamburger menu on mobile; the admin sidebar becomes a hamburger drawer on mobile and can collapse to icons on desktop.
 
 ---
 
