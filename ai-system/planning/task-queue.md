@@ -25,21 +25,21 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 
 ---
 
-## Current Sprint — Sprint 0: Foundation
+## Completed — Sprint 0: Foundation
 
 | Size | Task | Status |
 |------|------|--------|
 | [XL] | Bootstrap ai-system docs for this project + scaffold config-driven Next.js foundation (this session) | [x] |
-| [M] | Config-driven settings store (DB-backed with fallbacks) | [ ] |
-| [M] | Drizzle schema + migrations for all core tables | [ ] |
-| [M] | Integration wrappers: Paystack, Resend, Supabase | [ ] |
-| [M] | Universal component catalog baseline (Button, Input, Card, Navbar, Logo, ThemeToggle, Toast, Empty/Error, Modal, Table) | [ ] |
-| [S] | PWA manifest + service worker + theme | [ ] |
-| [S] | Root README + deployment/env documentation | [ ] |
+| [M] | Config-driven settings store (DB-backed with fallbacks) | [x] |
+| [M] | Drizzle schema + migrations for all core tables | [x] |
+| [M] | Integration wrappers: Paystack, Resend, Supabase | [x] |
+| [M] | Universal component catalog baseline (Button, Input, Card, Navbar, Logo, ThemeToggle, Toast, Empty/Error, Modal, Table) | [x] |
+| [S] | PWA manifest + service worker + theme | [x] |
+| [S] | Root README + deployment/env documentation | [x] |
 
 ---
 
-## Up Next — Sprint 1: Public Platform (MVP)
+## Completed — Sprint 1: Public Platform (MVP)
 
 | Size | Task |
 |------|------|
@@ -51,15 +51,26 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 | [M] | Event analytics collection (visits, opens, page views) |
 | [M] | Audit trail writer + payment/access records |
 
-## Up Next — Sprint 2: Admin Panel (MVP)
+## Completed — Sprint 2: Admin Panel (MVP)
 
 | Size | Task |
 |------|------|
-| [L] | Admin auth (Supabase Auth, admin-only routes) |
+| [L] | Admin auth (Supabase Auth, admin-only routes) + seeded superadmin |
+| [L] | Admin invite flow (superadmin-only, email link signup, auto-added admin) |
 | [XL] | Devotional upload/edit admin module |
 | [L] | Records views: payments, access grants, audit log |
-| [L] | Analytics dashboard |
+| [L] | Analytics dashboard (remaining — see Up Next) |
 | [M] | Settings editor (name, logo, copy, toggles, payment config) |
+| [L] | Email templates admin editor (visual blocks + raw HTML, superadmin-only) |
+
+---
+
+## Up Next — Sprint 3: Analytics + Live verification
+
+| Size | Task |
+|------|------|
+| [L] | Analytics dashboard (platform visits, devotional opens, purchases) |
+| [M] | Live verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) |
 
 ---
 
@@ -87,6 +98,8 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 |------|-----------|
 | Ingest requirement artifacts (genesis directive, Word brief → MD, zip context) | [x] |
 | Bootstrap ai-system project docs + foundation scaffold | [x] |
+| Sprint 1 public platform (browse, reader+paywall, purchase, access, anti-screenshot, analytics, audit) | [x] |
+| Sprint 2 admin panel (auth + invite flow, devotional upload/edit, records views, settings editor, email template editor) | [x] |
 
 ---
 

@@ -9,26 +9,22 @@ import { Card } from "@/components/ui/card";
 import { formatPrice } from "@/config/defaults";
 import { cn } from "@/lib/utils";
 
-// AccessGate — client-side password verification for locked devotional days.
-// Submits to /api/access/verify (server recomputes the derived password from
-// the Paystack reference). On success it reveals the remaining days.
-//
-// NOTE: passing locked content to the client means it ships in the bundle —
-// sufficient for the MVP scaffold, but a hardened flow should fetch locked
-// days only AFTER a server-side verification (see project-plan Phase 4/5).
+// AccessGate — verifies the access password against the server and fetches the
+// locked days ONLY after verification. Locked content never ships in the client
+// bundle; it is returned by POST /api/devotionals/[slug]/unlock server-side
+// (asset protection).
 
 interface AccessGateProps {
   devotional: Devotional;
-  lockedDays: DevotionalDay[];
   settings: SiteSettings;
 }
 
-export function AccessGate({ devotional, lockedDays, settings }: AccessGateProps) {
+export function AccessGate({ devotional, settings }: AccessGateProps) {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
+  const [days, setDays] = useState<DevotionalDay[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function verify(e: React.FormEvent) {
@@ -36,17 +32,17 @@ export function AccessGate({ devotional, lockedDays, settings }: AccessGateProps
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/access/verify", {
+      const res = await fetch(`/api/devotionals/${encodeURIComponent(devotional.slug)}/unlock`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: devotional.slug, email, password }),
+        body: JSON.stringify({ email, password }),
       });
-      const data = (await res.json()) as { ok: boolean; error?: string };
-      if (!res.ok || !data.ok) {
+      const data = (await res.json()) as { ok: boolean; days?: DevotionalDay[]; error?: string };
+      if (!res.ok || !data.ok || !data.days) {
         setError(data.error ?? "That password did not work.");
         return;
       }
-      setUnlocked(true);
+      setDays(data.days);
       toast("Access granted. Enjoy!", "success");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -55,16 +51,16 @@ export function AccessGate({ devotional, lockedDays, settings }: AccessGateProps
     }
   }
 
-  if (unlocked) {
+  if (days) {
     return (
       <div className="section-gap">
         <Card className="border-success/40 bg-success/5">
           <h2 className="text-lg font-semibold text-success">Access unlocked</h2>
           <p className="text-sm text-text-muted">
-            You now have access to all {lockedDays.length} day{lockedDays.length === 1 ? "" : "s"} of {devotional.title}.
+            You now have access to the remaining {days.length} day{days.length === 1 ? "" : "s"} of {devotional.title}.
           </p>
         </Card>
-        {lockedDays.map((day) => (
+        {days.map((day) => (
           <article key={day.id} className="rounded-xl border border-border bg-surface p-6">
             <h3 className="mb-2 text-xl font-semibold text-text-primary">
               Day {day.dayNumber} — {day.title}

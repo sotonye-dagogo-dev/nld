@@ -20,17 +20,36 @@ Public pages (src/app, src/app/devotionals, src/app/purchase, src/app/access)
 
 Admin pages (src/app/admin/*)
   → src/components/ui
+  → src/components/admin (forms, editors, tables)
   → src/config
   → src/data
-  → src/integrations/supabase (auth session guard)
+  → src/lib/admin-auth (session + RBAC: requireAdmin, isSuperAdmin, can)
+  → src/lib/email-render (preview), src/lib/email-blocks (editor)
+  → src/integrations/supabase (auth session validation)
   → src/lib/audit
+
+Public reader + unlock (src/app/devotionals/[slug])
+  → src/data (devotional + preview days only; NO locked days in SSR payload)
+  → src/components/devotionals (access-gate verifier, anti-screenshot)
+  → POST /api/devotionals/[slug]/unlock (returns locked days after verification)
 
 API route handlers (src/app/api/*)
   → src/integrations/paystack (init, webhook verify)
-  → src/integrations/resend (access email)
+  → src/integrations/resend (renders from email template store)
+  → src/integrations/supabase (admin login, invite signup)
   → src/lib/access (password derivation)
   → src/lib/audit
-  → src/data (purchases, access_grants, events)
+  → src/lib/email-templates (store + renderer + seed)
+  → src/lib/admin-auth (API guards)
+  → src/data (purchases, access_grants, events, templates, invites, admins)
+
+src/lib/email-templates
+  → src/config (defaults/fallbacks)
+  → src/lib/email-render (render + escape)
+  → src/data (email_templates table)
+
+src/lib/email-render → pure functions (client-safe, used by editor preview)
+src/lib/email-blocks → pure block builder/serializer (client-safe, used by editor)
 
 src/config/site
   → src/data (settings table reads)
@@ -38,6 +57,9 @@ src/config/site
 src/lib/access
   → src/integrations/paystack (txn reference types)
   → env (ACCESS_PASSWORD_SECRET)
+
+src/middleware (src/middleware.ts)
+  → src/lib/admin-auth (cookie presence check only — cheap redirect; real authz in (panel) layout + API guards)
 
 src/data/db
   → drizzle-orm

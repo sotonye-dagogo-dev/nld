@@ -135,6 +135,84 @@ Directive: "I don't care much for it, still adding in case you get some context.
 
 ---
 
+### Admin session = signed Supabase token in an HttpOnly cookie; middleware stays cheap
+
+**Decision:** Store the signed Supabase access token in an `admin_session` HttpOnly cookie. `src/middleware.ts` only redirects `/admin/*` to `/admin/login` when the cookie is absent. Real authorization (token validation against Supabase + `admins` row lookup by `auth_user_id`/email) happens in the guarded `(panel)` layout and per-API guards via `requireAdmin`.
+**Date:** 2026-08-20
+**Made by:** execute-feature (issue 2)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Keeps the middleware hot-path cheap (no DB/Supabase round-trip on every request) while making it impossible to reach admin data without a valid session. Layouts/route handlers are the actual gate.
+
+**Alternatives Considered:**
+- JWT in a separate signed cookie — equivalent security, more moving parts.
+- Middleware performing full validation — rejected: would hit Supabase + DB on every page navigation.
+
+**Implications:**
+- Middleware must NOT be the security boundary for admin data; any new `/admin/*` page must rely on the guarded layout, and any API must call `requireAdmin`.
+
+---
+
+### Admin role model: `owner` (superadmin) vs `admin` (invited) vs `editor` (reserved)
+
+**Decision:** Roles map to privileges via `ADMIN_PRIVILEGES` in `src/lib/admin-auth.ts`. `owner` = superadmin (can invite + edit email templates + everything). `admin` = invited standard admin (no invite power, no template editing). `editor` reserved for future content-only access. Seed script creates an `owner` bootstrap account (`scripts/seed-admin.mjs`, `npm run db:seed-admin`); invitees are created as `admin`.
+**Date:** 2026-08-20
+**Made by:** execute-feature (issue 2)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Directive: superadmin is the only one who can invite; all other admin powers are broadly shared. Keeps RBAC data-driven and easy to extend.
+
+**Alternatives Considered:**
+- Boolean `isSuperAdmin` flag on admins — equivalent but less extensible than a role + privilege map.
+
+**Implications:**
+- The seeded `owner` is temporary: self-promote a real account, then delete the seed account (`scripts/seed-admin.mjs --delete` or direct DB delete). Documented in `.env.example` and the QA report.
+
+---
+
+### Email template variables: escape interpolated values only; template markup is trusted
+
+**Decision:** `renderTemplate` replaces `{{var}}` placeholders and HTML-escapes the substituted values (`escapeHtml`). Static template markup is authored by admins (superadmin-only editor) and is left as-is. Unknown variables stay untouched.
+**Date:** 2026-08-20
+**Made by:** execute-feature (issue 2)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Email content is admin-authored (not end-user input), so template markup is trusted; only interpolated runtime values (email addresses, URLs, passwords) are untrusted and must be escaped to prevent injection into the rendered email.
+
+**Alternatives Considered:**
+- Escaping the whole template — would double-escape legitimate admin markup.
+- Treating templates as fully untrusted — contradicts the superadmin-only editor design.
+
+**Implications:**
+- Any future template source outside the superadmin editor must be treated as untrusted.
+
+---
+
+### Email template block serializer must be self-consistent with seeded defaults
+
+**Decision:** The visual builder's block→HTML serializer (`email-block-to-html` in `src/lib/email-blocks.ts`) is the canonical form: password boxes render as `<div style="...password-box">`, buttons as bare `<a>` (no `<p>` wrapper), so `emailHtmlToBlocks` can round-trip them unambiguously. `src/config/defaults.ts` and `scripts/seed-admin.mjs` seed templates using the same forms.
+**Date:** 2026-08-20
+**Made by:** execute-feature (issue 2)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+The initial password/button forms (`<p>` wrappers, no parser marker) could not be recovered as blocks after an edit — the paragraph branch swallowed anchors. Canonicalizing the forms keeps "edit → save → reopen" stable.
+
+**Alternatives Considered:**
+- Special-casing the parser for the old `<p style="...">` forms — rejected as fragile and permissive.
+
+**Implications:**
+- Do not change block serialization without updating the parser + seeded defaults together.
+
+---
+
 ### PDF extraction backend for the design-asset viewer
 
 **Decision:** Use the single multi-format converter (`markitdown`) if the project is Python-heavy; use the PDF classify-then-extract library (`pdf-inspector`) if the project is Rust/WASM-friendly. Reaffirm at implementation time of the design-asset viewer.

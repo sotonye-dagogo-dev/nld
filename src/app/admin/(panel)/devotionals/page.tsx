@@ -60,12 +60,17 @@ export default async function AdminDevotionalsPage() {
                 <th className="px-4 py-3 font-medium">Access</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Created</th>
+                <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((d) => (
                 <tr key={d.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 font-medium text-text-primary">{d.title}</td>
+                  <td className="px-4 py-3 font-medium text-text-primary">
+                    <Link href={`/admin/devotionals/${d.id}`} className="hover:underline">
+                      {d.title}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-text-muted">
                     {d.priceMinor > 0 ? formatPrice(d.priceMinor, d.currency) : "Free"}
                   </td>
@@ -74,6 +79,14 @@ export default async function AdminDevotionalsPage() {
                     <span className="rounded-full bg-background px-2 py-0.5 text-xs text-text-muted">{d.status}</span>
                   </td>
                   <td className="px-4 py-3 text-text-muted">{d.createdAt.toISOString().slice(0, 10)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/admin/devotionals/${d.id}`}
+                      className="rounded-lg border border-border bg-surface px-3 py-1 text-xs text-text-muted hover:bg-background"
+                    >
+                      Edit
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

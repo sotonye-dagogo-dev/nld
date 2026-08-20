@@ -17,16 +17,16 @@ project-root/
 │
 ├── src/                        → Application source (Next.js App Router)
 │   ├── app/                    → Routes (public + admin + API)
-│   │   ├── devotionals/        → /devotionals/[slug] reader
+│   │   ├── devotionals/        → /devotionals/[slug] reader (preview-only SSR + unlock)
 │   │   ├── purchase/           → /purchase/[slug] checkout
 │   │   ├── access/             → /access password entry
-│   │   ├── admin/              → /admin/* panel
-│   │   └── api/                → Route handlers (paystack, access)
+│   │   ├── admin/              → /admin/* panel (login, invite signup, guarded (panel) group)
+│   │   └── api/                → Route handlers (paystack, access, unlock, admin/*)
 │   ├── components/             → Universal UI catalog + feature components
-│   ├── config/                 → Admin-configurable settings with fallbacks
+│   ├── config/                 → Admin-configurable settings + defaults with fallbacks
 │   ├── data/                   → Drizzle schema + DB client
 │   ├── integrations/           → Isolated SDK wrappers (paystack, resend, supabase)
-│   ├── lib/                    → Service logic (access, audit, utils)
+│   ├── lib/                    → Service logic (access, audit, utils, email templates/render/blocks, admin auth)
 │   ├── types/                  → Global type definitions (injected via tsconfig)
 │   └── hooks/                  → Shared React hooks (theme)
 │
@@ -49,16 +49,18 @@ project-root/
 
 | Directory           | Purpose                                     | Key Files                         |
 | ------------------- | ------------------------------------------- | --------------------------------- |
-| `src/app`           | Next.js App Router routes                    | layout.tsx, page.tsx, admin/*     |
+| `src/app`           | Next.js App Router routes                    | layout.tsx, page.tsx, admin/*, api/* |
 | `src/components/ui` | Universal component catalog (baseline §13)   | button.tsx, navbar.tsx, table.tsx |
-| `src/config`        | Config-driven settings + fallbacks           | site.ts                           |
+| `src/components/admin` | Admin feature components (forms, editors, tables) | devotional-form.tsx, email-template-editor.tsx, records-table.tsx |
+| `src/config`        | Config-driven settings + defaults            | site.ts, defaults.ts              |
 | `src/data`          | Drizzle schema and DB client                 | db/schema.ts, db/index.ts         |
 | `src/integrations`  | SDK isolation wrappers (§17)                 | paystack/*, resend/*, supabase/*  |
-| `src/lib`           | Business logic (access, audit, utils)        | access.ts, audit.ts               |
+| `src/lib`           | Business logic (access, audit, email, admin auth) | access.ts, audit.ts, email-templates.ts, email-render.ts, email-blocks.ts, admin-auth.ts |
 | `src/types`         | Global TS types (no import needed)           | global.d.ts                       |
 | `drizzle/`          | Generated migrations                         | (generated)                       |
 | `artifacts`         | Client requirement briefs                    | genesis-directive.txt, Next-Level-Devotional-App.md, next-level-devotional.zip |
-| `tests`             | Vitest suites                                | access.test.ts, config.test.ts    |
+| `tests`             | Vitest suites                                | access, config, utils, email-templates, admin-auth |
+| `scripts`           | Bootstrap/seed scripts                       | seed-admin.mjs                    |
 
 ---
 
@@ -68,6 +70,8 @@ project-root/
 | ---------------------- | ------------------------------- |
 | Frontend dev server    | `src/app/layout.tsx`            |
 | Public browse          | `src/app/page.tsx`              |
-| Admin panel            | `src/app/admin/page.tsx`        |
+| Admin panel            | `src/app/admin/(panel)/layout.tsx` |
+| Admin login            | `src/app/admin/login/page.tsx`  |
 | Config loading         | `src/config/site.ts`            |
-| Environment validation | `src/config/env.ts` (planned)   |
+| Email template store   | `src/lib/email-templates.ts`    |
+| Admin RBAC             | `src/lib/admin-auth.ts`         |

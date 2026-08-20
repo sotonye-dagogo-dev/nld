@@ -52,3 +52,26 @@ Bootstrapped the ai-system docs with real project content for the Next Level Dev
 
 **Next Sprint Focus:**
 Sprint 1 — public platform: browse listing, reader + paywall, purchase flow, access verification, audit/analytics collection.
+
+---
+
+## 2026-08-20 — Sprint 1 & 2: MVP Close-Out (asset protection, admin auth + invites, email template editor)
+
+**Summary:**
+Closed out the MVP: hardened asset protection so locked devotional days never ship in the client bundle, added Supabase-backed admin auth with a seeded superadmin + email invite flow, made email templates admin-configurable with a visual block builder and raw HTML editor, and finished the remaining Sprint 2 work (settings editor, records views, devotional upload persistence).
+
+**Completed:**
+- Asset protection: preview-only SSR reader; locked days fetched via `/api/devotionals/[slug]/unlock` after server-side verification; `AccessGate` verifier+fetcher; `AntiScreenshot` client behavior (admin-configurable)
+- Admin auth: cookie session (`admin_session`), middleware redirect, guarded `(panel)` route group, login/logout, `scripts/seed-admin.mjs` owner bootstrap
+- Invite flow: superadmin-only invites API → `/admin/invite/[token]` signup → accept API (auth user + `admins` row + auto-login)
+- Email templates: `email_templates` table + DB store with defaults fallback, pure render helpers + block builder (`email-render.ts`, `email-blocks.ts`), superadmin editor with blocks/HTML toggle + live preview; Resend renders from the store
+- Sprint 2 remainder: settings editor, records views (payments/grants/audit), devotional create/update/delete + form persistence + edit page
+- Migration `drizzle/0001_*.sql`; 17 new unit tests (renderer, blocks, admin auth)
+
+**Key Changes:**
+- Reader day-fetch bug fixed (was querying days by `slug` instead of `devotional.id`)
+- Block serializer canonicalized (`password-box` divs, bare `<a>` buttons) so editor round-trips are stable; seeded defaults aligned
+- RBAC data-driven via `ADMIN_PRIVILEGES` (`owner`/`admin`/`editor`)
+
+**Next Sprint Focus:**
+Sprint 3 — analytics dashboard (visits/opens/purchases) + live-key verification pass against real Paystack/Resend/Supabase accounts.

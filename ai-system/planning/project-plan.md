@@ -9,34 +9,36 @@
 
 ---
 
-## Phase 0 — Bootstrap & Foundation (current)
+## Phase 0 — Bootstrap & Foundation (complete)
 
 - [x] ai-system bootstrapped with project-specific content
-- [ ] Next.js + Tailwind + TypeScript scaffold with config-driven globals
-- [ ] Drizzle schema (settings, devotionals, days, purchases, access grants, audit, events)
-- [ ] Integration wrappers (Paystack, Resend, Supabase)
-- [ ] Universal component catalog baseline
-- [ ] PWA manifest + service worker
-- [ ] Config-driven settings store with fallbacks
+- [x] Next.js + Tailwind + TypeScript scaffold with config-driven globals
+- [x] Drizzle schema (settings, devotionals, days, purchases, access grants, audit, events)
+- [x] Integration wrappers (Paystack, Resend, Supabase)
+- [x] Universal component catalog baseline
+- [x] PWA manifest + service worker
+- [x] Config-driven settings store with fallbacks
 
-## Phase 1 — MVP: Public Platform
+## Phase 1 — MVP: Public Platform (complete)
 
-- [ ] Browse devotionals (metadata-driven listing, paginated)
-- [ ] Devotional reader page with configurable free preview days
-- [ ] Purchase flow: email capture → Paystack init → popup → webhook verify
-- [ ] Access password generation from Paystack reference + email delivery via Resend
-- [ ] Access verification page + reader unlock
-- [ ] Anti-screenshot / asset-protection behavior (admin-configurable)
-- [ ] Audit trails for uploads, payments, access grants
-- [ ] Event analytics (visits, devotional opens, page views)
+- [x] Browse devotionals (metadata-driven listing, paginated)
+- [x] Devotional reader page with configurable free preview days
+- [x] Purchase flow: email capture → Paystack init → popup → webhook verify
+- [x] Access password generation from Paystack reference + email delivery via Resend
+- [x] Access verification page + reader unlock
+- [x] Anti-screenshot / asset-protection behavior (admin-configurable)
+- [x] Audit trails for uploads, payments, access grants
+- [x] Event analytics (visits, devotional opens, page views)
 
-## Phase 2 — MVP: Admin Panel
+## Phase 2 — MVP: Admin Panel (largely complete)
 
-- [ ] Admin auth (Supabase Auth, admin-only)
-- [ ] Devotional upload / edit (content + pricing + preview days + access mode)
-- [ ] Records: payments, access grants, audit log viewer
+- [x] Admin auth (Supabase Auth, admin-only routes + seeded superadmin)
+- [x] Admin invite flow (superadmin → email link → signup → auto-added admin)
+- [x] Devotional upload / edit (content + pricing + preview days + access mode)
+- [x] Records: payments, access grants, audit log viewer
 - [ ] Analytics dashboard (platform visits, devotional opens, purchases)
-- [ ] Settings editor (platform name, logo, copy, feature toggles, payment config)
+- [x] Settings editor (platform name, logo, copy, feature toggles, payment config)
+- [x] Email templates admin editor (visual blocks + raw HTML, superadmin-only)
 
 ## Phase 3 — Beyond MVP: Engagement (client Word brief)
 

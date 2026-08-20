@@ -22,6 +22,9 @@ type DevotionalStatus = "draft" | "published" | "archived";
 /** Roles allowed in the admin panel. */
 type AdminRole = "owner" | "admin" | "editor";
 
+/** Lifecycle of an admin invitation link. */
+type InviteStatus = "pending" | "accepted" | "revoked" | "expired";
+
 /** Category for audit-log entries (engineering principle §23). */
 type AuditAction =
   | "devotional.create"
@@ -32,7 +35,11 @@ type AuditAction =
   | "access.grant"
   | "access.verify"
   | "settings.update"
-  | "admin.login";
+  | "admin.login"
+  | "admin.logout"
+  | "admin.invite"
+  | "admin.invite.accept"
+  | "email_template.update";
 
 /** Event names collected for platform analytics (visits, opens, views). */
 type PlatformEventType =
@@ -139,6 +146,29 @@ interface AdminUser {
   id: string;
   email: string;
   role: AdminRole;
+  createdAt: Date;
+}
+
+/** DB-backed, admin-editable email template (§18). */
+interface EmailTemplate {
+  key: string;
+  name: string;
+  subject: string;
+  bodyHtml: string;
+  variables: Record<string, string>; // variable name → human label (for editor chips)
+  updatedBy: string;
+  updatedAt: Date;
+}
+
+/** Invitation link that turns an email into an admin account. */
+interface AdminInvite {
+  id: string;
+  email: string;
+  token: string;
+  role: AdminRole;
+  invitedBy: string | null;
+  status: InviteStatus;
+  expiresAt: Date;
   createdAt: Date;
 }
 
