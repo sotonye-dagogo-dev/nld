@@ -5,6 +5,7 @@ import { DevotionalCard } from "@/components/devotionals/devotional-card";
 import { getPublishedDevotionals } from "@/lib/catalog";
 import { getSiteSettings } from "@/config/site";
 import { clampInt } from "@/lib/utils";
+import { recordEvent } from "@/lib/audit";
 
 export const metadata: Metadata = {
   title: "Devotionals",
@@ -28,6 +29,9 @@ export default async function HomePage({
   } catch {
     error = true;
   }
+
+  // Fire-and-forget analytics (never blocks render).
+  recordEvent({ eventType: "page.view", meta: { path: "/", page } }).catch(() => undefined);
 
   return (
     <div className="page-shell section-gap">

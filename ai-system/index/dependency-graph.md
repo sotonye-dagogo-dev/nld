@@ -20,13 +20,20 @@ Public pages (src/app, src/app/devotionals, src/app/purchase, src/app/access)
 
 Admin pages (src/app/admin/*)
   → src/components/ui
-  → src/components/admin (forms, editors, tables)
+  → src/components/admin (forms, editors, tables, analytics bars)
   → src/config
   → src/data
   → src/lib/admin-auth (session + RBAC: requireAdmin, isSuperAdmin, can)
   → src/lib/email-render (preview), src/lib/email-blocks (editor)
+  → src/lib/analytics (pure day-series + conversion helpers for the dashboard)
   → src/integrations/supabase (auth session validation)
   → src/lib/audit
+
+Analytics dashboard (src/app/admin/(panel)/analytics)
+  → src/data (events, purchases, devotionals aggregations)
+  → src/lib/analytics (fillDaySeries, conversionRate — pure, client-safe)
+  → src/components/admin/analytics-bars (CSS bar chart, server-safe)
+  → src/config (formatPrice)
 
 Public reader + unlock (src/app/devotionals/[slug])
   → src/data (devotional + preview days only; NO locked days in SSR payload)
@@ -50,6 +57,7 @@ src/lib/email-templates
 
 src/lib/email-render → pure functions (client-safe, used by editor preview)
 src/lib/email-blocks → pure block builder/serializer (client-safe, used by editor)
+src/lib/analytics → pure day-series/conversion helpers (client-safe, used by dashboard)
 
 src/config/site
   → src/data (settings table reads)

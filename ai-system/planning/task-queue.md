@@ -1,9 +1,9 @@
 # Development Task Queue
 
 > **Metadata**
-> - last-updated-by: execute-feature (issue 1)
+> - last-updated-by: execute-feature (issue 3)
 > - last-verified-against-code: 2026-08-20
-> - last-synced: 2026-08-20 (execute-feature issue 1)
+> - last-synced: 2026-08-20 (execute-feature issue 3)
 > - staleness-policy: re-verify before each session
 
 > **Overview:** Sprint-level task queue with complexity tagging. Agents execute tasks top to bottom within the current sprint. Each task is sized so it can be completed in a single session.
@@ -59,17 +59,22 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 | [L] | Admin invite flow (superadmin-only, email link signup, auto-added admin) |
 | [XL] | Devotional upload/edit admin module |
 | [L] | Records views: payments, access grants, audit log |
-| [L] | Analytics dashboard (remaining — see Up Next) |
+| [L] | Analytics dashboard (completed in Sprint 3) |
 | [M] | Settings editor (name, logo, copy, toggles, payment config) |
 | [L] | Email templates admin editor (visual blocks + raw HTML, superadmin-only) |
 
 ---
 
-## Up Next — Sprint 3: Analytics + Live verification
+## Completed — Sprint 3: Analytics (partial — task 1 done, live verification remains)
 
 | Size | Task |
 |------|------|
 | [L] | Analytics dashboard (platform visits, devotional opens, purchases) |
+
+## Up Next — Sprint 3: Analytics + Live verification
+
+| Size | Task |
+|------|------|
 | [M] | Live verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) |
 
 ---
@@ -100,6 +105,7 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 | Bootstrap ai-system project docs + foundation scaffold | [x] |
 | Sprint 1 public platform (browse, reader+paywall, purchase, access, anti-screenshot, analytics, audit) | [x] |
 | Sprint 2 admin panel (auth + invite flow, devotional upload/edit, records views, settings editor, email template editor) | [x] |
+| Sprint 3 analytics dashboard (visits, opens, purchases, revenue, conversion, trends, top devotionals, recent events) | [x] |
 
 ---
 

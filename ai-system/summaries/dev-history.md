@@ -75,3 +75,23 @@ Closed out the MVP: hardened asset protection so locked devotional days never sh
 
 **Next Sprint Focus:**
 Sprint 3 — analytics dashboard (visits/opens/purchases) + live-key verification pass against real Paystack/Resend/Supabase accounts.
+
+---
+
+## 2026-08-20 — Sprint 3 (part 1): Analytics dashboard
+
+**Summary:**
+Completed the analytics dashboard — the first remaining Sprint 3 task. The admin panel now surfaces platform visits, devotional opens, and purchases as stat cards, last-30-days trend bars, top-devotional rankings, and a recent-events feed, with `page.view` collection added to the main public entry points so the visits metric is real.
+
+**Completed:**
+- Analytics dashboard: overview stats (visits, opens, completed purchases, revenue, conversion rate), 30-day trend bars (CSS-only, no chart dep), top devotionals by opens and by purchases/revenue, recent-events table
+- `page.view` collection on home listing, purchase page, and access page (fire-and-forget, non-blocking)
+- Pure analytics helpers (`src/lib/analytics.ts`) with UTC day-key series + conversion math; 8 unit tests
+- Analytics nav link for all admin roles; layout nav refactored to explicit arrays
+
+**Key Changes:**
+- Day buckets standardized on UTC day keys (`to_char(... AT TIME ZONE 'UTC', 'YYYY-MM-DD')`) so dashboard math is timezone-deterministic
+- Dashboard is read-only aggregation over existing `events`/`purchases`/`devotionals` tables — no schema change, follows records-view patterns
+
+**Next Sprint Focus:**
+Sprint 3 (part 2) — live-key verification pass against real Paystack/Resend/Supabase accounts (payment → email → unlock e2e), then owner bootstrap (seed-admin → self-promote → delete seed).

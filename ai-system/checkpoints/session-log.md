@@ -114,3 +114,34 @@ Sprint 3 (queued in task-queue): analytics dashboard (platform visits, devotiona
 - QA gate: PASS. `npm test` 38/38, typecheck clean, lint clean, production build 30 routes, HTTP smoke verified (200/307/401/400, no RSC errors).
 - Fixed a stale-reference pass after the block refactor (`BlockType→EmailBlockType`, `BLOCK_LABELS→EMAIL_BLOCK_LABELS`, inline type array → `EMAIL_BLOCK_TYPES`) and aligned password/button serializers between `email-blocks.ts` and the seeded defaults so editor round-trips preserve them.
 - No real Paystack/Resend/Supabase keys in this environment — payment/email/auth paths verified via error paths + unit tests, not live calls.
+
+---
+
+## Session 4 — 2026-08-20
+
+**Completed:**
+Executed `execute-feature.md` (issue 3): first remaining Sprint 3 task — Analytics dashboard (platform visits, devotional opens, purchases).
+
+- Analytics dashboard (`/admin/(panel)/analytics`): overview stat cards (visits, opens, completed purchases, revenue, purchase conversion rate), last-30-days daily trend bars for visits/opens/purchases (CSS chart, no chart dep), top devotionals by opens and by purchases/revenue (leftJoin `devotionals`), recent-events table. Guards with `getAdminSession`; DB-down → ErrorState, no data → EmptyState.
+- `page.view` collection added to the platform visit entry points: home listing (`/`), purchase page (`/purchase/[slug]`), access page (`/access`). Event type already existed in `PlatformEventType`; `recordEvent` is fire-and-forget.
+- Pure, client-safe analytics helpers `src/lib/analytics.ts` (UTC day-key series `fillDaySeries`, `conversionRate`, `utcDayKey`, `dayLabelFromKey`) so dashboard math is unit-testable without a DB.
+- `AnalyticsBars` server component (`src/components/admin/analytics-bars.tsx`) for the trend charts.
+- Admin nav: added Analytics link for all roles; refactored `(panel)/layout.tsx` nav from fragile `slice()` composition to explicit `BASE_NAV`/`SUPERADMIN_NAV`/`RECORDS_NAV`/`ADMIN_NAV` arrays.
+- `tests/analytics.test.ts` — 8 unit tests (day keys, labels, series fill/aggregate/zero-fill, conversion rate).
+
+**Files Modified:**
+- New: `src/lib/analytics.ts`, `src/components/admin/analytics-bars.tsx`, `tests/analytics.test.ts`.
+- Modified: `src/app/admin/(panel)/analytics/page.tsx` (rebuilt from count-table to full dashboard), `src/app/admin/(panel)/layout.tsx` (Analytics nav link + explicit nav arrays), `src/app/page.tsx`, `src/app/purchase/[slug]/page.tsx`, `src/app/access/page.tsx` (added `page.view` recording; access page forced dynamic so visits record per request).
+- Docs: `ai-system/` — repo-map, dependency-graph, project-plan, task-queue, test-plan, test-results, session-log, dev-history.
+
+**Next Task:**
+Sprint 3 task 2: live-key verification pass against real Paystack/Resend/Supabase accounts (payment → email → unlock e2e). Operational: run `npm run db:seed-admin` with a real `DATABASE_URL`, self-promote a real account to owner, then delete the seed account (`--delete`).
+
+**Assumptions Made:**
+- Day buckets use UTC day keys (`to_char(... AT TIME ZONE 'UTC', 'YYYY-MM-DD')` in SQL) so the dashboard is deterministic across server/session timezones; documented in `src/lib/analytics.ts`.
+- Revenue stat displays in the settings-default currency (NGN) — MVP is single-currency; noted for multi-currency follow-up.
+- `page.view` covers the three main public pages; reader views are already captured by `devotional.open`.
+
+**Notes / Blockers:**
+- QA gate: PASS. `npm test` 46/46 (8 new analytics tests), typecheck clean, lint clean, production build 30 routes, HTTP smoke verified (200/307, no RSC errors; `recordEvent` with no `DATABASE_URL` degrades non-fatally as designed).
+- No real Paystack/Resend/Supabase keys in this environment — live-key verification pass remains queued.
