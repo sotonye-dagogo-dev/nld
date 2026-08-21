@@ -1,11 +1,11 @@
 # Design System
 
 > **Metadata**
-> - last-updated-by: (set on first run)
-> - last-verified-against-code: (set after visual audit)
+> - last-updated-by: execute-feature (issue 5)
+> - last-verified-against-code: 2026-08-20
 > - staleness-policy: re-verify if UI components or styling dependencies change
 
-> **Overview:** Visual language, component patterns, and UX principles. Agents building UI must read this before writing any frontend code. The colour, typography, and spacing tables below are the **single source of truth** for design tokens (per `standards/engineering-principles.md` §5) — components must consume these tokens rather than redeclaring values.
+> **Overview:** Visual language, component patterns, and UX principles. Agents building UI must read this before writing any frontend code. The colour, typography, and spacing tables below are the **single source of truth** for design tokens (per `standards/engineering-principles.md` §5) — components must consume these tokens rather than redeclaring values. Platform name, logo, and content copy are admin-configurable via the settings store with hardcoded fallbacks (per §3).
 
 ---
 
@@ -13,107 +13,116 @@
 
 ### Colour Palette
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| primary | [#hex] | [buttons, links, CTAs] |
-| secondary | [#hex] | [accents, highlights] |
-| background | [#hex] | [page background] |
-| surface | [#hex] | [cards, modals] |
-| text-primary | [#hex] | [main body text] |
-| text-muted | [#hex] | [labels, captions] |
-| danger | [#hex] | [errors, destructive actions] |
-| success | [#hex] | [confirmations] |
+| Token | Value (light/dark) | Usage |
+|-------|--------------------|-------|
+| primary | `#4f46e5` / `#818cf8` | buttons, links, CTAs |
+| secondary | `#0ea5e9` / `#38bdf8` | accents, highlights |
+| background | `#f8fafc` / `#0b1220` | page background |
+| surface | `#ffffff` / `#131c2e` | cards, modals |
+| text-primary | `#0f172a` / `#f1f5f9` | main body text |
+| text-muted | `#64748b` / `#94a3b8` | labels, captions |
+| danger | `#dc2626` / `#f87171` | errors, destructive actions |
+| success | `#16a34a` / `#4ade80` | confirmations, access granted |
+
+All tokens are declared once in `src/app/globals.css` as CSS variables and consumed via Tailwind theme mapping — components never redeclare hex values.
 
 ### Typography
 
 | Style | Font | Size | Weight |
 |-------|------|------|--------|
-| Heading 1 | [font] | [size] | [weight] |
-| Body | [font] | [size] | [weight] |
-| Code | [font] | [size] | [weight] |
+| Heading 1 | Inter / system-ui | 2.25rem (text-4xl) | 700 |
+| Heading 2 | Inter / system-ui | 1.5rem (text-2xl) | 600 |
+| Body | Inter / system-ui | 1rem (text-base) | 400 |
+| Code | ui-monospace | 0.875rem | 400 |
 
 ### Spacing Scale
 
-[e.g. 4px base unit: 4, 8, 12, 16, 24, 32, 48, 64]
+4px base unit: 4, 8, 12, 16, 24, 32, 48, 64 (`p-1` … `p-16`). Section rhythm uses `space-y-6`/`space-y-8` between blocks.
 
 ---
 
 ## Component Patterns
 
+The universal component catalog (per §13 required baseline) lives in `src/components/ui`:
+
 ### Buttons
-- Primary: [style and usage]
-- Secondary: [style and usage]
-- Destructive: [describe]
-- Disabled state: [describe]
+- Primary: filled `bg-primary text-white`, rounded-lg, `px-4 py-2`; loading state shows spinner
+- Secondary: outlined with border, same radius/padding
+- Destructive: `bg-danger text-white`
+- Disabled state: `opacity-50 cursor-not-allowed`
+- All variants rendered by the single `Button` component from a variant config map
 
 ### Forms
-- Input fields: [style and validation rules]
-- Error messages: [placement and style]
+- Input fields: `Input` wrapper with label, hint, and error text; validation errors inline below field
+- Error messages: `text-danger text-sm` under the field, with a summarized alert at the top of the form
 
 ### Navigation
-- [sidebar / topnav / tabs — describe pattern]
+- `Navbar`: responsive topnav with collapsible mobile menu (hamburger) and a desktop overflow "More" dropdown when links exceed the available width; logo from admin config (fallback wordmark); ThemeToggle in nav. Toggles are independent — opening one never conflicts with another.
+- `AdminSidebar`: admin panel shell with mobile hamburger drawer (overlay + close), desktop collapse-to-icons toggle, role-aware links, and sign-out.
+- `BackToTop`: global fixed bottom-right button, mounted once in the root layout; appears after 400px scroll, smooth-scrolls to top. Non-blocking (client-only, renders null until scrolled).
+- `Pagination`: universal pagination control (page numbers + prev/next, ellipsis for wide ranges); renders nothing on a single page. Server lists pass `hrefForPage`, client tables pass `onPageChange`.
 
 ### Cards / Containers
-- [shadow, border radius, padding]
+- `Card`: `bg-surface rounded-xl border shadow-sm p-6`, used for devotional cards, admin records, forms
 
 ### Modals / Dialogs
-- [confirmation, form-in-modal, alert patterns]
+- `Modal`: confirm/destructive actions route through `ConfirmDialog` (per §22); form-in-modal supported; closes on backdrop click with cancel path
+
+### Empty / Error States
+- `EmptyState` and `ErrorState` are shared components — no per-screen implementations
+
+### Icons
+- Icons come from the `lucide-react` library (§15) — imported per glyph, tree-shaken, no emoji-as-icon and no hand-written inline SVG in component code. Theme toggle uses Sun/Moon/Monitor; pagination uses ChevronLeft/ChevronRight; BackToTop uses ArrowUp; the navbar uses Menu/X/MoreHorizontal/ChevronDown; the admin sidebar uses Menu/X/PanelLeftClose/PanelLeftOpen/LogOut plus per-link icons.
+
+### Toast / Notifications
+- `Toast`/`toast()` helper for async feedback (purchase success, copy-password, errors)
 
 ---
 
 ## UX Principles
 
-1. [e.g. Always show loading state for async actions]
-2. [e.g. Destructive actions require confirmation]
-3. [e.g. Error messages must explain what the user can do]
+1. Always show loading state for async actions (buttons disable + spinner, pages show skeleton where appropriate).
+2. Destructive actions require confirmation via the universal `ConfirmDialog` with an undo path where possible.
+3. Error messages must explain what the user can do (e.g. "Payment failed — try again or contact support").
+4. Purchase and access-grant flows give immediate, obvious feedback (success toast + email preview copy).
 
 ---
 
 ## Responsive Breakpoints
 
-| Breakpoint | Value | Target |
-|------------|-------|--------|
-| sm | 640px | Mobile |
-| md | 768px | Tablet |
-| lg | 1024px | Desktop |
-| xl | 1280px | Wide screens |
+| Breakpoint | Value  | Target    |
+| ---------- | ------ | --------- |
+| sm         | 640px  | Mobile    |
+| md         | 768px  | Tablet    |
+| lg         | 1024px | Desktop   |
+| xl         | 1280px | Wide      |
+
+Reader layout collapses to single column on mobile; admin tables scroll horizontally on small screens; navbar collapses to a hamburger menu on mobile; the admin sidebar becomes a hamburger drawer on mobile and can collapse to icons on desktop.
 
 ---
 
 ## Accessibility Requirements
 
 - All interactive elements must have keyboard focus states
-- Colour contrast must meet WCAG AA (4.5:1 for text)
-- Images must have alt text
+- Colour contrast must meet WCAG AA (4.5:1 for text) — tokens chosen to comply in both themes
+- Images must have alt text; devotional content uses semantic headings
 - Forms must have associated labels
+- Theme toggle supports light / dark / system
 
 ---
 
 ## Reference Library
 
-External design languages — competitor, inspiration, or reference sites — pulled into `design-references/<name>/DESIGN.md` (Tier 4, read when explicitly relevant). The `generate-design-md` command creates them.
-
-These are **inputs to be reconciled**, never the project's source of truth. The token tables in this file remain the single source of truth per engineering principles §5. Promotion from a reference into the project's real tokens is a human decision, not an agent write.
-
-See `design-references/README.md` for the folder contract.
+External design languages — competitor, inspiration, or reference sites — pulled into `design-references/<name>/DESIGN.md` (Tier 4, read when explicitly relevant). None adopted yet. These are **inputs to be reconciled**, never the project's source of truth.
 
 ---
 
 ## Design Asset Viewer (dev-only entry point)
 
-A human-facing route to browse design assets — HTML mocks, images, PDFs — without those assets touching the app's real route table when deployed. This is a dev tool, not an agent workflow, and it is itself governed by the engineering principles like any other page.
+Not yet mounted. When needed, it must follow the template contract: mounted at a distinct base path (`/__design/*`), gated behind `ENABLE_DESIGN_VIEWER=true`, never enabled in production, reading a config manifest (engineering principles §1).
 
-**Hard rules (not conventions):**
-- Mounted at a distinct, configurable base path (e.g. `/__design/*`) on its own router/middleware branch — never nested under app routes.
-- **Gated:** only mountable when the env flag is set (e.g. `ENABLE_DESIGN_VIEWER=true`), defaulting off. **Never enabled in a production build regardless of the flag** — this is a hard rule, not a convention.
-- Reads a config manifest (engineering principles §1) listing which local folders/paths it is allowed to serve — never an open filesystem browser.
-- No hardcoded asset lists in code.
+---
 
-**Rendering by type:**
-- HTML → sandboxed iframe
-- Images → `<img>`
-- PDF → render pages; where text/structure extraction is needed, use the classify-then-extract approach from the `pdf-html-asset-inspection` skill (detect text vs scanned, extract with position awareness, convert to Markdown) via a small internal utility or thin wrapper.
+## Theme
 
-**Extraction backend decision:** chooses between the two registered extraction candidates (see `tools/registry.md` → PDF-extraction-tooling rows; approach documented in `tools/integrations/`) based on the project stack; the choice is documented in `memory/project-decisions.md`.
-
-**Where it lives:** see also the `system-architecture.md` configuration points template (the `ENABLE_DESIGN_VIEWER` flag) and the viewer's security isolation note for the deployment platform.
+- `ThemeToggle` persists choice in localStorage with `system` default; theme class applied on `<html>`; tokens swap via CSS variables.

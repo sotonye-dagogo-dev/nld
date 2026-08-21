@@ -2,9 +2,9 @@
 
 > **Metadata**
 >
-> - last-updated-by: bootstrap-project
-> - last-verified-against-code: (set on first run)
-> - installed-ai-system-version: [set by bootstrap-project from the kit VERSION — the baseline for pull-template-update]
+> - last-updated-by: bootstrap-project (execute-feature, issue 1)
+> - last-verified-against-code: 2026-08-20
+> - installed-ai-system-version: 3
 > - staleness-policy: re-verify before trusting if project structure has changed
 
 > **Overview:** Project overview — the very first file any AI agent should read. Provides a 30-second orientation to what this project is, what stack it uses, and where to find everything.
@@ -13,24 +13,32 @@
 
 ## Quick Reference
 
-| Field            | Value                             |
-| ---------------- | --------------------------------- |
-| Project Name     | [name]                            |
-| Type             | [e.g. Web App / API / Mobile App] |
-| Primary Language | [e.g. TypeScript]                 |
-| Frontend         | [e.g. Next.js 14]                 |
-| Backend          | [e.g. Node.js + Express]          |
-| Database         | [e.g. PostgreSQL]                 |
-| Styling          | [e.g. Tailwind CSS + Ant Design]  |
-| Deployment       | [e.g. Vercel + Railway]           |
+| Field            | Value                                                              |
+| ---------------- | ------------------------------------------------------------------ |
+| Project Name     | Next Level Devotional                                              |
+| Type             | Web App (public devotional reader + admin panel)                   |
+| Primary Language | TypeScript                                                         |
+| Frontend         | Next.js 15 (App Router) + React                                    |
+| Backend          | Next.js Route Handlers / Server Components                         |
+| Database         | PostgreSQL (Supabase) via Drizzle ORM                              |
+| Styling          | Tailwind CSS (config-driven, named global classes)                 |
+| Deployment       | Vercel                                                             |
+| Payments         | Paystack (transactional email via Resend)                          |
 
 ---
 
 ## Key Modules
 
-| Module   | Location | Purpose        |
-| -------- | -------- | -------------- |
-| [module] | [path]   | [what it does] |
+| Module                 | Location              | Purpose                                              |
+| ---------------------- | --------------------- | ---------------------------------------------------- |
+| Public devotional app  | `src/app`             | Browse, read, and purchase devotionals               |
+| Admin panel            | `src/app/admin`       | Upload devotionals, view records, configure platform |
+| Global config          | `src/config`          | Admin-configurable settings with code fallbacks      |
+| Data layer             | `src/data`            | Drizzle schema + DB client                           |
+| Integration wrappers   | `src/integrations`    | Paystack, Resend, Supabase isolated wrappers         |
+| Universal components   | `src/components/ui`   | Config-driven reusable UI catalog                    |
+| AI system docs         | `ai-system/`          | Development workflow, plans, and quality gates       |
+| Requirement artifacts  | `artifacts/`          | Client briefs (genesis directive, Word doc, zip)     |
 
 ---
 
@@ -48,4 +56,4 @@ Two catalogs worth knowing exist (read on demand, not up front):
 
 ## Active Development Focus
 
-[1–2 sentences about what is currently being built or fixed]
+Bootstrapping the ai-system docs and scaffolding the config-driven Next.js foundation for the MVP: devotional hosting, paid access via Paystack + Resend, and an admin panel — built to be absorbed into a larger project later.
