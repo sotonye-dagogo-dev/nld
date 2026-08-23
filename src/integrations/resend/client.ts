@@ -1,13 +1,33 @@
 import "server-only";
 
 import { Resend } from "resend";
-import { resendConfig } from "./config";
+import { createTransport } from "nodemailer";
+import { resendConfig, shouldUseSmtp } from "./config";
 import type { AccessEmailData } from "./types";
 import { renderEmail, type EmailTemplateKey, type TemplateVariables } from "@/lib/email-templates";
 
-// Resend client wrapper — the ONLY place the Resend SDK is touched
+// Resend client wrapper — the ONLY place the Resend SDK/nodemailer is touched
 // (engineering principle §17). Email bodies render from the DB-backed
 // template store (§18) with code fallbacks, never inline string-building.
+
+let smtpTransporter: ReturnType<typeof createTransport> | null = null;
+
+function getSmtpTransporter() {
+  if (smtpTransporter) return smtpTransporter;
+  if (!resendConfig.smtp.host || !resendConfig.smtp.user || !resendConfig.smtp.password) {
+    throw new Error("SMTP not configured");
+  }
+  smtpTransporter = createTransport({
+    host: resendConfig.smtp.host,
+    port: resendConfig.smtp.port ?? 465,
+    secure: (resendConfig.smtp.port ?? 465) === 465,
+    auth: {
+      user: resendConfig.smtp.user,
+      pass: resendConfig.smtp.password,
+    },
+  });
+  return smtpTransporter;
+}
 
 /**
  * Render the access-password email from the template store. Kept as a pure
@@ -26,16 +46,29 @@ export async function renderAccessEmail(data: AccessEmailData): Promise<{
   });
 }
 
-/** Send an already-rendered email. Throws only when Resend is unreachable. */
+/** Send an already-rendered email via Resend API or SMTP. Throws only when unreachable. */
 export async function sendEmail(input: {
   to: string;
   from?: string;
   subject: string;
   html: string;
 }): Promise<void> {
+  const from = input.from ?? resendConfig.from;
+
+  if (shouldUseSmtp()) {
+    const transporter = getSmtpTransporter();
+    await transporter.sendMail({
+      from,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+    });
+    return;
+  }
+
   const resend = new Resend(resendConfig.apiKey);
   const { error } = await resend.emails.send({
-    from: input.from ?? resendConfig.from,
+    from,
     to: [input.to],
     subject: input.subject,
     html: input.html,

@@ -2,8 +2,8 @@
 
 > **Metadata**
 >
-> - last-updated-by: execute-feature (issue 5)
-> - last-verified-against-code: 2026-08-20
+> - last-updated-by: update-ai-system (post-session 6)
+> - last-verified-against-code: 2026-08-24
 > - staleness-policy: this file is overwritten every session — always current
 
 > **Overview:** Tracks work that is currently in progress but not yet complete. Written _before_ starting risky multi-step work, cleared on clean completion. This is the first file `resume-session.md` reads on interruption — it is the single source of truth for "what was half-done."
@@ -12,17 +12,15 @@
 
 ## Current State
 
-**Status:** Complete — cleared on clean completion (execute-feature issue 5).
+**Status:** Complete — cleared on clean completion (update-ai-system post-session 6).
 
 **What was completed (this session):**
 
-- Compliance run: baseline green; QA gate PASS (55/55 tests, typecheck, lint, build 30 routes, HTTP smoke 200/307). Found and fixed one error-path gap: `/purchase/[slug]` 500'd without a DB → now degrades to ErrorState.
-- Icons: added `lucide-react` (§15), replaced ThemeToggle emoji (☀/☾/◐) with Sun/Moon/Monitor; grep confirms no emoji or raw SVG remains in `src/`.
-- `useTheme` hydration fix (storage read post-mount via hydrated ref).
-- Universal `Pagination` component + pure helpers (`src/lib/pagination.ts`) used by home listing and every Table; 8 new unit tests.
-- Global `BackToTop` mounted in root layout; anti-screenshot badge moved bottom-left to avoid overlap.
-- Navbar: client component with mobile hamburger + desktop overflow→"More" dropdown (ResizeObserver); independent, non-conflicting toggles.
-- Admin sidebar: `AdminSidebar` client component with mobile hamburger drawer + desktop collapse-to-icons; `logout-button.tsx` removed.
+- Database: `npm run db:migrate` applied all migrations; `npm run db:seed-admin` created superadmin (superadmin@nldv.vercel.app) and seeded email templates
+- Resend SMTP: added `EMAIL_SERVER_HOST`, `EMAIL_SERVER_PORT`, `EMAIL_SERVER_USER`, `EMAIL_SERVER_PASSWORD` to env; Resend client now uses SMTP when configured, falls back to API; added `nodemailer` dependency
+- Asset management: Supabase Storage integration (`uploadAsset`, `deleteAsset`, `getAssetPublicUrl`), `/api/admin/assets` route (POST/DELETE with audit), `FileUpload` component with preview/remove, integrated into `DevotionalForm` for cover images
+- Destructive action pattern: `useConfirmAction` hook + `ConfirmActionWrapper` + `WithConfirmAction` HOC; confirmation modal via `ConfirmDialog`; undo toast with 5s progress bar; reusable for delete/replace actions
+- Footer dev credit: added `footerDevCreditName`, `footerDevCreditUrl`, `footerDevCreditEnabled` to `SiteSettings` with defaults (S.D., https://sotonye-dagogo.is-a.dev, true); rendered in root layout with dynamic year (`new Date().getFullYear()`); admin settings editor updated with footer section
 
 **Next up (queued in `planning/task-queue.md`, Sprint 3):**
 

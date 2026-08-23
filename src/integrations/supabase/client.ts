@@ -74,3 +74,36 @@ export async function adminSignIn(
     return { ok: false, error: err instanceof Error ? err.message : "Sign-in error." };
   }
 }
+
+// --- Storage helpers (devotional assets: covers, etc.) ---
+
+export interface UploadResult {
+  path: string;
+  publicUrl: string;
+}
+
+/** Upload a file to Supabase Storage (devotional-assets bucket). */
+export async function uploadAsset(
+  file: Buffer,
+  path: string,
+  contentType: string,
+): Promise<UploadResult> {
+  const client = getAdminClient();
+  const { data, error } = await client.storage
+    .from(supabaseConfig.storage.bucket)
+    .upload(path, file, { contentType, upsert: true });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+  return { path: data.path, publicUrl: `${supabaseConfig.storage.publicUrl}/${data.path}` };
+}
+
+/** Delete a file from Supabase Storage. */
+export async function deleteAsset(path: string): Promise<void> {
+  const client = getAdminClient();
+  const { error } = await client.storage.from(supabaseConfig.storage.bucket).remove([path]);
+  if (error) throw new Error(`Storage delete failed: ${error.message}`);
+}
+
+/** Get public URL for an asset path. */
+export function getAssetPublicUrl(path: string): string {
+  return `${supabaseConfig.storage.publicUrl}/${path}`;
+}

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { Navbar } from "@/components/ui/navbar";
@@ -23,6 +24,7 @@ export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const { value: settings } = await getSiteSettings();
+  const currentYear = new Date().getFullYear();
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -45,7 +47,20 @@ export default async function RootLayout({
             />
             <main className="flex-1">{children}</main>
             <footer className="border-t border-border py-6 text-center text-sm text-text-muted">
-              © {new Date().getFullYear()} {settings.platformName}
+              <p>© {currentYear} {settings.platformName}</p>
+              {settings.footerDevCreditEnabled && settings.footerDevCreditName && (
+                <p className="mt-2">
+                  Built by{" "}
+                  <a
+                    href={settings.footerDevCreditUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-primary transition-colors"
+                  >
+                    {settings.footerDevCreditName}
+                  </a>
+                </p>
+              )}
             </footer>
           </div>
           <BackToTop />

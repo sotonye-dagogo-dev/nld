@@ -1,9 +1,9 @@
 # Development Task Queue
 
 > **Metadata**
-> - last-updated-by: execute-feature (issue 5)
-> - last-verified-against-code: 2026-08-20
-> - last-synced: 2026-08-20 (execute-feature issue 5)
+> - last-updated-by: update-ai-system (post-session 6)
+> - last-verified-against-code: 2026-08-24
+> - last-synced: 2026-08-24 (update-ai-system)
 > - staleness-policy: re-verify before each session
 
 > **Overview:** Sprint-level task queue with complexity tagging. Agents execute tasks top to bottom within the current sprint. Each task is sized so it can be completed in a single session.
@@ -65,11 +65,17 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 
 ---
 
-## Completed — Sprint 3: Analytics (partial — task 1 done, live verification remains)
+## Completed — Sprint 3: Analytics + Integrations Hardening
 
 | Size | Task |
 |------|------|
 | [L] | Analytics dashboard (platform visits, devotional opens, purchases) |
+| [M] | DB migrations applied + admin seeded (`npm run db:migrate`, `npm run db:seed-admin`) |
+| [M] | Resend SMTP support (dual-mode API + SMTP, config-driven) |
+| [M] | Asset upload/management via Supabase Storage (covers, admin CRUD) |
+| [M] | Global destructive action wrapper (confirmation modal + undo timeout) |
+| [M] | Config-driven footer dev credit (name, URL, enable toggle) + dynamic year |
+| [S] | Admin settings editor updated with footer dev credit section |
 
 ---
 
@@ -101,6 +107,7 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 | Sprint 2 admin panel (auth + invite flow, devotional upload/edit, records views, settings editor, email template editor) | [x] |
 | Sprint 3 analytics dashboard (visits, opens, purchases, revenue, conversion, trends, top devotionals, recent events) | [x] |
 | Compliance run + global UI/UX pass (issue 5): lucide icons (§15), theme-toggle hydration fix, universal Pagination + back-to-top, responsive navbar/sidebar with hamburger + overflow dropdowns + collapsibility | [x] |
+| Sprint 3 completion: DB migrations + seed, Resend SMTP, asset uploads, destructive actions, footer config | [x] |
 
 ---
 

@@ -41,7 +41,7 @@ The Next Level Devotional app hosts the church's devotional content and sells ac
 
 Phase: Active Development
 
-Active sprint focus: Bootstrap ai-system docs and scaffold the config-driven Next.js foundation (foundation sprint — Sprint 0).
+Active sprint focus: Sprint 3 completion — integrations hardening (SMTP, assets), global destructive action pattern, config-driven footer, live-key verification pass preparation.
 
 ---
 
@@ -57,6 +57,9 @@ Active sprint focus: Bootstrap ai-system docs and scaffold the config-driven Nex
 | PWA | Directive |
 | Config-driven over hardcoded (§1), metadata-driven structure (§2), admin-editability with fallbacks (§3) | Engineering standards + directive (even the barest things — platform name, logo, content — must be admin configurable) |
 | Access password derived from the Paystack transaction reference | No secret exchange needed; verifiable without extra state |
+| Resend dual-mode (API + SMTP) | SMTP for production deliverability; API as fallback; zero call-site changes |
+| Supabase Storage for asset uploads | Covers, future assets; integrated with audit trail |
+| Global destructive action pattern (`useConfirmAction`) | Consistent confirmation + undo UX across admin actions |
 
 ---
 
@@ -75,5 +78,5 @@ Active sprint focus: Bootstrap ai-system docs and scaffold the config-driven Nex
 | ---------- | ---------------------------------- | ------------------------ |
 | Supabase   | Postgres database, admin auth, storage | anon + service-role keys |
 | Paystack   | Payment collection (init + webhook) | Public + secret keys     |
-| Resend     | Transactional email (access password) | API key                 |
+| Resend     | Transactional email (access password) | API key (primary) / SMTP (fallback) |
 | Vercel     | Deployment + env hosting           | Platform secrets         |

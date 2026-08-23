@@ -39,7 +39,9 @@ type AuditAction =
   | "admin.logout"
   | "admin.invite"
   | "admin.invite.accept"
-  | "email_template.update";
+  | "email_template.update"
+  | "asset.upload"
+  | "asset.delete";
 
 /** Event names collected for platform analytics (visits, opens, views). */
 type PlatformEventType =
@@ -63,6 +65,12 @@ interface SiteSettings {
   paymentsEnabled: boolean;
   emailFrom: string;
   supportEmail: string;
+  /** Footer developer credit — name shown in footer */
+  footerDevCreditName: string;
+  /** Footer developer credit — URL linked from name */
+  footerDevCreditUrl: string;
+  /** Footer developer credit — whether to show the credit */
+  footerDevCreditEnabled: boolean;
 }
 
 /** A single devotional (metadata record; content lives in devotional_days). */

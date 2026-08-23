@@ -22,6 +22,9 @@ const SETTING_KEYS: (keyof SiteSettings)[] = [
   "paymentsEnabled",
   "emailFrom",
   "supportEmail",
+  "footerDevCreditName",
+  "footerDevCreditUrl",
+  "footerDevCreditEnabled",
 ];
 
 export function coerceValue<T>(key: keyof SiteSettings, raw: unknown, fallback: T): T {
