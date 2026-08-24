@@ -70,6 +70,7 @@ export const devotionalDays = pgTable(
     title: text("title").notNull(),
     content: text("content").notNull(),
     sermonUrl: text("sermon_url"),
+    contentFileUrl: text("content_file_url"),
     published: boolean("published").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

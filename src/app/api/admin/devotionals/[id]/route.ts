@@ -15,6 +15,7 @@ const daySchema = z.object({
   title: z.string().min(1).max(300),
   content: z.string().min(1),
   sermonUrl: z.string().max(2000).optional().or(z.literal("")),
+  contentFileUrl: z.string().max(2000).optional().or(z.literal("")),
 });
 
 const bodySchema = z.object({
@@ -102,6 +103,7 @@ export async function PUT(
           title: d.title,
           content: d.content,
           sermonUrl: d.sermonUrl || null,
+          contentFileUrl: d.contentFileUrl || null,
         })),
       );
     });

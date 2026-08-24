@@ -17,6 +17,7 @@ interface DayDraft {
   title: string;
   content: string;
   sermonUrl: string;
+  contentFileUrl?: string;
 }
 
 interface DevotionalFormProps {
@@ -31,9 +32,10 @@ function initialDays(existing?: DevotionalDay[]): DayDraft[] {
       title: d.title,
       content: d.content,
       sermonUrl: d.sermonUrl ?? "",
+      contentFileUrl: (d as DevotionalDay & { contentFileUrl?: string }).contentFileUrl ?? "",
     }));
   }
-  return [{ dayNumber: 1, title: "", content: "", sermonUrl: "" }];
+  return [{ dayNumber: 1, title: "", content: "", sermonUrl: "", contentFileUrl: "" }];
 }
 
 export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
@@ -94,6 +96,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
           title: d.title,
           content: d.content,
           sermonUrl: d.sermonUrl || undefined,
+          contentFileUrl: d.contentFileUrl || undefined,
         })),
       };
       const url = isEdit ? `/api/admin/devotionals/${devotional?.id}` : "/api/admin/devotionals";
@@ -244,6 +247,12 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
                 className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </label>
+            <FileUpload
+              label="Content File (PDF/DOCX, optional)"
+              value={day.contentFileUrl}
+              onChange={(url) => updateDay(i, { contentFileUrl: url ?? "" })}
+              type="asset"
+            />
             <Input
               name={`sermonUrl-${i}`}
               label="Sermon URL (optional)"
