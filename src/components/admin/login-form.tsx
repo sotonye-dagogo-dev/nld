@@ -69,6 +69,7 @@ export function AdminLoginForm({ next }: { next: string }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             error={error ?? undefined}
+            showPasswordToggle
           />
           <Button type="submit" loading={loading} className="w-full">
             Sign in

@@ -6,6 +6,7 @@ import { Navbar } from "@/components/ui/navbar";
 import { BackToTop } from "@/components/ui/back-to-top";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { getSiteSettings } from "@/config/site";
+import { ErrorBoundaryProvider } from "@/components/ui/error-boundary-provider";
 
 export const metadata: Metadata = {
   title: "Next Level Devotional",
@@ -30,40 +31,42 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <ToastProvider>
-          <ServiceWorkerRegistration />
-          <div className="flex min-h-screen flex-col bg-background">
-            <Navbar
-              platformName={settings.platformName}
-              logoUrl={settings.logoUrl}
-              links={[{ href: "/", label: "Devotionals" }]}
-              trailing={
-                <a
-                  href="/admin"
-                  className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text-muted hover:bg-background"
-                >
-                  Admin
-                </a>
-              }
-            />
-            <main className="flex-1">{children}</main>
-            <footer className="border-t border-border py-6 text-center text-sm text-text-muted">
-              <p>© {currentYear} {settings.platformName}</p>
-              {settings.footerDevCreditEnabled && settings.footerDevCreditName && (
-                <p className="mt-2">
-                  Built by{" "}
+          <ErrorBoundaryProvider>
+            <ServiceWorkerRegistration />
+            <div className="flex min-h-screen flex-col bg-background">
+              <Navbar
+                platformName={settings.platformName}
+                logoUrl={settings.logoUrl}
+                links={[{ href: "/", label: "Devotionals" }]}
+                trailing={
                   <a
-                    href={settings.footerDevCreditUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-primary transition-colors"
+                    href="/admin"
+                    className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text-muted hover:bg-background"
                   >
-                    {settings.footerDevCreditName}
+                    Admin
                   </a>
-                </p>
-              )}
-            </footer>
-          </div>
-          <BackToTop />
+                }
+              />
+              <main className="flex-1">{children}</main>
+              <footer className="border-t border-border py-6 text-center text-sm text-text-muted">
+                <p>© {currentYear} {settings.platformName}</p>
+                {settings.footerDevCreditEnabled && settings.footerDevCreditName && (
+                  <p className="mt-2">
+                    Built by{" "}
+                    <a
+                      href={settings.footerDevCreditUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-primary transition-colors"
+                    >
+                      {settings.footerDevCreditName}
+                    </a>
+                  </p>
+                )}
+              </footer>
+            </div>
+            <BackToTop />
+          </ErrorBoundaryProvider>
         </ToastProvider>
       </body>
     </html>
