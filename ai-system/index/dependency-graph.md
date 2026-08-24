@@ -54,6 +54,7 @@ Destructive actions (global pattern)
 API route handlers (src/app/api/*)
   → src/integrations/paystack (init, webhook verify)
   → src/integrations/resend (renders from email template store; SMTP or API)
+  → src/integrations/cloudflare (renders from email template store; Cloudflare Worker + MailChannels)
   → src/integrations/supabase (admin login, invite signup, storage)
   → src/lib/access (password derivation)
   → src/lib/audit
@@ -90,6 +91,11 @@ src/middleware (src/middleware.ts)
 src/data/db
   → drizzle-orm
   → postgres (Supabase connection)
+
+src/integrations/cloudflare
+  → src/lib/email-templates (store + renderer + seed)
+  → src/config (defaults/fallbacks)
+  → Cloudflare Worker (HTTP) + MailChannels (email delivery)
 ```
 
 ---
@@ -128,3 +134,4 @@ None detected.
 - Destructive actions must use the `useConfirmAction` pattern (confirmation modal + undo timeout).
 - File uploads must go through `/api/admin/assets` with Supabase Storage.
 - Resend integration supports both API (apiKey) and SMTP — SMTP takes priority when configured.
+- Cloudflare email integration uses a Cloudflare Worker + MailChannels — no SDK, pure HTTP; works with free Vercel domains.

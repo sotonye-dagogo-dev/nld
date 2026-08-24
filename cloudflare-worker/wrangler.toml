@@ -1,0 +1,15 @@
+name = "nld-email-relay"
+main = "smtp-relay.ts"
+compatibility_date = "2024-08-24"
+
+# Secrets (set via `wrangler secret put CLOUDFLARE_EMAIL_WORKER_SECRET`)
+# CLOUDFLARE_EMAIL_WORKER_SECRET = "your-secure-random-secret"
+
+# Optional: Custom domain for the worker
+# routes = [
+#   { pattern = "email.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
+
+# Observability
+[observability]
+enabled = true

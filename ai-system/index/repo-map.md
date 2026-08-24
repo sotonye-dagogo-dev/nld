@@ -29,11 +29,12 @@ project-root/
 │   │   └── pwa/                → Service worker registration
 │   ├── config/                 → Admin-configurable settings + defaults with fallbacks
 │   ├── data/                   → Drizzle schema + DB client
-│   ├── integrations/           → Isolated SDK wrappers (paystack, resend, supabase)
+│   ├── integrations/           → Isolated SDK wrappers (paystack, resend, supabase, cloudflare)
 │   ├── lib/                    → Service logic (access, audit, utils, email templates/render/blocks, admin auth, analytics, pagination)
 │   ├── types/                  → Global type definitions (injected via tsconfig)
 │   └── hooks/                  → Shared React hooks (theme)
 │
+├── cloudflare-worker/          → Cloudflare Worker for MailChannels email relay
 ├── drizzle/                    → Generated migration files
 ├── ai-system/                  → AI development system docs
 ├── artifacts/                  → Client briefs (genesis directive, Word MD, zip)
@@ -60,9 +61,10 @@ project-root/
 | `src/components/devotionals` | Public devotional components (reader protection) | access-gate.tsx, anti-screenshot.tsx, purchase-checkout.tsx |
 | `src/config`        | Config-driven settings + defaults            | site.ts, defaults.ts              |
 | `src/data`          | Drizzle schema and DB client                 | db/schema.ts, db/index.ts         |
-| `src/integrations`  | SDK isolation wrappers (§17)                 | paystack/*, resend/*, supabase/*  |
+| `src/integrations`  | SDK isolation wrappers (§17)                 | paystack/*, resend/*, supabase/*, cloudflare/* |
 | `src/lib`           | Business logic (access, audit, email, admin auth, pagination, analytics) | access.ts, audit.ts, email-templates.ts, email-render.ts, email-blocks.ts, admin-auth.ts, analytics.ts, pagination.ts |
 | `src/types`         | Global TS types (no import needed)           | global.d.ts                       |
+| `cloudflare-worker/`| MailChannels email relay via Cloudflare Worker | smtp-relay.ts, wrangler.toml      |
 | `drizzle/`          | Generated migrations                         | (generated)                       |
 | `artifacts`         | Client requirement briefs                    | genesis-directive.txt, Next-Level-Devotional-App.md, next-level-devotional.zip |
 | `tests`             | Vitest suites                                | access, config, utils, email-templates, admin-auth, analytics, pagination |

@@ -1,8 +1,8 @@
 # Project Decisions
 
 > **Metadata**
-> - last-updated-by: execute-feature (issue 1)
-> - last-verified-against-code: 2026-08-20
+> - last-updated-by: update-ai-system (post-session 7)
+> - last-verified-against-code: 2026-08-24
 > - staleness-policy: each entry has its own staleness — check supersedes links
 
 > **Overview:** Log of significant architectural, technical, and product decisions. Agents consult this before proposing changes to avoid contradicting prior reasoning. Uses supersedes/superseded-by links so contradictory entries are explicitly resolved rather than both appearing equally valid.
@@ -293,3 +293,32 @@ The viewer needs PDF text/structure extraction in one thin wrapper. This is a st
 
 **Implications:**
 - Deferred until the design-asset viewer is built (not in MVP scope).
+
+---
+
+### Email provider: Cloudflare Workers + MailChannels (free, no domain verification)
+
+**Decision:** Use Cloudflare Workers + MailChannels as the primary email provider for the free `nldv.vercel.app` domain. Resend remains as a fallback option. The email abstraction (`EmailClient` interface) supports both via `EMAIL_PROVIDER` env var.
+**Date:** 2026-08-24
+**Made by:** update-ai-system (post-session 7)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Resend requires domain verification and blocks sending from `nldv.vercel.app`. Cloudflare Workers + MailChannels is completely free (no limits), requires no domain verification, works with any subdomain, and integrates via a simple HTTP relay. The existing DB-backed template system, admin editor, variable handling, and call sites remain unchanged — only the transport layer is swapped.
+
+**Alternatives Considered:**
+- Brevo (Sendinblue): 300 emails/day free, but still requires sender verification for production
+- SendGrid: 100 emails/day free, domain auth required for production volumes
+- Postmark: 100 emails/month free, strict domain verification
+- Self-hosted SMTP: requires server management, IP reputation, deliverability work
+- AWS SES: requires AWS account, domain verification, sandbox limits
+
+Cloudflare + MailChannels is the only option that is completely free, unlimited, works immediately with `nldv.vercel.app`, and requires no domain ownership.
+
+**Implications:**
+- `EMAIL_PROVIDER` env var selects provider (`resend` | `cloudflare`)
+- Cloudflare Worker secret stored in Cloudflare Worker environment (not Vercel)
+- Worker URL (`CLOUDFLARE_EMAIL_WORKER_URL`) and secret (`CLOUDFLARE_EMAIL_WORKER_SECRET`) in Vercel env vars
+- Templates, variables, admin editor, preview — all unchanged
+- Resend SMTP/API remains as a tested fallback

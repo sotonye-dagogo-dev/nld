@@ -6,7 +6,8 @@ import { DEFAULT_EMAIL_TEMPLATES } from "@/config/defaults";
 import type { DefaultEmailTemplate } from "@/config/defaults";
 
 // Email client abstraction — swap providers by implementing this interface.
-// Current implementation uses Resend; see EMAIL_SERVICE_ALTERNATIVES.md for alternatives.
+// Current implementation uses Resend; Cloudflare Workers + MailChannels is also supported.
+// See EMAIL_SERVICE_ALTERNATIVES.md for alternatives.
 
 export interface AccessEmailParams {
   to: string;
@@ -39,6 +40,11 @@ export async function getEmailClient(): Promise<EmailClient> {
     case "resend": {
       const { createResendClient } = await import("./resend/client");
       emailClientInstance = createResendClient();
+      break;
+    }
+    case "cloudflare": {
+      const { createCloudflareEmailClient } = await import("./cloudflare/client");
+      emailClientInstance = createCloudflareEmailClient();
       break;
     }
     case "brevo":
