@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // Admin panel sidebar (§13 nav baseline). Role-aware links come from the
@@ -90,8 +91,10 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
   const { toast } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   async function logout() {
+    setLoggingOut(true);
     try {
       await fetch("/api/admin/auth/logout", { method: "POST" });
     } catch {
@@ -136,14 +139,16 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
                     </span>
                   )}
                 </span>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  loading={loggingOut}
                   onClick={logout}
                   aria-label="Sign out"
-                  className="rounded-lg px-2 py-1 text-xs text-text-muted hover:bg-background hover:text-danger"
                 >
                   <LogOut aria-hidden className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -179,15 +184,18 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
         <NavLinks nav={nav} collapsed={collapsed} />
         <div className="mt-2 border-t border-border pt-2">
           {collapsed ? (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              loading={loggingOut}
               onClick={logout}
               aria-label="Sign out"
               title="Sign out"
               className={cn(linkClass, "w-full justify-center px-2")}
             >
               <LogOut aria-hidden className="h-4 w-4" />
-            </button>
+            </Button>
           ) : (
             <div className="flex items-center justify-between gap-2 px-3 py-2">
               <span className="min-w-0 truncate text-xs text-text-muted">
@@ -198,14 +206,16 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
                   </span>
                 )}
               </span>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
+                loading={loggingOut}
                 onClick={logout}
                 aria-label="Sign out"
-                className="rounded-lg px-2 py-1 text-xs text-text-muted hover:bg-background hover:text-danger"
               >
                 <LogOut aria-hidden className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           )}
         </div>
