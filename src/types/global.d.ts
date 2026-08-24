@@ -98,6 +98,7 @@ interface DevotionalDay {
   title: string;
   content: string;
   sermonUrl: string | null;
+  contentFileUrl: string | null;
   published: boolean;
 }
 

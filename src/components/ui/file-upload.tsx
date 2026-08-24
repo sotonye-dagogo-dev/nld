@@ -12,12 +12,25 @@ interface FileUploadProps {
   onChange: (url: string | undefined) => void;
   label?: string;
   accept?: string;
-  type?: "cover" | "asset";
+  type?: "cover" | "asset" | "sermon";
   disabled?: boolean;
   preview?: boolean;
 }
 
-export function FileUpload({ value, onChange, label, accept = "image/*", type = "cover", disabled = false, preview = true }: FileUploadProps) {
+function getAcceptType(type: FileUploadProps["type"]): string {
+  switch (type) {
+    case "cover":
+      return "image/*";
+    case "sermon":
+    case "asset":
+      return "image/*,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    default:
+      return "image/*";
+  }
+}
+
+export function FileUpload({ value, onChange, label, accept, type = "cover", disabled = false, preview = true }: FileUploadProps) {
+  const effectiveAccept = accept ?? getAcceptType(type);
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -109,7 +122,7 @@ export function FileUpload({ value, onChange, label, accept = "image/*", type = 
             <>
               <Upload className="h-8 w-8 text-text-muted" />
               <span className="text-sm text-text-muted">
-                Click to upload {type === "cover" ? "cover image" : "asset"} (max 5MB)
+                Click to upload {type === "cover" ? "cover image" : "asset"} (max 10MB)
               </span>
             </>
           )}
