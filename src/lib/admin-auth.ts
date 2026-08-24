@@ -55,7 +55,7 @@ export async function getAdminSession(): Promise<AdminUser | null> {
           ),
         ).limit(1),
       0, // no retries for auth - fail fast
-      5000, // 5 second timeout for auth
+      10000, // 10 second timeout for auth (cold start tolerance)
     );
     const admin = rows[0];
     if (!admin) return null;

@@ -123,7 +123,7 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
             <NavLinks nav={nav} onNavigate={() => setDrawerOpen(false)} />
             <div className="mt-auto border-t border-border pt-2">
               <div className="flex items-center justify-between gap-2 px-3 py-2">
-                <span className="min-w-0 truncate text-xs text-text-muted">
+                <span className="flex-1 text-xs text-text-muted break-all whitespace-normal">
                   {email}
                   {superadmin && (
                     <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
@@ -189,7 +189,7 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
             </Button>
           ) : (
             <div className="flex items-center gap-2 px-3 py-2 min-w-0">
-              <span className="min-w-0 flex-1 text-xs text-text-muted break-all">
+              <span className="flex-1 text-xs text-text-muted break-all whitespace-normal">
                 {email}
                 {superadmin && (
                   <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">

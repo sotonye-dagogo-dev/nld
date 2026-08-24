@@ -5,6 +5,7 @@ import { createTransport } from "nodemailer";
 import { resendConfig, shouldUseSmtp } from "./config";
 import type { AccessEmailData } from "./types";
 import { renderEmail, type EmailTemplateKey, type TemplateVariables } from "@/lib/email-templates";
+import type { EmailClient, AccessEmailParams, TemplateEmailParams } from "@/integrations/email-client";
 
 // Resend client wrapper — the ONLY place the Resend SDK/nodemailer is touched
 // (engineering principle §17). Email bodies render from the DB-backed
@@ -93,4 +94,16 @@ export async function sendTemplateEmail(input: {
 }): Promise<void> {
   const { subject, html } = await renderEmail(input.key, input.variables);
   await sendEmail({ to: input.to, from: input.from, subject, html });
+}
+
+/** Factory for the email client abstraction. */
+export function createResendClient(): EmailClient {
+  return {
+    async sendAccessEmail(params: AccessEmailParams) {
+      await sendAccessEmail(params);
+    },
+    async sendTemplateEmail(params: TemplateEmailParams) {
+      await sendTemplateEmail({ to: params.to, key: params.templateKey as EmailTemplateKey, variables: params.variables });
+    },
+  };
 }
