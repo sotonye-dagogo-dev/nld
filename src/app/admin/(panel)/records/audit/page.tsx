@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { desc, sql } from "drizzle-orm";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { auditLogs } from "@/data/db/schema";
 import { getAdminSession } from "@/lib/admin-auth";
 import { clampInt } from "@/lib/utils";
@@ -38,22 +38,23 @@ export default async function AuditLogPage({
   let total = 0;
   let error = false;
   try {
-    const db = getDb();
     const [result, count] = await Promise.all([
-      db
-        .select({
-          id: auditLogs.id,
-          actor: auditLogs.actor,
-          action: auditLogs.action,
-          entity: auditLogs.entity,
-          entityId: auditLogs.entityId,
-          created: auditLogs.createdAt,
-        })
-        .from(auditLogs)
-        .orderBy(desc(auditLogs.createdAt))
-        .limit(PAGE_SIZE)
-        .offset((page - 1) * PAGE_SIZE),
-      db.select({ n: sql<number>`count(*)::int` }).from(auditLogs),
+      queryWithTimeout((db) =>
+        db
+          .select({
+            id: auditLogs.id,
+            actor: auditLogs.actor,
+            action: auditLogs.action,
+            entity: auditLogs.entity,
+            entityId: auditLogs.entityId,
+            created: auditLogs.createdAt,
+          })
+          .from(auditLogs)
+          .orderBy(desc(auditLogs.createdAt))
+          .limit(PAGE_SIZE)
+          .offset((page - 1) * PAGE_SIZE)
+      ),
+      queryWithTimeout((db) => db.select({ n: sql<number>`count(*)::int` }).from(auditLogs)),
     ]);
     rows = result.map((r) => ({
       id: r.id,

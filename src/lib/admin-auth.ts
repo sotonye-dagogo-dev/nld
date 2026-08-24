@@ -3,7 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { or, eq } from "drizzle-orm";
 import { validateAdminToken } from "@/integrations/supabase/client";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { admins } from "@/data/db/schema";
 
 // Admin session handling. A Supabase Auth access token is stored in an
@@ -40,17 +40,16 @@ export async function getAdminSession(): Promise<AdminUser | null> {
   const result = await validateAdminToken(token);
   if (!result.ok || !result.user) return null;
 
+  const user = result.user;
   try {
-    const rows = await getDb()
-      .select()
-      .from(admins)
-      .where(
+    const rows = await queryWithTimeout((db) =>
+      db.select().from(admins).where(
         or(
-          result.user.id ? eq(admins.authUserId, result.user.id) : undefined,
-          eq(admins.email, result.user.email),
+          user.id ? eq(admins.authUserId, user.id) : undefined,
+          eq(admins.email, user.email),
         ),
-      )
-      .limit(1);
+      ).limit(1)
+    );
     const admin = rows[0];
     if (!admin) return null;
     return {

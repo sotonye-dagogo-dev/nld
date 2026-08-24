@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { accessGrants, devotionalDays } from "@/data/db/schema";
 import { getDevotionalBySlug } from "@/lib/catalog";
 import { verifyAccessPassword } from "@/lib/access";
@@ -52,13 +52,9 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Devotional not found." }, { status: 404 });
   }
 
-  const db = getDb();
-  const grant = await db
-    .select()
-    .from(accessGrants)
-    .where(and(eq(accessGrants.devotionalId, devotional.id), eq(accessGrants.email, payload.email)))
-    .limit(1)
-    .catch(() => []);
+  const grant = await queryWithTimeout((db) =>
+    db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devotional.id), eq(accessGrants.email, payload.email))).limit(1)
+  ).catch(() => []);
 
   const active = grant.find((g) => g.status === "active");
   if (!active) {
@@ -89,12 +85,9 @@ export async function POST(
     );
   }
 
-  const days = (await db
-    .select()
-    .from(devotionalDays)
-    .where(and(eq(devotionalDays.devotionalId, devotional.id), eq(devotionalDays.published, true)))
-    .orderBy(devotionalDays.dayNumber)
-    .catch(() => [])) as DevotionalDay[];
+  const days = (await queryWithTimeout((db) =>
+    db.select().from(devotionalDays).where(and(eq(devotionalDays.devotionalId, devotional.id), eq(devotionalDays.published, true))).orderBy(devotionalDays.dayNumber)
+  ).catch(() => [])) as DevotionalDay[];
 
   const { value: settings } = await getSiteSettings().catch(() => ({ value: null }));
   const previewDays = clampInt(

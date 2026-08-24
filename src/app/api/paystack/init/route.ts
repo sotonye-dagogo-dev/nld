@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { env } from "@/config/env";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { purchases } from "@/data/db/schema";
 import { getDevotionalBySlug } from "@/lib/catalog";
 import { initializeTransaction } from "@/integrations/paystack/client";
@@ -58,15 +58,17 @@ export async function POST(request: Request) {
     });
 
     // Record a pending purchase for the audit trail + webhook reconciliation.
-    await getDb().insert(purchases).values({
-      devotionalId: devotional.id,
-      email: payload.email,
-      amountMinor: devotional.priceMinor,
-      currency: devotional.currency,
-      paystackReference: reference,
-      status: "pending",
-      metadata: { initAccessCode: init.access_code },
-    });
+    await queryWithTimeout((db) =>
+      db.insert(purchases).values({
+        devotionalId: devotional.id,
+        email: payload.email,
+        amountMinor: devotional.priceMinor,
+        currency: devotional.currency,
+        paystackReference: reference,
+        status: "pending",
+        metadata: { initAccessCode: init.access_code },
+      })
+    );
 
     await recordAudit({
       actor: payload.email,

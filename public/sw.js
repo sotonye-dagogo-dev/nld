@@ -10,7 +10,15 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE_ASSETS))
+      .then((cache) =>
+        Promise.allSettled(
+          PRECACHE_ASSETS.map((asset) =>
+            cache.add(asset).catch((err) => {
+              console.warn("[sw] precache failed for", asset, err);
+            })
+          )
+        )
+      )
       .then(() => self.skipWaiting()),
   );
 });

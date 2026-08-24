@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { desc } from "drizzle-orm";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { adminInvites } from "@/data/db/schema";
 import { getAdminSession, isSuperAdmin } from "@/lib/admin-auth";
 import { ErrorState } from "@/components/ui/error-state";
@@ -22,7 +22,7 @@ export default async function AdminInvitesPage() {
 
   let invites: AdminInvite[] = [];
   try {
-    const rows = await getDb().select().from(adminInvites).orderBy(desc(adminInvites.createdAt));
+    const rows = await queryWithTimeout((db) => db.select().from(adminInvites).orderBy(desc(adminInvites.createdAt)));
     invites = rows as AdminInvite[];
   } catch {
     invites = [];

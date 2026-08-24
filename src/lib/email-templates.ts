@@ -1,7 +1,7 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
-import { getDb } from "@/data/db";
+import { queryWithTimeout, getDb } from "@/data/db";
 import { emailTemplates } from "@/data/db/schema";
 import { DEFAULT_EMAIL_TEMPLATES, EMAIL_TEMPLATE_KEYS } from "@/config/defaults";
 import {
@@ -26,11 +26,9 @@ export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];
 export async function getEmailTemplate(key: EmailTemplateKey): Promise<EmailTemplate> {
   const fallback = DEFAULT_EMAIL_TEMPLATES[key];
   try {
-    const rows = await getDb()
-      .select()
-      .from(emailTemplates)
-      .where(eq(emailTemplates.key, key))
-      .limit(1);
+    const rows = await queryWithTimeout((db) =>
+      db.select().from(emailTemplates).where(eq(emailTemplates.key, key)).limit(1)
+    );
     const row = rows[0];
     if (row) {
       return {
@@ -61,7 +59,7 @@ export async function listEmailTemplates(): Promise<EmailTemplate[]> {
     updatedAt: Date;
   }> = [];
   try {
-    dbRows = (await getDb().select().from(emailTemplates)) as typeof dbRows;
+    dbRows = (await queryWithTimeout((db) => db.select().from(emailTemplates))) as typeof dbRows;
   } catch {
     dbRows = [];
   }
@@ -104,19 +102,20 @@ export async function seedEmailTemplates(actor = "system"): Promise<void> {
   const db = getDb();
   for (const key of EMAIL_TEMPLATE_KEYS) {
     const t = DEFAULT_EMAIL_TEMPLATES[key];
-    await db
-      .insert(emailTemplates)
-      .values({
-        key,
-        name: t.name,
-        subject: t.subject,
-        bodyHtml: t.bodyHtml,
-        variables: t.variables,
-        updatedBy: actor,
-      })
-      .onConflictDoUpdate({
-        target: emailTemplates.key,
-        set: { updatedAt: new Date() },
-      });
+    await queryWithTimeout((db) =>
+      db.insert(emailTemplates)
+        .values({
+          key,
+          name: t.name,
+          subject: t.subject,
+          bodyHtml: t.bodyHtml,
+          variables: t.variables,
+          updatedBy: actor,
+        })
+        .onConflictDoUpdate({
+          target: emailTemplates.key,
+          set: { updatedAt: new Date() },
+        })
+    );
   }
 }
