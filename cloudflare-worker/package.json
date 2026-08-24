@@ -1,0 +1,14 @@
+{
+  "name": "nld-cloudflare-email-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for relaying emails via MailChannels",
+  "main": "smtp-relay.ts",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240000.0",
+    "wrangler": "^3.0.0"
+  }
+}

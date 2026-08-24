@@ -1,7 +1,7 @@
 # Project Plan
 
 > **Metadata**
-> - last-updated-by: update-ai-system (post-session 6)
+> - last-updated-by: update-ai-system (post-session 7)
 > - last-verified-against-code: 2026-08-24
 > - staleness-policy: re-verify if project scope or phase changes
 
@@ -14,7 +14,7 @@
 - [x] ai-system bootstrapped with project-specific content
 - [x] Next.js + Tailwind + TypeScript scaffold with config-driven globals
 - [x] Drizzle schema (settings, devotionals, days, purchases, access grants, audit, events)
-- [x] Integration wrappers (Paystack, Resend, Supabase)
+- [x] Integration wrappers (Paystack, Resend, Supabase, Cloudflare)
 - [x] Universal component catalog baseline
 - [x] PWA manifest + service worker
 - [x] Config-driven settings store with fallbacks
@@ -24,7 +24,7 @@
 - [x] Browse devotionals (metadata-driven listing, paginated)
 - [x] Devotional reader page with configurable free preview days
 - [x] Purchase flow: email capture → Paystack init → popup → webhook verify
-- [x] Access password generation from Paystack reference + email delivery via Resend
+- [x] Access password generation from Paystack reference + email delivery via Resend or Cloudflare (MailChannels)
 - [x] Access verification page + reader unlock
 - [x] Anti-screenshot / asset-protection behavior (admin-configurable)
 - [x] Audit trails for uploads, payments, access grants
@@ -62,6 +62,7 @@
 - [x] Asset upload/management (Supabase Storage, cover images, admin CRUD)
 - [x] Global destructive action wrapper (confirmation modal + undo timeout pattern)
 - [x] Config-driven footer dev credit (name, URL, enable toggle) + dynamic copyright year
+- [x] Cloudflare Workers + MailChannels email integration (free, no domain verification, works with Vercel subdomain)
 - [ ] Unit test coverage for core modules (config, access, pricing)
 - [ ] Integration tests for purchase + access flow
 - [ ] E2E tests for browse → purchase → unlock

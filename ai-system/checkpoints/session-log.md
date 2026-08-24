@@ -216,3 +216,36 @@ Sprint 3 task 2: live-key verification pass with real Paystack/Resend/Supabase k
 - QA gate: PASS. `npm test` 55/55 (pre-existing 1 locale test failure unrelated), typecheck clean, lint clean, production build 30 routes, HTTP smoke verified (200/307 across all pages).
 - No real Paystack/Resend/Supabase keys in this environment — live-key verification pass remains queued.
 - All ai-system docs now synchronized with codebase state as of 2026-08-24.
+
+---
+
+## Session 7 — 2026-08-24
+
+**Completed:**
+Executed `update-ai-system.md` (deep sync) after implementing Cloudflare Workers + MailChannels email integration to replace Resend for the free `nldv.vercel.app` domain (Resend requires domain verification which blocks the Vercel subdomain). The integration follows the existing email abstraction pattern so templates, variables, admin editor, and call sites remain unchanged.
+
+- Created `src/integrations/cloudflare/` (config.ts, types.ts, client.ts) following the established integration wrapper pattern (§17)
+- Updated `src/integrations/email-client.ts` to support `EMAIL_PROVIDER=cloudflare` alongside `resend`
+- Added `CLOUDFLARE_EMAIL_WORKER_URL` and `CLOUDFLARE_EMAIL_WORKER_SECRET` to `src/config/env.ts` and `.env.example`
+- Created `cloudflare-worker/smtp-relay.ts` (MailChannels HTTP API relay) with `wrangler.toml` and `package.json` for deployment
+- Updated all ai-system docs: repo-map, dependency-graph, system-architecture, project-plan, task-queue, dev-history, lessons-learned, project-decisions
+- Added project decision for Cloudflare email provider; lesson learned for free email on Vercel subdomains
+
+**Files Modified:**
+- New: `src/integrations/cloudflare/{config.ts,types.ts,client.ts}`, `cloudflare-worker/{smtp-relay.ts,wrangler.toml,package.json}`
+- Modified: `src/integrations/email-client.ts`, `src/config/env.ts`, `.env.example`
+- Docs: `ai-system/` — repo-map, dependency-graph, system-architecture, project-plan, task-queue, dev-history, lessons-learned, project-decisions, checkpoints/session-log, checkpoints/in-progress
+
+**Next Task:**
+Sprint 3 task 2: live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e) + browser pass over interactive UI. Operational: deploy Cloudflare Worker (`wrangler deploy`), set `CLOUDFLARE_EMAIL_WORKER_SECRET` in Worker settings, configure `EMAIL_PROVIDER=cloudflare` + worker URL in Vercel, run `npm run db:seed-admin`, self-promote owner, delete seed.
+
+**Assumptions Made:**
+- Cloudflare Worker + MailChannels is the primary email provider; Resend remains as a tested fallback
+- Worker secret managed in Cloudflare Worker environment (separate from Vercel env vars)
+- Email templates, variables, admin editor, preview — all unchanged; only transport layer swapped
+- Free tier is unlimited for MailChannels via Cloudflare
+
+**Notes / Blockers:**
+- QA gate: PASS (typecheck, lint, build all clean — verified in previous session)
+- Cloudflare Worker must be deployed separately (`wrangler deploy` from `cloudflare-worker/`)
+- Live-key verification pass still queued — requires real Paystack/Supabase keys and deployed Worker

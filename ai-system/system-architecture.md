@@ -28,7 +28,7 @@ Data Access (Drizzle ORM)  src/data
      ↓
 Supabase Postgres (single database)
 Supabase Storage (devotional assets: covers, etc.)
-Integration wrappers (isolated SDKs): Supabase, Paystack, Resend
+Integration wrappers (isolated SDKs): Supabase, Paystack, Resend, Cloudflare (Worker + MailChannels)
 ```
 
 ---
@@ -43,7 +43,7 @@ Integration wrappers (isolated SDKs): Supabase, Paystack, Resend
 | API layer          | Paystack init/webhook, access verification, assets | `src/app/api`                   | integrations, data     |
 | Service logic      | Access password gen/verify, audit, pricing, analytics | `src/lib/access.ts`, `src/lib/audit.ts`, `src/lib/analytics.ts` | config, data, integrations |
 | Data layer         | Drizzle schema + DB client                        | `src/data/db/schema.ts`         | drizzle-orm, postgres  |
-| Integration layer  | SDK isolation per §17                             | `src/integrations/{paystack,resend,supabase}` | vendor SDKs |
+| Integration layer  | SDK isolation per §17                             | `src/integrations/{paystack,resend,supabase,cloudflare}` | vendor SDKs / HTTP     |
 | Destructive actions | Global confirmation + undo pattern               | `src/components/ui/confirm-action.tsx` | modal, button, hooks |
 | File uploads       | Asset management via Supabase Storage            | `src/components/ui/file-upload.tsx`, `src/app/api/admin/assets/route.ts` | supabase storage |
 
@@ -62,12 +62,12 @@ Request → Next.js route (server component / route handler)
 
 ### Payment Flow
 ```
-/purchase/[slug] collects email
+Purchase/[slug] collects email
   → /api/paystack/init: creates pending purchase row, returns Paystack transaction ref
   → client opens Paystack popup
   → Paystack redirects/calls /api/paystack/webhook on success
   → webhook verifies signature, flips purchase to success, derives access password from
-    transaction reference, writes access_grant, sends email via Resend, writes audit + event
+    transaction reference, writes access_grant, sends email via Resend or Cloudflare, writes audit + event
   → user enters access password at /access → verified → reader unlocks
 ```
 
@@ -103,23 +103,26 @@ Asset uploads go to Supabase Storage; DB stores only the path + public URL.
 
 ## Configuration Points
 
-| Config Key              | Purpose                                  | Location           | Default |
-| ----------------------- | ---------------------------------------- | ------------------ | ------- |
-| `NEXT_PUBLIC_APP_URL`   | Canonical origin for emails/PWA          | .env               | `http://localhost:3000` |
-| `DATABASE_URL`          | Supabase Postgres connection string      | .env (server only) | none — startup-required |
-| `SUPABASE_URL`          | Supabase project URL                     | .env               | none    |
-| `SUPABASE_ANON_KEY`     | Public client key                        | .env (public)      | none    |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only elevated key            | .env (server only) | none    |
-| `PAYSTACK_SECRET_KEY`   | Server-side verification key             | .env (server only) | none    |
-| `PAYSTACK_PUBLIC_KEY`   | Client-side popup key                    | .env (public)      | none    |
-| `RESEND_API_KEY`        | Transactional mail key (API mode)        | .env (server only) | none    |
-| `EMAIL_SERVER_HOST`     | SMTP host (Resend SMTP mode)             | .env               | none    |
-| `EMAIL_SERVER_PORT`     | SMTP port (465 default)                  | .env               | 465     |
-| `EMAIL_SERVER_USER`     | SMTP username (Resend)                   | .env               | resend  |
-| `EMAIL_SERVER_PASSWORD` | SMTP password (Resend API key)           | .env (server only) | none    |
-| `ACCESS_PASSWORD_SECRET`| HMAC key for access-password derivation  | .env (server only) | dev fallback in config |
-| Site settings (DB)      | Platform name, logo, pricing, access mode, toggles, footer dev credit | `settings` table | code fallbacks in `src/config/site.ts` |
-| `ENABLE_DESIGN_VIEWER`  | Dev-only design-asset viewer mount        | .env               | false   |
+| Config Key                    | Purpose                                  | Location           | Default |
+| ----------------------------- | ---------------------------------------- | ------------------ | ------- |
+| `NEXT_PUBLIC_APP_URL`         | Canonical origin for emails/PWA          | .env               | `http://localhost:3000` |
+| `DATABASE_URL`                | Supabase Postgres connection string      | .env (server only) | none — startup-required |
+| `SUPABASE_URL`                | Supabase project URL                     | .env               | none    |
+| `SUPABASE_ANON_KEY`           | Public client key                        | .env (public)      | none    |
+| `SUPABASE_SERVICE_ROLE_KEY`   | Server-only elevated key            | .env (server only) | none    |
+| `PAYSTACK_SECRET_KEY`         | Server-side verification key             | .env (server only) | none    |
+| `PAYSTACK_PUBLIC_KEY`         | Client-side popup key                    | .env (public)      | none    |
+| `RESEND_API_KEY`              | Transactional mail key (API mode)        | .env (server only) | none    |
+| `EMAIL_SERVER_HOST`           | SMTP host (Resend SMTP mode)             | .env               | none    |
+| `EMAIL_SERVER_PORT`           | SMTP port (465 default)                  | .env               | 465     |
+| `EMAIL_SERVER_USER`           | SMTP username (Resend)                   | .env               | resend  |
+| `EMAIL_SERVER_PASSWORD`       | SMTP password (Resend API key)           | .env (server only) | none    |
+| `EMAIL_PROVIDER`              | Email provider: "resend" or "cloudflare" | .env               | "resend" |
+| `CLOUDFLARE_EMAIL_WORKER_URL` | Cloudflare Worker URL for MailChannels   | .env (server only) | none    |
+| `CLOUDFLARE_EMAIL_WORKER_SECRET` | Worker secret for auth                 | .env (server only) | none    |
+| `ACCESS_PASSWORD_SECRET`      | HMAC key for access-password derivation  | .env (server only) | dev fallback in config |
+| Site settings (DB)            | Platform name, logo, pricing, access mode, toggles, footer dev credit | `settings` table | code fallbacks in `src/config/site.ts` |
+| `ENABLE_DESIGN_VIEWER`        | Dev-only design-asset viewer mount        | .env               | false   |
 
 All config points follow the fallback discipline from `standards/engineering-principles.md` §1 and §3 — every config-driven value has a documented, safe fallback so the system degrades gracefully if the value is missing or malformed.
 
@@ -142,17 +145,17 @@ No project CLI exists yet. Verification is via `npm run typecheck`, `npm run lin
 
 ## Tech Stack
 
-| Layer      | Technology              | Version      |
-| ---------- | ----------------------- | ------------ |
-| Frontend   | Next.js (App Router)    | 15.x         |
-| Language   | TypeScript              | 5.x          |
-| Styling    | Tailwind CSS            | 3.x          |
-| Database   | Supabase Postgres       | 15           |
-| ORM        | Drizzle ORM             | 0.36+        |
-| Storage    | Supabase Storage        | —            |
-| Payments   | Paystack                | API v3       |
-| Email      | Resend (API + SMTP)     | SDK + nodemailer |
-| Auth (admin only) | Supabase Auth    | —            |
+| Layer      | Technology                      | Version      |
+| ---------- | ------------------------------- | ------------ |
+| Frontend   | Next.js (App Router)            | 15.x         |
+| Language   | TypeScript                      | 5.x          |
+| Styling    | Tailwind CSS                    | 3.x          |
+| Database   | Supabase Postgres               | 15           |
+| ORM        | Drizzle ORM                     | 0.36+        |
+| Storage    | Supabase Storage                | —            |
+| Payments   | Paystack                        | API v3       |
+| Email      | Resend (API + SMTP) / Cloudflare Workers + MailChannels | SDK + nodemailer / HTTP |
+| Auth (admin only) | Supabase Auth            | —            |
 
 ---
 
@@ -164,6 +167,7 @@ No project CLI exists yet. Verification is via `npm run typecheck`, `npm run lin
 - Anti-screenshot protection is a best-effort client behavior (DRM-level protection is a future consideration; the parent project may own this).
 - Supabase Storage bucket `devotional-assets` must exist and be public (or use signed URLs for private assets).
 - Destructive action undo is UI-level only; actual data rollback must be implemented by the consumer (e.g., soft-delete, re-create from audit log).
+- Cloudflare email worker secret must be set in Cloudflare Worker environment (not in Vercel) — separate secret management.
 
 ---
 
