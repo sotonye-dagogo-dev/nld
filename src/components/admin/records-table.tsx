@@ -21,7 +21,7 @@ export function RecordsTable<T>({
 }: {
   columns: TableColumn<T>[];
   rows: T[];
-  rowKey: (row: T) => string;
+  rowKey: keyof T | string;
   page: number;
   pageSize: number;
   total: number;

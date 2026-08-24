@@ -99,7 +99,7 @@ export default async function PaymentsPage({
         <RecordsTable
           columns={columns}
           rows={rows}
-          rowKey={(r) => r.id}
+          rowKey="id"
           page={page}
           pageSize={PAGE_SIZE}
           total={total}

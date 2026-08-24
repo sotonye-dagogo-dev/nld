@@ -57,15 +57,7 @@ export default async function AdminDashboardPage() {
             {stat(counts.grants, "Access grants")}
             {stat(counts.events, "Events logged")}
           </div>
-          <Card>
-            <CardTitle>Sprint 2 complete</CardTitle>
-            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-text-muted">
-              <li>Admin auth via Supabase + seeded superadmin, invite flow for team members.</li>
-              <li>Devotional editor with content, pricing, and preview days.</li>
-              <li>Records tables for payments, access grants, and audit log.</li>
-              <li>Settings editor for platform name, logo, copy, and toggles.</li>
-            </ul>
-          </Card>
+          
         </>
       )}
     </div>
