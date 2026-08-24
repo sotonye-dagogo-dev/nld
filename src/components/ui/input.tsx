@@ -30,7 +30,8 @@ export function Input({ label, hint, error, className, id, showPasswordToggle, .
           type={isPassword && showPassword ? "text" : "password"}
           aria-invalid={Boolean(error)}
           className={cn(
-            "rounded-lg border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary pr-12",
+            "rounded-lg border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+            isPassword ? "pr-12" : "pr-3",
             error ? "border-danger" : "border-border",
             className,
           )}
@@ -40,7 +41,7 @@ export function Input({ label, hint, error, className, id, showPasswordToggle, .
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
-            className="absolute right-0 top-0 h-full w-10 flex items-center justify-center text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-r-lg"
+            className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
           >

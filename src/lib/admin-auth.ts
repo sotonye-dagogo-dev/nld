@@ -19,7 +19,7 @@ export async function createAdminSession(token: string): Promise<void> {
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true, // Always secure in production (Vercel is HTTPS)
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE,
@@ -42,13 +42,15 @@ export async function getAdminSession(): Promise<AdminUser | null> {
 
   const user = result.user;
   try {
-    const rows = await queryWithTimeout((db) =>
-      db.select().from(admins).where(
-        or(
-          user.id ? eq(admins.authUserId, user.id) : undefined,
-          eq(admins.email, user.email),
-        ),
-      ).limit(1)
+    const rows = await queryWithTimeout(
+      (db) =>
+        db.select().from(admins).where(
+          or(
+            user.id ? eq(admins.authUserId, user.id) : undefined,
+            eq(admins.email, user.email),
+          ),
+        ).limit(1),
+      0, // no retries for auth - fail fast
     );
     const admin = rows[0];
     if (!admin) return null;

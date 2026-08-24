@@ -31,6 +31,7 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
   const [measured, setMeasured] = useState(false);
   const rowRef = useRef<HTMLDivElement | null>(null);
   const moreRef = useRef<HTMLDivElement | null>(null);
+  const measuredRef = useRef(false);
 
   // Measure how many desktop links fit; the rest move into the "More"
   // dropdown. Post-mount only, so SSR is stable (no hydration mismatch).
@@ -51,7 +52,10 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
         fits += 1;
       }
       setOverflowCount(Math.max(0, links.length - fits));
-      if (!measured) setMeasured(true);
+      if (!measuredRef.current) {
+        measuredRef.current = true;
+        setMeasured(true);
+      }
     };
     // Defer initial measurement to next frame to ensure layout is stable
     const rafId = requestAnimationFrame(measure);
@@ -63,7 +67,7 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [links.length, measured]);
+  }, [links.length]);
 
   // Close the overflow dropdown on outside click or Escape.
   useEffect(() => {
