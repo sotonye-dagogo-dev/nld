@@ -15,7 +15,7 @@ export interface TableColumn<T> {
 interface TableProps<T> {
   columns: TableColumn<T>[];
   rows: T[];
-  rowKey: (row: T) => string;
+  rowKey: keyof T | string;
   page: number;
   pageSize: number;
   total: number;
@@ -57,7 +57,7 @@ export function Table<T>({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)} className="border-b border-border last:border-0 hover:bg-background/50">
+              <tr key={String(row[rowKey as keyof T])} className="border-b border-border last:border-0 hover:bg-background/50">
                 {columns.map((c) => (
                   <td key={c.key} className={cn("px-4 py-3 text-text-primary", c.align === "right" && "text-right")}>
                     {c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? "")}

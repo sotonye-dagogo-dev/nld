@@ -164,7 +164,8 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
         </div>
 
         <div className="space-y-3 border-t border-border pt-4">
-          <h3 className="text-lg font-semibold text-text-primary">Footer Developer Credit</h3>
+          {/* Footer Developer Credit — hidden from admin UI per requirement; still config-driven via DB */}
+          {/* <h3 className="text-lg font-semibold text-text-primary">Footer Developer Credit</h3>
           <label className="flex items-center justify-between gap-4 text-sm text-text-primary">
             <span>
               Show developer credit
@@ -191,7 +192,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             placeholder="https://example.com"
             value={form.footerDevCreditUrl}
             onChange={(e) => setForm({ ...form, footerDevCreditUrl: e.target.value })}
-          />
+          /> */}
         </div>
 
         <div className="flex justify-end border-t border-border pt-4">
