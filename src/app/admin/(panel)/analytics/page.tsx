@@ -10,6 +10,12 @@ import { events, purchases, devotionals } from "@/data/db/schema";
 import { conversionRate, fillDaySeries } from "@/lib/analytics";
 import { formatPrice } from "@/config/defaults";
 
+const ANALYTICS_QUERY_TIMEOUT_MS = 30000;
+
+async function queryAnalytics<T>(fn: (db: ReturnType<typeof import("@/data/db").getDb>) => Promise<T>): Promise<T> {
+  return queryWithTimeout(fn, ANALYTICS_QUERY_TIMEOUT_MS);
+}
+
 export const metadata: Metadata = { title: "Admin — Analytics" };
 export const dynamic = "force-dynamic";
 
@@ -56,10 +62,10 @@ export default async function AdminAnalyticsPage() {
   try {
     const [typeRows, revenueRows, trendRows, purchaseTrendRows, topOpenRows, topPurchaseRows, recentRows] =
       await Promise.all([
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db.select({ eventType: events.eventType, n: sql<number>`count(*)::int` }).from(events).groupBy(events.eventType)
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               n: sql<number>`count(*)::int`,
@@ -68,7 +74,7 @@ export default async function AdminAnalyticsPage() {
             .from(purchases)
             .where(eq(purchases.status, "success"))
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               eventType: events.eventType,
@@ -79,7 +85,7 @@ export default async function AdminAnalyticsPage() {
             .where(gte(events.createdAt, CUTOFF))
             .groupBy(events.eventType, TREND_DAY(events.createdAt))
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               day: TREND_DAY(purchases.createdAt),
@@ -89,7 +95,7 @@ export default async function AdminAnalyticsPage() {
             .where(and(eq(purchases.status, "success"), gte(purchases.createdAt, CUTOFF)))
             .groupBy(TREND_DAY(purchases.createdAt))
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               slug: events.slug,
@@ -103,7 +109,7 @@ export default async function AdminAnalyticsPage() {
             .orderBy(sql`count(*) desc`)
             .limit(10)
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               devotionalId: purchases.devotionalId,
@@ -119,7 +125,7 @@ export default async function AdminAnalyticsPage() {
             .orderBy(sql`count(*) desc`)
             .limit(10)
         ),
-        queryWithTimeout((db) => db.select().from(events).orderBy(desc(events.createdAt)).limit(8)),
+        queryAnalytics((db) => db.select().from(events).orderBy(desc(events.createdAt)).limit(8)),
       ]);
 
     const countBy = new Map(typeRows.map((r) => [r.eventType, r.n]));
