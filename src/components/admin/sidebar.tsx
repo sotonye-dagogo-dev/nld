@@ -197,8 +197,8 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
               <LogOut aria-hidden className="h-4 w-4" />
             </Button>
           ) : (
-            <div className="flex items-center justify-between gap-2 px-3 py-2">
-              <span className="min-w-0 truncate text-xs text-text-muted">
+            <div className="flex items-center gap-2 px-3 py-2 min-w-0">
+              <span className="min-w-0 flex-1 truncate text-xs text-text-muted">
                 {email}
                 {superadmin && (
                   <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
@@ -213,6 +213,7 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
                 loading={loggingOut}
                 onClick={logout}
                 aria-label="Sign out"
+                className="shrink-0"
               >
                 <LogOut aria-hidden className="h-4 w-4" />
               </Button>

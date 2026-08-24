@@ -104,7 +104,7 @@ export function InviteManager({ initialInvites }: { initialInvites: AdminInvite[
       <Table
         columns={columns}
         rows={invites}
-        rowKey={(r) => r.id}
+        rowKey="id"
         page={1}
         pageSize={50}
         total={invites.length}
