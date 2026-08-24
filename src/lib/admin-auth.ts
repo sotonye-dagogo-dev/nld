@@ -15,11 +15,15 @@ import { admins } from "@/data/db/schema";
 const SESSION_COOKIE = "admin_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
 export async function createAdminSession(token: string): Promise<void> {
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: true, // Always secure in production (Vercel is HTTPS)
+    secure: isProduction(), // Only secure in production (Vercel is HTTPS)
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE,
