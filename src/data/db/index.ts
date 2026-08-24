@@ -13,20 +13,46 @@ import * as schema from "./schema";
 let client: ReturnType<typeof postgres> | null = null;
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-export function getDb() {
-  if (dbInstance) return dbInstance;
+const QUERY_TIMEOUT_MS = 5000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number = QUERY_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Database query timeout after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
+function createDbClient() {
   if (!env.databaseUrl) {
     throw new Error("DATABASE_URL is not set — cannot create DB client");
   }
-  client = postgres(env.databaseUrl, {
+  // Use a short connection timeout and disable prepared statements for PgBouncer compatibility
+  const pgClient = postgres(env.databaseUrl, {
     max: 1,
     prepare: false,
-    connect_timeout: 10,
-    idle_timeout: 20,
-    max_lifetime: 60 * 30,
+    connect_timeout: 5,
+    idle_timeout: 10,
+    max_lifetime: 60 * 5,
+    // Fail fast on connection issues
+    onnotice: () => {},
+    transform: {
+      undefined: (val: unknown) => val,
+    },
   });
-  dbInstance = drizzle(client, { schema });
+  return drizzle(pgClient, { schema });
+}
+
+export function getDb() {
+  if (dbInstance) return dbInstance;
+  dbInstance = createDbClient();
   return dbInstance;
+}
+
+export async function queryWithTimeout<T>(fn: (db: ReturnType<typeof drizzle<typeof schema>>) => Promise<T>): Promise<T> {
+  const db = getDb();
+  return withTimeout(fn(db));
 }
 
 export const db = getDb;

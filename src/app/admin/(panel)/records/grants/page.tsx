@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { eq, desc, sql } from "drizzle-orm";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { accessGrants, devotionals } from "@/data/db/schema";
 import { getAdminSession } from "@/lib/admin-auth";
 import { clampInt } from "@/lib/utils";
@@ -39,25 +39,26 @@ export default async function AccessGrantsPage({
   let total = 0;
   let error = false;
   try {
-    const db = getDb();
     const [result, count] = await Promise.all([
-      db
-        .select({
-          id: accessGrants.id,
-          email: accessGrants.email,
-          devotionalTitle: devotionals.title,
-          devotionalSlug: devotionals.slug,
-          status: accessGrants.status,
-          password: accessGrants.accessPassword,
-          granted: accessGrants.grantedAt,
-          expires: accessGrants.expiresAt,
-        })
-        .from(accessGrants)
-        .leftJoin(devotionals, eq(accessGrants.devotionalId, devotionals.id))
-        .orderBy(desc(accessGrants.grantedAt))
-        .limit(PAGE_SIZE)
-        .offset((page - 1) * PAGE_SIZE),
-      db.select({ n: sql<number>`count(*)::int` }).from(accessGrants),
+      queryWithTimeout((db) =>
+        db
+          .select({
+            id: accessGrants.id,
+            email: accessGrants.email,
+            devotionalTitle: devotionals.title,
+            devotionalSlug: devotionals.slug,
+            status: accessGrants.status,
+            password: accessGrants.accessPassword,
+            granted: accessGrants.grantedAt,
+            expires: accessGrants.expiresAt,
+          })
+          .from(accessGrants)
+          .leftJoin(devotionals, eq(accessGrants.devotionalId, devotionals.id))
+          .orderBy(desc(accessGrants.grantedAt))
+          .limit(PAGE_SIZE)
+          .offset((page - 1) * PAGE_SIZE)
+      ),
+      queryWithTimeout((db) => db.select({ n: sql<number>`count(*)::int` }).from(accessGrants)),
     ]);
     rows = result.map((r) => ({
       id: r.id,

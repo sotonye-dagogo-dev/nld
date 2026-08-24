@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { settings } from "@/data/db/schema";
 import { getSiteSettings } from "@/config/site";
 import { DEFAULT_SETTINGS } from "@/config/defaults";
@@ -40,7 +40,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
   }
 
-  const db = getDb();
   const before: Record<string, string | number | boolean> = {};
   const after: Record<string, string | number | boolean> = {};
 
@@ -51,13 +50,14 @@ export async function POST(request: Request) {
       const stored = typeof raw === "boolean" ? String(raw) : typeof raw === "number" ? String(raw) : raw;
       before[key] = stored;
       after[key] = stored;
-      await db
-        .insert(settings)
-        .values({ key: key as string, value: stored, updatedAt: new Date() })
-        .onConflictDoUpdate({
-          target: settings.key,
-          set: { value: stored, updatedAt: new Date() },
-        });
+      await queryWithTimeout((db) =>
+        db.insert(settings)
+          .values({ key: key as string, value: stored, updatedAt: new Date() })
+          .onConflictDoUpdate({
+            target: settings.key,
+            set: { value: stored, updatedAt: new Date() },
+          })
+      );
     }
   } catch {
     return NextResponse.json(

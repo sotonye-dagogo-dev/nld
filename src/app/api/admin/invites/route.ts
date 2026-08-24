@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { adminInvites, admins } from "@/data/db/schema";
 import { requireAdmin, isSuperAdmin } from "@/lib/admin-auth";
 import { sendTemplateEmail } from "@/integrations/resend/client";
@@ -27,7 +27,7 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Forbidden." }, { status: 403 });
   }
   try {
-    const rows = await getDb().select().from(adminInvites).orderBy(desc(adminInvites.createdAt));
+    const rows = await queryWithTimeout((db) => db.select().from(adminInvites).orderBy(desc(adminInvites.createdAt)));
     return NextResponse.json({ ok: true, invites: rows });
   } catch {
     return NextResponse.json({ ok: false, error: "Could not load invites." }, { status: 503 });
@@ -52,10 +52,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "A valid email address is required." }, { status: 400 });
   }
 
-  const db = getDb();
-
   // Reject if the address is already an admin.
-  const existingAdmin = await db.select().from(admins).where(eq(admins.email, email)).limit(1).catch(() => []);
+  const existingAdmin = await queryWithTimeout((db) => db.select().from(admins).where(eq(admins.email, email)).limit(1)).catch(() => []);
   if (existingAdmin[0]) {
     return NextResponse.json(
       { ok: false, error: "That email is already an admin." },
@@ -64,12 +62,9 @@ export async function POST(request: Request) {
   }
 
   // Reject if a pending invite already exists.
-  const existingInvite = await db
-    .select()
-    .from(adminInvites)
-    .where(eq(adminInvites.email, email))
-    .limit(1)
-    .catch(() => []);
+  const existingInvite = await queryWithTimeout((db) =>
+    db.select().from(adminInvites).where(eq(adminInvites.email, email)).limit(1)
+  ).catch(() => []);
   if (existingInvite[0] && existingInvite[0].status === "pending") {
     return NextResponse.json(
       { ok: false, error: "A pending invitation already exists for that email." },
@@ -80,14 +75,16 @@ export async function POST(request: Request) {
   const token = randomBytes(24).toString("hex");
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
 
-  await db.insert(adminInvites).values({
-    email,
-    token,
-    role: "admin",
-    invitedBy: admin.id,
-    status: "pending",
-    expiresAt,
-  });
+  await queryWithTimeout((db) =>
+    db.insert(adminInvites).values({
+      email,
+      token,
+      role: "admin",
+      invitedBy: admin.id,
+      status: "pending",
+      expiresAt,
+    })
+  );
 
   await recordAudit({
     actor: admin.email,

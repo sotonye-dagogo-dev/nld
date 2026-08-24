@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { accessGrants, devotionalDays, devotionals } from "@/data/db/schema";
 import { getDevotionalBySlug } from "@/lib/catalog";
 import { verifyAccessPassword } from "@/lib/access";
@@ -41,13 +41,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Devotional not found." }, { status: 404 });
   }
 
-  const db = getDb();
-  const grant = await db
-    .select()
-    .from(accessGrants)
-    .where(and(eq(accessGrants.devotionalId, devotional.id), eq(accessGrants.email, payload.email)))
-    .limit(1)
-    .catch(() => []);
+  const grant = await queryWithTimeout((db) =>
+    db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devotional.id), eq(accessGrants.email, payload.email))).limit(1)
+  ).catch(() => []);
 
   const active = grant.find((g) => g.status === "active");
   if (!active) {
@@ -79,12 +75,9 @@ export async function POST(request: Request) {
   }
 
   // Password matches — grant was verified. Count the unlocked days.
-  const days = await db
-    .select({ n: devotionalDays.dayNumber })
-    .from(devotionalDays)
-    .where(and(eq(devotionalDays.devotionalId, devotional.id), eq(devotionalDays.published, true)))
-    .then((rows) => rows.length)
-    .catch(() => 0);
+  const days = await queryWithTimeout((db) =>
+    db.select({ n: devotionalDays.dayNumber }).from(devotionalDays).where(and(eq(devotionalDays.devotionalId, devotional.id), eq(devotionalDays.published, true)))
+  ).then((rows) => rows.length).catch(() => 0);
 
   await recordAudit({
     actor: payload.email,

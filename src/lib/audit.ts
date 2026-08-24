@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { auditLogs, events } from "@/data/db/schema";
 
 // Audit trail writer (engineering principle §23) and platform analytics event
@@ -20,15 +20,17 @@ export async function recordAudit(input: {
   metadata?: Json;
 }): Promise<void> {
   try {
-    await getDb().insert(auditLogs).values({
-      actor: input.actor,
-      action: input.action,
-      entity: input.entity,
-      entityId: input.entityId ?? "",
-      before: input.before ?? null,
-      after: input.after ?? null,
-      metadata: input.metadata ?? null,
-    });
+    await queryWithTimeout((db) =>
+      db.insert(auditLogs).values({
+        actor: input.actor,
+        action: input.action,
+        entity: input.entity,
+        entityId: input.entityId ?? "",
+        before: input.before ?? null,
+        after: input.after ?? null,
+        metadata: input.metadata ?? null,
+      })
+    );
   } catch (err) {
     console.error("[audit] write failed (non-fatal):", err);
   }
@@ -42,12 +44,14 @@ export async function recordEvent(input: {
   meta?: Json;
 }): Promise<void> {
   try {
-    await getDb().insert(events).values({
-      eventType: input.eventType,
-      slug: input.slug ?? null,
-      email: input.email ?? null,
-      meta: input.meta ?? null,
-    });
+    await queryWithTimeout((db) =>
+      db.insert(events).values({
+        eventType: input.eventType,
+        slug: input.slug ?? null,
+        email: input.email ?? null,
+        meta: input.meta ?? null,
+      })
+    );
   } catch (err) {
     console.error("[events] write failed (non-fatal):", err);
   }

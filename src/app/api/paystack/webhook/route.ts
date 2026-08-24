@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { purchases, accessGrants } from "@/data/db/schema";
 import { verifyWebhookSignature } from "@/integrations/paystack/client";
 import { deriveAccessPassword } from "@/lib/access";
@@ -46,10 +46,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const db = getDb();
-
   // Flip the pending purchase to success (idempotent upsert by reference).
-  const existing = await db.select().from(purchases).where(eq(purchases.paystackReference, reference)).limit(1);
+  const existing = await queryWithTimeout((db) => db.select().from(purchases).where(eq(purchases.paystackReference, reference)).limit(1)).catch(() => []);
   const purchase = existing[0];
   if (!purchase) {
     // Webhook for a purchase we never initialized — reject.
@@ -57,10 +55,9 @@ export async function POST(request: Request) {
   }
 
   if (purchase.status !== "success") {
-    await db
-      .update(purchases)
-      .set({ status: "success", updatedAt: new Date() })
-      .where(eq(purchases.paystackReference, reference));
+    await queryWithTimeout((db) =>
+      db.update(purchases).set({ status: "success", updatedAt: new Date() }).where(eq(purchases.paystackReference, reference))
+    );
     await recordAudit({
       actor: purchase.email,
       action: "purchase.verify",
@@ -74,11 +71,9 @@ export async function POST(request: Request) {
 
   const accessPassword = deriveAccessPassword(reference);
   const email = customer.email || purchase.email;
-  const existingGrant = await db
-    .select()
-    .from(accessGrants)
-    .where(eq(accessGrants.paystackReference, reference))
-    .limit(1);
+  const existingGrant = await queryWithTimeout((db) =>
+    db.select().from(accessGrants).where(eq(accessGrants.paystackReference, reference)).limit(1)
+  ).catch(() => []);
   const grant = existingGrant[0];
 
   if (grant) {
@@ -86,13 +81,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  await db.insert(accessGrants).values({
-    devotionalId: purchase.devotionalId,
-    email,
-    paystackReference: reference,
-    accessPassword,
-    status: "active",
-  });
+  await queryWithTimeout((db) =>
+    db.insert(accessGrants).values({
+      devotionalId: purchase.devotionalId,
+      email,
+      paystackReference: reference,
+      accessPassword,
+      status: "active",
+    })
+  );
   await recordAudit({
     actor: email,
     action: "access.grant",

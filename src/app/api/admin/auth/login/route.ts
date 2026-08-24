@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { adminSignIn } from "@/integrations/supabase/client";
 import { createAdminSession } from "@/lib/admin-auth";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { admins } from "@/data/db/schema";
 import { or, eq } from "drizzle-orm";
 import { recordAudit } from "@/lib/audit";
@@ -33,17 +33,16 @@ export async function POST(request: Request) {
 
   // Authorization: the Supabase user must exist in the `admins` table.
   let adminRole: AdminRole | null = null;
+  const user = result.user;
   try {
-    const rows = await getDb()
-      .select()
-      .from(admins)
-      .where(
+    const rows = await queryWithTimeout((db) =>
+      db.select().from(admins).where(
         or(
-          result.user.id ? eq(admins.authUserId, result.user.id) : undefined,
-          eq(admins.email, result.user.email),
+          user.id ? eq(admins.authUserId, user.id) : undefined,
+          eq(admins.email, user.email),
         ),
-      )
-      .limit(1);
+      ).limit(1)
+    );
     adminRole = rows[0]?.role ?? null;
   } catch {
     // DB unavailable — do not allow login (authorization cannot be verified).
@@ -51,7 +50,7 @@ export async function POST(request: Request) {
 
   if (!adminRole) {
     await recordAudit({
-      actor: result.user.email,
+      actor: user.email,
       action: "admin.login",
       entity: "admin",
       metadata: { result: "denied" },
@@ -64,7 +63,7 @@ export async function POST(request: Request) {
 
   await createAdminSession(result.token);
   await recordAudit({
-    actor: result.user.email,
+    actor: user.email,
     action: "admin.login",
     entity: "admin",
     after: { role: adminRole },

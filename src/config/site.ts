@@ -1,7 +1,7 @@
 import "server-only";
 
 import { DEFAULT_SETTINGS } from "./defaults";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { settings } from "@/data/db/schema";
 
 // Server-only loader for admin-configurable platform settings.
@@ -51,7 +51,7 @@ export async function getSiteSettings(): Promise<ConfigValue<SiteSettings>> {
   let readDb = false;
 
   try {
-    const rows = await getDb().select().from(settings);
+    const rows = await queryWithTimeout((db) => db.select().from(settings));
     readDb = true;
     for (const row of rows) {
       const key = row.key as keyof SiteSettings;
