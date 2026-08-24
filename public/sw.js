@@ -4,11 +4,13 @@
    Sprint 1 concern. */
 const CACHE = "nld-shell-v1";
 
+const PRECACHE_ASSETS = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(["/", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"]))
+      .then((cache) => cache.addAll(PRECACHE_ASSETS))
       .then(() => self.skipWaiting()),
   );
 });
@@ -34,8 +36,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put("/", copy));
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put("/", copy));
+          }
           return response;
         })
         .catch(() => caches.match("/")),
@@ -47,10 +51,12 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(request).then(
       (cached) => cached || fetch(request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, copy));
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, copy));
+        }
         return response;
-      }),
+      }).catch(() => cached),
     ),
   );
 });

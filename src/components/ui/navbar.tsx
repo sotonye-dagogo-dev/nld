@@ -28,6 +28,7 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
   const [mobileOpen, setMobileOpen] = useState(false);
   const [overflowCount, setOverflowCount] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [measured, setMeasured] = useState(false);
   const rowRef = useRef<HTMLDivElement | null>(null);
   const moreRef = useRef<HTMLDivElement | null>(null);
 
@@ -39,6 +40,7 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
     const measure = () => {
       const gap = 4; // px
       let available = row.clientWidth;
+      if (available === 0) return; // Not rendered yet
       let fits = 0;
       for (const child of Array.from(row.children) as HTMLElement[]) {
         const w = child.offsetWidth + gap;
@@ -47,6 +49,7 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
         fits += 1;
       }
       setOverflowCount(Math.max(0, links.length - fits));
+      setMeasured(true);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -100,7 +103,7 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
               ))}
             </div>
 
-            {overflowLinks.length > 0 && (
+            {measured && overflowLinks.length > 0 && (
               <div className="relative" ref={moreRef}>
                 <button
                   type="button"

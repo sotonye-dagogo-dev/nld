@@ -34,7 +34,7 @@ export async function validateAdminToken(
   try {
     const authPromise = getAdminClient().auth.getUser(token);
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Auth validation timeout")), 10000)
+      setTimeout(() => reject(new Error("Auth validation timeout")), 5000)
     );
     const { data, error } = await Promise.race([authPromise, timeoutPromise]);
     if (error || !data.user) return { ok: false, error: error?.message ?? "invalid token" };
@@ -47,7 +47,11 @@ export async function validateAdminToken(
       },
     };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "auth error" };
+    const message = err instanceof Error ? err.message : "auth error";
+    if (message.includes("timeout") || message.includes("ECONNREFUSED") || message.includes("ENOTFOUND")) {
+      return { ok: false, error: "Authentication service unavailable" };
+    }
+    return { ok: false, error: message };
   }
 }
 
@@ -63,7 +67,7 @@ export async function adminSignIn(
   try {
     const authPromise = getAdminClient().auth.signInWithPassword({ email, password });
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Auth request timeout")), 15000)
+      setTimeout(() => reject(new Error("Auth request timeout")), 10000)
     );
     const { data, error } = await Promise.race([authPromise, timeoutPromise]);
     if (error || !data.session) {
@@ -79,7 +83,11 @@ export async function adminSignIn(
       },
     };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Sign-in error." };
+    const message = err instanceof Error ? err.message : "Sign-in error.";
+    if (message.includes("timeout") || message.includes("ECONNREFUSED") || message.includes("ENOTFOUND")) {
+      return { ok: false, error: "Authentication service unavailable. Please try again." };
+    }
+    return { ok: false, error: message };
   }
 }
 
