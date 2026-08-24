@@ -54,6 +54,7 @@ async function fetchSettingsFromDb(): Promise<Partial<SiteSettings>> {
     const rows = await queryWithTimeout(
       (db) => db.select().from(settings),
       0, // no retries for settings - fail fast to fallbacks
+      1000, // 1 second timeout for settings
     );
     const out: Partial<SiteSettings> = {};
     for (const row of rows) {

@@ -23,11 +23,6 @@ import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// Admin panel sidebar (§13 nav baseline). Role-aware links come from the
-// server layout; this client shell adds: mobile hamburger drawer (collapsible,
-// non-conflicting with the public navbar), desktop collapse-to-icons, and
-// sign-out. One component for every admin screen.
-
 export interface AdminNavItem {
   href: string;
   label: string;
@@ -98,7 +93,6 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
     try {
       await fetch("/api/admin/auth/logout", { method: "POST" });
     } catch {
-      // Non-fatal — cookie clearing is best-effort server-side.
     }
     toast("Signed out.", "info");
     router.push("/admin/login");
@@ -106,7 +100,6 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
 
   return (
     <>
-      {/* Mobile drawer toggle (hamburger) + brand row. */}
       <div className="mb-4 flex items-center justify-between md:hidden">
         <button
           type="button"
@@ -120,7 +113,6 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
         <span className="text-sm font-semibold text-text-primary">{platformName} — Admin</span>
       </div>
 
-      {/* Mobile drawer. */}
       {drawerOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} aria-hidden />
@@ -155,7 +147,6 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
         </div>
       )}
 
-      {/* Desktop sidebar with collapse toggle. */}
       <aside
         className={cn(
           "hidden shrink-0 rounded-xl border border-border bg-surface p-2 transition-[width] duration-200 md:block",
@@ -198,7 +189,7 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
             </Button>
           ) : (
             <div className="flex items-center gap-2 px-3 py-2 min-w-0">
-              <span className="min-w-0 flex-1 truncate text-xs text-text-muted">
+              <span className="min-w-0 flex-1 text-xs text-text-muted break-all">
                 {email}
                 {superadmin && (
                   <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">

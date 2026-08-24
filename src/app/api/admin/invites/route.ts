@@ -74,6 +74,7 @@ export async function POST(request: Request) {
 
   const token = randomBytes(24).toString("hex");
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+  const inviteUrl = `${env.appUrl}/admin/invite/${token}`;
 
   await queryWithTimeout((db) =>
     db.insert(adminInvites).values({
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
 
   // Deliver the invitation email. Failure is audited but non-fatal — the
   // invite row exists and can be re-sent from the panel.
+  let emailSent = false;
   try {
     const { value: settings } = await getSiteSettings();
     await sendTemplateEmail({
@@ -103,10 +105,11 @@ export async function POST(request: Request) {
       key: "admin_invite",
       variables: {
         platformName: settings.platformName,
-        inviteUrl: `${env.appUrl}/admin/invite/${token}`,
+        inviteUrl,
         expiresAt: expiresAt.toISOString().slice(0, 10),
       },
     });
+    emailSent = true;
   } catch (err) {
     console.error("[admin/invites] invite email send failed:", err);
     await recordAudit({
@@ -118,5 +121,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json({ ok: true, token });
+  return NextResponse.json({ ok: true, token, inviteUrl, emailSent });
 }
