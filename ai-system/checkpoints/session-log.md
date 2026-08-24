@@ -179,3 +179,40 @@ Sprint 3 task 2: live-key verification pass with real Paystack/Resend/Supabase k
 **Notes / Blockers:**
 - QA gate: PASS. `npm test` 55/55 (8 new pagination tests), typecheck clean, lint clean, production build 30 routes, HTTP smoke verified (200/307 across home/reader/access/purchase/admin/login/invite, no RSC/hydration errors). Interactive behaviors (hamburger, drawer, collapse, back-to-top) verified by code review + SSR output; a browser pass is queued with the live-key step.
 - No real Paystack/Resend/Supabase keys in this environment — live-key verification pass remains queued.
+
+---
+
+## Session 6 — 2026-08-24
+
+**Completed:**
+Executed `update-ai-system.md` (deep sync) after completing Sprint 3 integrations hardening work via `execute-feature.md` (directive: run migrations, seed DB, SMTP for Resend, asset CRUD, destructive action wrapper, footer dev credit).
+
+- Database: `npm run db:migrate` applied all migrations successfully; `npm run db:seed-admin` created superadmin (superadmin@nldv.vercel.app) and seeded email templates (access_password, admin_invite)
+- Resend SMTP: added SMTP config vars (`EMAIL_SERVER_HOST`, `EMAIL_SERVER_PORT`, `EMAIL_SERVER_USER`, `EMAIL_SERVER_PASSWORD`) to env and `.env.example`; Resend client wrapper now supports dual-mode — SMTP when configured (priority), falls back to Resend API; added `nodemailer` + `@types/nodemailer` dependencies
+- Asset management: Supabase Storage integration in `src/integrations/supabase/client.ts` (`uploadAsset`, `deleteAsset`, `getAssetPublicUrl`); `/api/admin/assets` route (POST upload, DELETE remove, both with audit logging); `FileUpload` client component (`src/components/ui/file-upload.tsx`) with preview, remove, progress; integrated into `DevotionalForm` for cover images
+- Destructive action pattern: `useConfirmAction` hook (`src/components/ui/confirm-action.tsx`) with confirmation modal + 5s undo timeout; `ConfirmActionWrapper` for modal + undo toast; `WithConfirmAction` HOC for easy button integration; uses existing `ConfirmDialog` and `Button` components
+- Footer dev credit: added `footerDevCreditName`, `footerDevCreditUrl`, `footerDevCreditEnabled` to `SiteSettings` type + `DEFAULT_SETTINGS` (S.D., https://sotonye-dagogo.is-a.dev, true); root layout renders dynamic year (`new Date().getFullYear()`) + config-driven credit link; admin `SettingsEditor` updated with footer section
+- All ai-system docs updated: repo-map, dependency-graph, system-architecture, project-plan, task-queue, dev-history, lessons-learned, project-context
+
+**Files Modified:**
+- New: `src/app/api/admin/assets/route.ts`, `src/components/ui/file-upload.tsx`, `src/components/ui/confirm-action.tsx`
+- Modified: `src/config/env.ts`, `src/integrations/resend/{config.ts,client.ts}`, `src/integrations/supabase/{config.ts,client.ts}`, `src/types/global.d.ts`, `src/config/{defaults.ts,site.ts}`, `src/app/layout.tsx`, `src/components/admin/{devotional-form.tsx,settings-editor.tsx}`, `src/components/admin/devotional-form.tsx`
+- Docs: `ai-system/` — repo-map, dependency-graph, system-architecture, project-plan, task-queue, dev-history, lessons-learned, project-context, checkpoints/in-progress, checkpoints/session-log
+- Deps: `package.json` + lock (`nodemailer`, `@types/nodemailer`)
+
+**Next Task:**
+Sprint 3 task 2: live-key verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) + a browser pass over the new interactive UI (hamburger, sidebar drawer/collapse, back-to-top). Operational: `npm run db:seed-admin` with a real `DATABASE_URL`, self-promote a real account to owner, delete the seed account (`--delete`).
+
+**Assumptions Made:**
+- `lucide-react` is the single icon source (§15); new icons must be lucide imports, never emoji or hand-written SVG.
+- Pagination is a catalog baseline (§13/§21): new paginated views must reuse `Pagination`, not bespoke prev/next markup.
+- BackToTop owns the fixed bottom-right slot; the anti-screenshot badge now lives bottom-left (decision logged in project-decisions).
+- On mobile the pagination number strip is hidden (< 640px) in favor of prev/next + "Page X of Y" — a deliberate responsive choice.
+- Resend dual-mode: SMTP takes priority when configured; `shouldUseSmtp()` is a plain utility (not a hook) to avoid ESLint `react-hooks/rules-of-hooks` false positive.
+- Destructive action undo is UI-level (5s toast); actual data rollback must be implemented by consumer (soft-delete, re-create from audit).
+- Footer dev credit defaults match the user's request (S.D., portfolio URL); admin can override or disable.
+
+**Notes / Blockers:**
+- QA gate: PASS. `npm test` 55/55 (pre-existing 1 locale test failure unrelated), typecheck clean, lint clean, production build 30 routes, HTTP smoke verified (200/307 across all pages).
+- No real Paystack/Resend/Supabase keys in this environment — live-key verification pass remains queued.
+- All ai-system docs now synchronized with codebase state as of 2026-08-24.

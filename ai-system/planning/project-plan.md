@@ -1,8 +1,8 @@
 # Project Plan
 
 > **Metadata**
-> - last-updated-by: execute-feature (issue 3)
-> - last-verified-against-code: 2026-08-20
+> - last-updated-by: update-ai-system (post-session 6)
+> - last-verified-against-code: 2026-08-24
 > - staleness-policy: re-verify if project scope or phase changes
 
 > **Overview:** High-level feature checklist organized by development phase. See `planning/task-queue.md` for granular, sprint-level tasks. The MVP scope comes from `artifacts/genesis-directive.txt`; the beyond-MVP roadmap comes from the client Word brief (`artifacts/Next-Level-Devotional-App.md`) and platform suggestions.
@@ -30,7 +30,7 @@
 - [x] Audit trails for uploads, payments, access grants
 - [x] Event analytics (visits, devotional opens, page views)
 
-## Phase 2 — MVP: Admin Panel (largely complete)
+## Phase 2 — MVP: Admin Panel (complete)
 
 - [x] Admin auth (Supabase Auth, admin-only routes + seeded superadmin)
 - [x] Admin invite flow (superadmin → email link → signup → auto-added admin)
@@ -58,6 +58,10 @@
 ## Phase 5 — Quality & Polish
 
 - [x] Icons everywhere (lucide-react, no emoji/raw SVG — §15), global theme toggle, back-to-top, universal pagination, responsive navbar/sidebar (hamburger + overflow dropdowns + collapse)
+- [x] SMTP support for Resend (config-driven, falls back to API)
+- [x] Asset upload/management (Supabase Storage, cover images, admin CRUD)
+- [x] Global destructive action wrapper (confirmation modal + undo timeout pattern)
+- [x] Config-driven footer dev credit (name, URL, enable toggle) + dynamic copyright year
 - [ ] Unit test coverage for core modules (config, access, pricing)
 - [ ] Integration tests for purchase + access flow
 - [ ] E2E tests for browse → purchase → unlock

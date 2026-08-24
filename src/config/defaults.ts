@@ -16,6 +16,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   paymentsEnabled: true,
   emailFrom: "Next Level Devotional <devotional@example.com>",
   supportEmail: "support@example.com",
+  footerDevCreditName: "S.D.",
+  footerDevCreditUrl: "https://sotonye-dagogo.is-a.dev",
+  footerDevCreditEnabled: true,
 };
 
 /** Currency display helpers, config-driven with fallbacks. */

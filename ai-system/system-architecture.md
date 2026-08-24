@@ -1,8 +1,8 @@
 # System Architecture
 
 > **Metadata**
-> - last-updated-by: bootstrap-project (execute-feature, issue 1)
-> - last-verified-against-code: 2026-08-20
+> - last-updated-by: update-ai-system (post-session 6)
+> - last-verified-against-code: 2026-08-24
 > - staleness-policy: re-verify before trusting if any architecture-affecting commits have been made since last-verified-against-code
 
 > **Overview:** How the system is structured — layers, modules, data flow, and configuration. Agents designing or changing structure must read this first.
@@ -19,14 +19,15 @@ Next.js App Router (Vercel)
 ├── Public surface        /devotionals/[slug]   devotional reader + paywall
 ├── Public surface        /purchase/[slug]      checkout (email + Paystack)
 ├── Public surface        /access               enter access password
-├── Admin surface         /admin/*              upload, records, settings
-└── API Route Handlers    /api/*                paystack init/webhook, access verify
+├── Admin surface         /admin/*              upload, records, settings, assets
+└── API Route Handlers    /api/*                paystack init/webhook, access verify, assets upload/delete
      ↓
 Service / Business Logic  src/lib, src/services
      ↓
 Data Access (Drizzle ORM)  src/data
      ↓
 Supabase Postgres (single database)
+Supabase Storage (devotional assets: covers, etc.)
 Integration wrappers (isolated SDKs): Supabase, Paystack, Resend
 ```
 
@@ -38,11 +39,13 @@ Integration wrappers (isolated SDKs): Supabase, Paystack, Resend
 | ------------------ | ------------------------------------------------- | ------------------------------- | ---------------------- |
 | Config layer       | Admin-configurable settings with code fallbacks   | `src/config/site.ts`            | drizzle settings table |
 | Public UI          | Browse + read + purchase + access pages           | `src/app`, `src/components/ui`  | config, data, lib      |
-| Admin UI           | Content upload, records, analytics, settings      | `src/app/admin`                 | config, data, lib      |
-| API layer          | Paystack init/webhook, access verification        | `src/app/api`                   | integrations, data     |
-| Service logic      | Access password gen/verify, audit, pricing        | `src/lib/access.ts`, `src/lib/audit.ts` | config, data, integrations |
+| Admin UI           | Content upload, records, analytics, settings, assets | `src/app/admin`                 | config, data, lib      |
+| API layer          | Paystack init/webhook, access verification, assets | `src/app/api`                   | integrations, data     |
+| Service logic      | Access password gen/verify, audit, pricing, analytics | `src/lib/access.ts`, `src/lib/audit.ts`, `src/lib/analytics.ts` | config, data, integrations |
 | Data layer         | Drizzle schema + DB client                        | `src/data/db/schema.ts`         | drizzle-orm, postgres  |
 | Integration layer  | SDK isolation per §17                             | `src/integrations/{paystack,resend,supabase}` | vendor SDKs |
+| Destructive actions | Global confirmation + undo pattern               | `src/components/ui/confirm-action.tsx` | modal, button, hooks |
+| File uploads       | Asset management via Supabase Storage            | `src/components/ui/file-upload.tsx`, `src/app/api/admin/assets/route.ts` | supabase storage |
 
 ---
 
@@ -68,11 +71,32 @@ Request → Next.js route (server component / route handler)
   → user enters access password at /access → verified → reader unlocks
 ```
 
+### Asset Upload Flow (Admin)
+```
+/admin/devotionals (create/edit) → FileUpload component
+  → POST /api/admin/assets (multipart/form-data)
+  → uploadAsset → Supabase Storage (devotional-assets bucket)
+  → returns publicUrl → saved as devotional.coverUrl
+  → recordAudit (asset.upload)
+```
+
+### Destructive Action Pattern (Global)
+```
+Button click → WithConfirmAction / useConfirmAction
+  → ConfirmDialog modal (title, description, confirm/cancel)
+  → onConfirm → execute(async action)
+  → action() runs (e.g., delete devotional, remove asset)
+  → Undo toast appears (5s timeout with progress bar)
+  → onUndo → reverts action (consumer implements undo logic)
+  → timeout expires → toast auto-dismisses
+```
+
 ### Data Persistence Flow
 ```
 All writes via Drizzle against Supabase Postgres.
 Multi-step writes (payment confirm + access grant + email + audit) run as one transaction
 with the email sent after commit; partial failure leaves compensation trace in audit_logs.
+Asset uploads go to Supabase Storage; DB stores only the path + public URL.
 ```
 
 ---
@@ -88,9 +112,13 @@ with the email sent after commit; partial failure leaves compensation trace in a
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only elevated key            | .env (server only) | none    |
 | `PAYSTACK_SECRET_KEY`   | Server-side verification key             | .env (server only) | none    |
 | `PAYSTACK_PUBLIC_KEY`   | Client-side popup key                    | .env (public)      | none    |
-| `RESEND_API_KEY`        | Transactional mail key                   | .env (server only) | none    |
+| `RESEND_API_KEY`        | Transactional mail key (API mode)        | .env (server only) | none    |
+| `EMAIL_SERVER_HOST`     | SMTP host (Resend SMTP mode)             | .env               | none    |
+| `EMAIL_SERVER_PORT`     | SMTP port (465 default)                  | .env               | 465     |
+| `EMAIL_SERVER_USER`     | SMTP username (Resend)                   | .env               | resend  |
+| `EMAIL_SERVER_PASSWORD` | SMTP password (Resend API key)           | .env (server only) | none    |
 | `ACCESS_PASSWORD_SECRET`| HMAC key for access-password derivation  | .env (server only) | dev fallback in config |
-| Site settings (DB)      | Platform name, logo, pricing, access mode, toggles | `settings` table | code fallbacks in `src/config/site.ts` |
+| Site settings (DB)      | Platform name, logo, pricing, access mode, toggles, footer dev credit | `settings` table | code fallbacks in `src/config/site.ts` |
 | `ENABLE_DESIGN_VIEWER`  | Dev-only design-asset viewer mount        | .env               | false   |
 
 All config points follow the fallback discipline from `standards/engineering-principles.md` §1 and §3 — every config-driven value has a documented, safe fallback so the system degrades gracefully if the value is missing or malformed.
@@ -108,6 +136,7 @@ No project CLI exists yet. Verification is via `npm run typecheck`, `npm run lin
 - **Previous-build promotion** — Vercel instant rollback to the previous deployment is the primary undo path.
 - **DB migration reversibility** — Drizzle migrations are generated with both up and down; roll back with `drizzle-kit` down where the migration is reversible. Destructive migrations require explicit flagging.
 - **Feature-flag kill switch** — purchase gating and reader protection are config-driven (DB settings) so they can be toggled without a deploy.
+- **Destructive action undo** — 5-second undo window on delete/replace actions via `useConfirmAction` pattern (UI-level, not DB transaction rollback).
 
 ---
 
@@ -120,8 +149,9 @@ No project CLI exists yet. Verification is via `npm run typecheck`, `npm run lin
 | Styling    | Tailwind CSS            | 3.x          |
 | Database   | Supabase Postgres       | 15           |
 | ORM        | Drizzle ORM             | 0.36+        |
+| Storage    | Supabase Storage        | —            |
 | Payments   | Paystack                | API v3       |
-| Email      | Resend                  | SDK          |
+| Email      | Resend (API + SMTP)     | SDK + nodemailer |
 | Auth (admin only) | Supabase Auth    | —            |
 
 ---
@@ -132,6 +162,8 @@ No project CLI exists yet. Verification is via `npm run typecheck`, `npm run lin
 - Supabase `anon` key is public by design; RLS/policies must be enforced at the DB level for anything a client could touch directly.
 - Access password derivation depends on `ACCESS_PASSWORD_SECRET`; changing it invalidates existing grants (documented migration path in `memory/project-decisions.md`).
 - Anti-screenshot protection is a best-effort client behavior (DRM-level protection is a future consideration; the parent project may own this).
+- Supabase Storage bucket `devotional-assets` must exist and be public (or use signed URLs for private assets).
+- Destructive action undo is UI-level only; actual data rollback must be implemented by the consumer (e.g., soft-delete, re-create from audit log).
 
 ---
 

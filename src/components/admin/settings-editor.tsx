@@ -23,6 +23,9 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
     accessMode: initial.accessMode,
     paymentsEnabled: initial.paymentsEnabled,
     antiScreenshotEnabled: initial.antiScreenshotEnabled,
+    footerDevCreditName: initial.footerDevCreditName,
+    footerDevCreditUrl: initial.footerDevCreditUrl,
+    footerDevCreditEnabled: initial.footerDevCreditEnabled,
   });
   const [saving, setSaving] = useState(false);
 
@@ -158,6 +161,37 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
               className="h-4 w-4 accent-primary"
             />
           </label>
+        </div>
+
+        <div className="space-y-3 border-t border-border pt-4">
+          <h3 className="text-lg font-semibold text-text-primary">Footer Developer Credit</h3>
+          <label className="flex items-center justify-between gap-4 text-sm text-text-primary">
+            <span>
+              Show developer credit
+              <span className="block text-xs text-text-muted">Display &lsquo;Built by [Name]&rsquo; in the footer.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={form.footerDevCreditEnabled}
+              onChange={(e) => setForm({ ...form, footerDevCreditEnabled: e.target.checked })}
+              className="h-4 w-4 accent-primary"
+            />
+          </label>
+          <Input
+            name="footerDevCreditName"
+            label="Developer name"
+            placeholder="S.D."
+            value={form.footerDevCreditName}
+            onChange={(e) => setForm({ ...form, footerDevCreditName: e.target.value })}
+          />
+          <Input
+            name="footerDevCreditUrl"
+            type="url"
+            label="Developer URL"
+            placeholder="https://example.com"
+            value={form.footerDevCreditUrl}
+            onChange={(e) => setForm({ ...form, footerDevCreditUrl: e.target.value })}
+          />
         </div>
 
         <div className="flex justify-end border-t border-border pt-4">

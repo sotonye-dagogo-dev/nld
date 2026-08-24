@@ -16,6 +16,10 @@ export const env = {
 
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   emailFrom: process.env.EMAIL_FROM ?? "",
+  emailServerHost: process.env.EMAIL_SERVER_HOST ?? "",
+  emailServerPort: process.env.EMAIL_SERVER_PORT ? Number(process.env.EMAIL_SERVER_PORT) : undefined,
+  emailServerUser: process.env.EMAIL_SERVER_USER ?? "",
+  emailServerPassword: process.env.EMAIL_SERVER_PASSWORD ?? "",
 
   // HMAC key for access-password derivation. Falls back to a dev-only value
   // so local/dev runs work without setup; production MUST set a real secret.

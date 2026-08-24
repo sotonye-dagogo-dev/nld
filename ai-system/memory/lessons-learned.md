@@ -76,3 +76,70 @@ Writing any new unit test that imports a server-only module.
 
 **Supersedes:** None
 **Superseded by:** None
+
+---
+
+### Resend dual-mode (API + SMTP) requires explicit hook naming
+
+**Context:**
+The Resend integration was extended to support both the Resend HTTP API and SMTP (via nodemailer). The config function was initially named `useSmtp()` which triggered a React Hooks ESLint error because it was called from a non-component function.
+
+**What We Learned:**
+Avoid prefixing utility functions with `use` unless they are actual React hooks. Renamed to `shouldUseSmtp()` to follow naming conventions and avoid lint errors. The function is a plain utility that checks config, not a hook.
+
+**Apply When:**
+Adding configuration check functions that might be called from server-side utility functions. Never use `use` prefix for non-hook functions.
+
+**Supersedes:** None
+**Superseded by:** None
+
+---
+
+### Global destructive action pattern replaces ad-hoc confirm dialogs
+
+**Context:**
+Multiple admin actions (delete devotional, remove asset, remove day) needed confirmation modals. Previously each would have custom confirm logic. Created a unified `useConfirmAction` hook + `WithConfirmAction` HOC + `ConfirmActionWrapper` that provides consistent UX: confirmation modal → action execution → undo toast with 5s timeout and progress bar.
+
+**What We Learned:**
+Invest in a reusable destructive action pattern early. It standardizes the confirmation flow, provides undo capability (UI-level), and eliminates scattered custom implementations. The pattern uses existing `ConfirmDialog` and `Button` components, keeping bundle size minimal.
+
+**Apply When:**
+Any new destructive action (delete, remove, replace, archive) in admin or public UI. Wrap the action button with `WithConfirmAction` and implement the actual action + undo logic.
+
+**Supersedes:** None
+**Superseded by:** None
+
+---
+
+### File upload to Supabase Storage via API route + client component
+
+**Context:**
+Needed admin cover image upload for devotionals. Implemented `FileUpload` client component with drag-drop zone, preview, remove button, and progress indication. Backend `/api/admin/assets` route handles multipart upload to Supabase Storage, returns public URL, and writes audit log.
+
+**What We Learned:**
+- Use `next/image` for preview optimization (avoids `@next/next/no-img-element` lint warning)
+- Supabase Storage `upsert: true` handles overwrites cleanly
+- Keep upload logic in API route (server-only) — client only handles file selection and UI state
+- Audit every upload/delete for traceability
+
+**Apply When:**
+Adding any file upload feature (covers, assets, documents). Follow the same pattern: client component → API route → Supabase Storage → audit.
+
+**Supersedes:** None
+**Superseded by:** None
+
+---
+
+### Config-driven footer credit + dynamic year eliminates hardcoded values
+
+**Context:**
+Footer had hardcoded "Built by S.D." link and dynamic year was already using `new Date().getFullYear()` but the dev credit was not config-driven.
+
+**What We Learned:**
+Add footer dev credit settings (`footerDevCreditName`, `footerDevCreditUrl`, `footerDevCreditEnabled`) to the settings store with defaults. Admin can now change name, URL, or disable entirely without code changes. The dynamic year was already correct — verify it stays `new Date().getFullYear()` in the root layout.
+
+**Apply When:**
+Any "static" footer/header content that stakeholders might want to change. Make it config-driven from the start — the overhead is minimal (one DB column + default + admin form field).
+
+**Supersedes:** None
+**Superseded by:** None

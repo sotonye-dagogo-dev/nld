@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { FileUpload } from "@/components/ui/file-upload";
 import { slugify } from "@/lib/utils";
 
 // Devotional upload/edit form — creates or updates a devotional with its
@@ -44,6 +45,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
     title: devotional?.title ?? "",
     subtitle: devotional?.subtitle ?? "",
     slug: devotional?.slug ?? "",
+    coverUrl: devotional?.coverUrl ?? "",
     priceMinor: devotional ? String(devotional.priceMinor) : "500000",
     currency: devotional?.currency ?? "NGN",
     previewDays: devotional ? String(devotional.previewDays) : "3",
@@ -81,6 +83,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
         title: form.title,
         subtitle: form.subtitle,
         slug: form.slug,
+        coverUrl: form.coverUrl,
         priceMinor: Number(form.priceMinor) || 0,
         currency: form.currency || "NGN",
         accessMode: form.accessMode,
@@ -141,6 +144,12 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             placeholder={derivedSlug}
             value={form.slug}
             onChange={(e) => setForm({ ...form, slug: e.target.value })}
+          />
+          <FileUpload
+            label="Cover Image"
+            value={form.coverUrl}
+            onChange={(url) => setForm({ ...form, coverUrl: url ?? "" })}
+            type="cover"
           />
           <div className="grid grid-cols-2 gap-4">
             <Input

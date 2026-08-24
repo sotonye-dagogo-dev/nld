@@ -119,3 +119,28 @@ Ran the QA gate and delivered the global UI/UX pass: icons now come from lucide-
 
 **Next Sprint Focus:**
 Sprint 3 (part 2) — live-key verification pass with real Paystack/Resend/Supabase keys, including a browser pass over the new interactive UI (hamburger, drawer/collapse, back-to-top).
+
+---
+
+## 2026-08-24 — Sprint 3 Completion: Integrations hardening, assets, destructive actions, footer config
+
+**Summary:**
+Completed the remaining Sprint 3 work and additional hardening: ran DB migrations and seeded the admin user, added SMTP support for Resend (config-driven with API fallback), implemented asset upload/management via Supabase Storage (covers, admin CRUD), created a global destructive action wrapper with confirmation modal and undo timeout (5s), and made the footer developer credit fully config-driven (name, URL, enabled toggle) with a dynamic copyright year.
+
+**Completed:**
+- Database: `npm run db:migrate` applied all migrations; `npm run db:seed-admin` created superadmin (superadmin@nldv.vercel.app) and seeded email templates
+- Resend SMTP: added `EMAIL_SERVER_HOST`, `EMAIL_SERVER_PORT`, `EMAIL_SERVER_USER`, `EMAIL_SERVER_PASSWORD` to env; Resend client now uses SMTP when configured, falls back to API; added `nodemailer` dependency
+- Asset management: Supabase Storage integration (`uploadAsset`, `deleteAsset`, `getAssetPublicUrl`), `/api/admin/assets` route (POST/DELETE with audit), `FileUpload` component with preview/remove, integrated into `DevotionalForm` for cover images
+- Destructive action pattern: `useConfirmAction` hook + `ConfirmActionWrapper` + `WithConfirmAction` HOC; confirmation modal via `ConfirmDialog`; undo toast with 5s progress bar; reusable for delete/replace actions
+- Footer dev credit: added `footerDevCreditName`, `footerDevCreditUrl`, `footerDevCreditEnabled` to `SiteSettings` with defaults (S.D., https://sotonye-dagogo.is-a.dev, true); rendered in root layout with dynamic year (`new Date().getFullYear()`); admin settings editor updated with footer section
+- Updated admin settings editor with footer dev credit configuration section
+
+**Key Changes:**
+- Resend now dual-mode (API + SMTP) — SMTP takes priority when configured, zero code changes at call sites
+- Asset uploads go to Supabase Storage `devotional-assets` bucket; DB stores path + public URL
+- Global destructive action pattern established — replaces ad-hoc confirm dialogs, provides consistent UX with undo
+- Footer credit is fully admin-configurable via settings editor; no hardcoded values
+- Copyright year is dynamically rendered, not hardcoded
+
+**Next Sprint Focus:**
+Sprint 3 (part 2) — live-key verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) + browser pass over interactive UI. Operational: bootstrap owner account, self-promote, delete seed.
