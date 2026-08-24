@@ -41,25 +41,29 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
       const gap = 4; // px
       let available = row.clientWidth;
       if (available === 0) return; // Not rendered yet
+      const children = Array.from(row.children) as HTMLElement[];
+      if (children.length === 0) return;
       let fits = 0;
-      for (const child of Array.from(row.children) as HTMLElement[]) {
+      for (const child of children) {
         const w = child.offsetWidth + gap;
         if (available - w < 0) break;
         available -= w;
         fits += 1;
       }
       setOverflowCount(Math.max(0, links.length - fits));
-      setMeasured(true);
+      if (!measured) setMeasured(true);
     };
-    measure();
+    // Defer initial measurement to next frame to ensure layout is stable
+    const rafId = requestAnimationFrame(measure);
     const ro = new ResizeObserver(measure);
     ro.observe(row);
     window.addEventListener("resize", measure);
     return () => {
+      cancelAnimationFrame(rafId);
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [links.length]);
+  }, [links.length, measured]);
 
   // Close the overflow dropdown on outside click or Escape.
   useEffect(() => {

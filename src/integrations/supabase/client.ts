@@ -8,6 +8,26 @@ import { supabaseConfig } from "./config";
 
 let serviceClient: ReturnType<typeof createClient> | null = null;
 
+const AUTH_TIMEOUT_MS = 8000;
+const VALIDATE_TIMEOUT_MS = 4000;
+
+function withAbortTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  return promise
+    .then((result) => {
+      clearTimeout(timeoutId);
+      return result;
+    })
+    .catch((err) => {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError" || err.name === "CancellationError") {
+        throw new Error("Request timeout");
+      }
+      throw err;
+    });
+}
+
 /**
  * Server-only admin client using the service-role key. Bypasses RLS by
  * design; only call from route handlers / server components / wrappers.
@@ -19,6 +39,16 @@ export function getAdminClient() {
   }
   serviceClient = createClient(supabaseConfig.url, supabaseConfig.serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: {
+      fetch: (url, options) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
+        return fetch(url, {
+          ...options,
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timeoutId));
+      },
+    },
   });
   return serviceClient;
 }
@@ -32,11 +62,10 @@ export async function validateAdminToken(
 ): Promise<AdminSessionResult> {
   if (!token) return { ok: false, error: "missing token" };
   try {
-    const authPromise = getAdminClient().auth.getUser(token);
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Auth validation timeout")), 5000)
+    const { data, error } = await withAbortTimeout(
+      getAdminClient().auth.getUser(token),
+      VALIDATE_TIMEOUT_MS,
     );
-    const { data, error } = await Promise.race([authPromise, timeoutPromise]);
     if (error || !data.user) return { ok: false, error: error?.message ?? "invalid token" };
     return {
       ok: true,
@@ -48,7 +77,10 @@ export async function validateAdminToken(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "auth error";
-    if (message.includes("timeout") || message.includes("ECONNREFUSED") || message.includes("ENOTFOUND")) {
+    if (message.includes("timeout") || message.includes("AbortError") || message.includes("CancellationError")) {
+      return { ok: false, error: "Authentication service unavailable" };
+    }
+    if (message.includes("ECONNREFUSED") || message.includes("ENOTFOUND")) {
       return { ok: false, error: "Authentication service unavailable" };
     }
     return { ok: false, error: message };
@@ -65,11 +97,10 @@ export async function adminSignIn(
   password: string,
 ): Promise<AdminSessionResult & { token?: string }> {
   try {
-    const authPromise = getAdminClient().auth.signInWithPassword({ email, password });
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Auth request timeout")), 10000)
+    const { data, error } = await withAbortTimeout(
+      getAdminClient().auth.signInWithPassword({ email, password }),
+      AUTH_TIMEOUT_MS,
     );
-    const { data, error } = await Promise.race([authPromise, timeoutPromise]);
     if (error || !data.session) {
       return { ok: false, error: error?.message ?? "Invalid email or password." };
     }
@@ -84,7 +115,10 @@ export async function adminSignIn(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sign-in error.";
-    if (message.includes("timeout") || message.includes("ECONNREFUSED") || message.includes("ENOTFOUND")) {
+    if (message.includes("timeout") || message.includes("AbortError") || message.includes("CancellationError")) {
+      return { ok: false, error: "Authentication service unavailable. Please try again." };
+    }
+    if (message.includes("ECONNREFUSED") || message.includes("ENOTFOUND")) {
       return { ok: false, error: "Authentication service unavailable. Please try again." };
     }
     return { ok: false, error: message };
