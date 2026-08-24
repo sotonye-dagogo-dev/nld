@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { AccessGate } from "@/components/devotionals/access-gate";
 import { AntiScreenshot } from "@/components/devotionals/anti-screenshot";
+import { AccessPasswordFallback } from "@/components/devotionals/access-password-fallback";
 import { getDevotionalBySlug, getDevotionalDays } from "@/lib/catalog";
 import { getSiteSettings } from "@/config/site";
 import { recordEvent } from "@/lib/audit";
@@ -24,10 +25,13 @@ export async function generateMetadata({
 
 export default async function DevotionalPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ reference?: string }>;
 }) {
   const { slug } = await params;
+  const { reference } = await searchParams;
   const { value: settings } = await getSiteSettings();
 
   let devotional: Devotional | null = null;
@@ -108,6 +112,10 @@ export default async function DevotionalPage({
                 </article>
               ))}
             </section>
+
+            {reference && devotional.priceMinor > 0 && (
+              <AccessPasswordFallback reference={reference} devotionalSlug={devotional.title} />
+            )}
 
             {hasAccessControl && <AccessGate devotional={devotional} settings={settings} />}
             {hasAccessControl === false && (
