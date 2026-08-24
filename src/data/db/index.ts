@@ -13,10 +13,10 @@ import * as schema from "./schema";
 let client: ReturnType<typeof postgres> | null = null;
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-const QUERY_TIMEOUT_MS = 5000;
-const CONNECT_TIMEOUT_MS = 3000;
-const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 500;
+const QUERY_TIMEOUT_MS = 15000;
+const CONNECT_TIMEOUT_MS = 10000;
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number = QUERY_TIMEOUT_MS): Promise<T> {
   return Promise.race([
@@ -54,11 +54,11 @@ function createPgClient() {
     throw new Error("DATABASE_URL is not set — cannot create DB client");
   }
   // Use a short connection timeout and disable prepared statements for PgBouncer compatibility
-  // max: 1 to avoid connection pool exhaustion in serverless
-  // connect_timeout: 3 seconds to fail fast
+  // max: 3 for serverless to handle concurrent requests
+  // connect_timeout: 10 seconds for cold starts
   // idle_timeout: 10 seconds, max_lifetime: 5 minutes
   const pgClient = postgres(databaseUrl, {
-    max: 1,
+    max: 3,
     prepare: false,
     connect_timeout: CONNECT_TIMEOUT_MS / 1000,
     idle_timeout: 10,

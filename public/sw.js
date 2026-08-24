@@ -7,21 +7,18 @@ const CACHE = "nld-shell-v1";
 const PRECACHE_ASSETS = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 async function precacheAssets(cache) {
-  const results = await Promise.allSettled(
-    PRECACHE_ASSETS.map(async (asset) => {
-      try {
-        const response = await fetch(asset, { cache: "no-cache" });
-        if (response.ok) {
-          await cache.put(asset, response);
-        } else {
-          console.warn("[sw] precache failed for", asset, "status:", response.status);
-        }
-      } catch (err) {
-        console.warn("[sw] precache failed for", asset, err);
+  for (const asset of PRECACHE_ASSETS) {
+    try {
+      const response = await fetch(asset, { cache: "no-cache" });
+      if (response.ok) {
+        await cache.put(asset, response);
+      } else {
+        console.warn("[sw] precache failed for", asset, "status:", response.status);
       }
-    })
-  );
-  return results;
+    } catch (err) {
+      console.warn("[sw] precache failed for", asset, err);
+    }
+  }
 }
 
 self.addEventListener("install", (event) => {
@@ -56,7 +53,7 @@ self.addEventListener("fetch", (event) => {
         .then((response) => {
           if (response.ok) {
             const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put("/", copy));
+            caches.open(CACHE).then((cache) => cache.put("/", copy)).catch(() => {});
           }
           return response;
         })
@@ -71,7 +68,7 @@ self.addEventListener("fetch", (event) => {
       (cached) => cached || fetch(request).then((response) => {
         if (response.ok) {
           const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
         }
         return response;
       }).catch(() => cached),

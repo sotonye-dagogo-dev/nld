@@ -2,7 +2,7 @@
 
 > **Metadata**
 >
-> - last-updated-by: update-ai-system (post-session 6)
+> - last-updated-by: fix-build
 > - last-verified-against-code: 2026-08-24
 > - staleness-policy: this file is overwritten every session — always current
 
@@ -12,15 +12,26 @@
 
 ## Current State
 
-**Status:** Complete — cleared on clean completion (update-ai-system post-session 6).
+**Status:** Complete — cleared on clean completion (fix-build session).
 
 **What was completed (this session):**
 
-- Database: `npm run db:migrate` applied all migrations; `npm run db:seed-admin` created superadmin (superadmin@nldv.vercel.app) and seeded email templates
-- Resend SMTP: added `EMAIL_SERVER_HOST`, `EMAIL_SERVER_PORT`, `EMAIL_SERVER_USER`, `EMAIL_SERVER_PASSWORD` to env; Resend client now uses SMTP when configured, falls back to API; added `nodemailer` dependency
-- Asset management: Supabase Storage integration (`uploadAsset`, `deleteAsset`, `getAssetPublicUrl`), `/api/admin/assets` route (POST/DELETE with audit), `FileUpload` component with preview/remove, integrated into `DevotionalForm` for cover images
-- Destructive action pattern: `useConfirmAction` hook + `ConfirmActionWrapper` + `WithConfirmAction` HOC; confirmation modal via `ConfirmDialog`; undo toast with 5s progress bar; reusable for delete/replace actions
-- Footer dev credit: added `footerDevCreditName`, `footerDevCreditUrl`, `footerDevCreditEnabled` to `SiteSettings` with defaults (S.D., https://sotonye-dagogo.is-a.dev, true); rendered in root layout with dynamic year (`new Date().getFullYear()`); admin settings editor updated with footer section
+- Fixed "Event handlers cannot be passed to Client Component props" error by changing `ErrorState` to use `retryHref` instead of `onRetry` function prop
+- Fixed Vercel Runtime Timeout (300s) and Database query timeout (5000ms) by increasing timeouts and connection pool size
+- Fixed admin authentication redirect loop by making layout redirect instead of rendering fallback, and fixing cookie secure flag for dev
+- Fixed service worker errors by improving precaching error handling
+- Verified password visibility toggle, navbar dropdown behavior, and button loading states work correctly
+- All builds, lint, typecheck, and tests pass
+
+**Files affected:**
+- `src/components/ui/error-state.tsx` — use retryHref instead of onRetry
+- `src/app/admin/(panel)/layout.tsx` — redirect on invalid session
+- `src/data/db/index.ts` — increased timeouts (15s query, 10s connect), pool max: 3
+- `src/integrations/supabase/client.ts` — increased auth timeouts (15s/10s)
+- `src/lib/admin-auth.ts` — cookie secure flag respects NODE_ENV
+- `public/sw.js` — robust precaching with try/catch per asset
+- `ai-system/repair-system.md` — added 4 new error pattern entries
+- `ai-system/checkpoints/in-progress.md` — updated
 
 **Next up (queued in `planning/task-queue.md`, Sprint 3):**
 

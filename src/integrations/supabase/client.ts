@@ -8,8 +8,8 @@ import { supabaseConfig } from "./config";
 
 let serviceClient: ReturnType<typeof createClient> | null = null;
 
-const AUTH_TIMEOUT_MS = 5000;
-const VALIDATE_TIMEOUT_MS = 3000;
+const AUTH_TIMEOUT_MS = 15000;
+const VALIDATE_TIMEOUT_MS = 10000;
 
 function withAbortTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   const controller = new AbortController();

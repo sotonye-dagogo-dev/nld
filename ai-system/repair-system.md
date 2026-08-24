@@ -1,8 +1,8 @@
 # Repair System — Error Knowledge Base
 
 > **Metadata**
-> - last-updated-by: (set on first entry)
-> - last-verified-against-code: (set after fix verification)
+> - last-updated-by: fix-build
+> - last-verified-against-code: 2026-08-24
 > - staleness-policy: individual entries may be stale if the code has changed around them — verify fix still applies before reusing
 
 > **Overview:** Living knowledge base of errors encountered during development, their root causes, and how they were fixed. Agents must search this before diagnosing new errors and log every fixed bug to prevent recurrence.
@@ -109,3 +109,47 @@
 - Cause: Supabase RLS denies the `anon` key; tables enabled for RLS without matching policies
 - Fix: Add per-table policies for public reads; service-role bypass only in server wrappers
 - Prevention: Write the RLS policy block beside every table in `src/data/db/schema.ts` (raw SQL migration); test with the anon key, not just service role
+
+### React / Next.js — Server-to-Client Function Passing
+
+**Event handlers cannot be passed to Client Component props**
+- Symptom: `Error: Event handlers cannot be passed to Client Component props.` when rendering a client component from a server component with an `onClick` or similar handler prop
+- Cause: Next.js Server Components cannot pass functions (event handlers) as props to Client Components — functions are not serializable
+- Fix: Replace function props with serializable values (e.g., `retryHref` string) and use `useRouter().push()` in the client component; or make the parent a client component
+- Prevention: Never pass functions from server to client components; use URLs, IDs, or other serializable data instead; audit component boundaries during code review
+- Files Affected: `src/components/ui/error-state.tsx`, `src/app/admin/(panel)/layout.tsx`
+- Date: 2026-08-24
+- Status: Active
+
+### Database / Serverless — Connection Timeouts
+
+**Vercel Runtime Timeout / Database query timeout after 5000ms**
+- Symptom: `FUNCTION_INVOCATION_TIMEOUT` after 300s on Vercel; `Database query timeout after 5000ms` in logs; admin login and root page hang indefinitely
+- Cause: Aggressive timeouts (5s query, 3s connect) and single-connection pool (`max: 1`) unsuitable for serverless cold starts; Supabase connection latency exceeds limits
+- Fix: Increase `QUERY_TIMEOUT_MS` to 15s, `CONNECT_TIMEOUT_MS` to 10s, pool `max` to 3; increase Supabase auth timeouts to 15s/10s; add retries with backoff
+- Prevention: Profile cold-start latency in target environment; set timeouts to 3-5x observed p99; use connection pooling (PgBouncer) for serverless; monitor `pg_stat_activity` for connection leaks
+- Files Affected: `src/data/db/index.ts`, `src/integrations/supabase/client.ts`
+- Date: 2026-08-24
+- Status: Active
+
+### Next.js Auth — Redirect Loop / Session Validation
+
+**Admin authentication redirect loop / login not redirecting**
+- Symptom: Middleware redirects to `/admin/login` (307); login succeeds but `/admin` still redirects; manual navigation to admin pages fails with 504 timeout
+- Cause: Middleware only checks cookie presence; layout renders fallback instead of redirecting on invalid session; invalid cookie persists causing middleware/layout mismatch; `secure: true` cookie in development breaks local auth
+- Fix: Layout now redirects via `redirect("/admin/login")` when session invalid; cookie `secure` flag respects `NODE_ENV`; middleware remains cheap presence check only
+- Prevention: Validate session in layout with redirect (not fallback); keep middleware minimal; test auth flow in both dev and prod; use `server-only` modules for session logic
+- Files Affected: `src/app/admin/(panel)/layout.tsx`, `src/lib/admin-auth.ts`, `src/middleware.ts`
+- Date: 2026-08-24
+- Status: Active
+
+### PWA — Service Worker Errors
+
+**Service worker "Failed to execute 'addAll' on 'Cache'" / "Connection closed"**
+- Symptom: Console errors from SW install; `cache.addAll` failures (not used in code but browser logs); connection closed errors during fetch
+- Cause: `Promise.allSettled` with `cache.put` can race; fetch failures during precaching not handled gracefully; missing `.catch()` on cache operations
+- Fix: Sequential precaching with try/catch per asset; add `.catch(() => {})` to all cache.put calls; swallow non-fatal SW errors
+- Prevention: Test SW in production-like environment; avoid `addAll`; handle all cache promises; log but don't throw on SW failures
+- Files Affected: `public/sw.js`, `src/components/pwa/service-worker-registration.tsx`
+- Date: 2026-08-24
+- Status: Active
