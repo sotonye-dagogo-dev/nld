@@ -21,6 +21,10 @@ export const env = {
   emailServerUser: process.env.EMAIL_SERVER_USER ?? "",
   emailServerPassword: process.env.EMAIL_SERVER_PASSWORD ?? "",
 
+  // Cloudflare Workers + MailChannels email (free, no domain verification needed)
+  cloudflareEmailWorkerUrl: process.env.CLOUDFLARE_EMAIL_WORKER_URL ?? "",
+  cloudflareEmailWorkerSecret: process.env.CLOUDFLARE_EMAIL_WORKER_SECRET ?? "",
+
   // HMAC key for access-password derivation. Falls back to a dev-only value
   // so local/dev runs work without setup; production MUST set a real secret.
   accessPasswordSecret: process.env.ACCESS_PASSWORD_SECRET ?? "dev-only-access-password-secret",

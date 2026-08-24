@@ -2,7 +2,7 @@
 
 > **Metadata**
 >
-> - last-updated-by: fix-build
+> - last-updated-by: update-ai-system
 > - last-verified-against-code: 2026-08-24
 > - staleness-policy: this file is overwritten every session — always current
 
@@ -12,28 +12,24 @@
 
 ## Current State
 
-**Status:** Complete — cleared on clean completion (fix-build session).
+**Status:** Complete — cleared on clean completion (update-ai-system session).
 
 **What was completed (this session):**
 
-- Fixed "Event handlers cannot be passed to Client Component props" error by changing `ErrorState` to use `retryHref` instead of `onRetry` function prop
-- Fixed Vercel Runtime Timeout (300s) and Database query timeout (5000ms) by increasing timeouts and connection pool size
-- Fixed admin authentication redirect loop by making layout redirect instead of rendering fallback, and fixing cookie secure flag for dev
-- Fixed service worker errors by improving precaching error handling
-- Verified password visibility toggle, navbar dropdown behavior, and button loading states work correctly
-- All builds, lint, typecheck, and tests pass
+- Implemented Cloudflare Workers + MailChannels email integration (free, no domain verification, works with nldv.vercel.app)
+- Created `src/integrations/cloudflare/` wrapper following the established pattern
+- Updated email client abstraction to support `EMAIL_PROVIDER=cloudflare`
+- Added Cloudflare env vars to config and .env.example
+- Created Cloudflare Worker script for MailChannels relay
+- Deep sync of all ai-system docs (repo-map, dependency-graph, system-architecture, project-plan, task-queue, dev-history, lessons-learned, project-decisions, session-log)
 
 **Files affected:**
-- `src/components/ui/error-state.tsx` — use retryHref instead of onRetry
-- `src/app/admin/(panel)/layout.tsx` — redirect on invalid session
-- `src/data/db/index.ts` — increased timeouts (15s query, 10s connect), pool max: 3
-- `src/integrations/supabase/client.ts` — increased auth timeouts (15s/10s)
-- `src/lib/admin-auth.ts` — cookie secure flag respects NODE_ENV
-- `public/sw.js` — robust precaching with try/catch per asset
-- `ai-system/repair-system.md` — added 4 new error pattern entries
-- `ai-system/checkpoints/in-progress.md` — updated
+- New: `src/integrations/cloudflare/{config.ts,types.ts,client.ts}`, `cloudflare-worker/{smtp-relay.ts,wrangler.toml,package.json}`
+- Modified: `src/integrations/email-client.ts`, `src/config/env.ts`, `.env.example`
+- Docs: all ai-system files updated
 
 **Next up (queued in `planning/task-queue.md`, Sprint 3):**
 
-1. Live-key verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) + browser pass over the new interactive UI (hamburger, sidebar drawer/collapse, back-to-top).
+1. Live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e) + browser pass over the new interactive UI (hamburger, sidebar drawer/collapse, back-to-top).
 2. Bootstrap the owner: `npm run db:seed-admin` with real env, self-promote a real account, delete the seed account.
+3. Deploy Cloudflare Worker (`wrangler deploy` from `cloudflare-worker/`), set secrets, configure Vercel env vars.

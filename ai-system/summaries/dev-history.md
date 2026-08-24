@@ -2,8 +2,8 @@
 
 > **Metadata**
 >
-> - last-updated-by: execute-feature (issue 1)
-> - last-verified-against-code: 2026-08-20
+> - last-updated-by: update-ai-system (post-session 7)
+> - last-verified-against-code: 2026-08-24
 > - staleness-policy: historical entries do not go stale
 
 > **Overview:** Chronological log of completed development work. Each sprint ends with a summary entry. Agents add entries after completing tasks. Useful for understanding what has been built, when decisions were made, and what patterns have emerged.
@@ -144,3 +144,26 @@ Completed the remaining Sprint 3 work and additional hardening: ran DB migration
 
 **Next Sprint Focus:**
 Sprint 3 (part 2) — live-key verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) + browser pass over interactive UI. Operational: bootstrap owner account, self-promote, delete seed.
+
+---
+
+## 2026-08-24 — Cloudflare Email Integration (MailChannels via Cloudflare Workers)
+
+**Summary:**
+Added Cloudflare Workers + MailChannels as a free, production-ready email provider that works with the free `nldv.vercel.app` domain (no domain verification required). This resolves the Resend domain verification blocker while maintaining full compatibility with the existing DB-backed email template system, admin editor, and variable handling.
+
+**Completed:**
+- Created `src/integrations/cloudflare/` with config, types, and client following the established integration wrapper pattern (§17)
+- Updated `src/integrations/email-client.ts` to support `EMAIL_PROVIDER=cloudflare` alongside `resend`
+- Added `CLOUDFLARE_EMAIL_WORKER_URL` and `CLOUDFLARE_EMAIL_WORKER_SECRET` to `src/config/env.ts` and `.env.example`
+- Created `cloudflare-worker/smtp-relay.ts` (MailChannels HTTP API relay) with `wrangler.toml` for deployment
+- Email templates, variables, admin editor, and preview all remain unchanged — only the transport layer swapped
+
+**Key Changes:**
+- Email provider is now selectable via `EMAIL_PROVIDER` env var (resend/cloudflare)
+- Cloudflare Worker + MailChannels: completely free, unlimited emails, no domain verification, works with any Vercel subdomain
+- Zero code changes at call sites (`sendAccessEmail`, `sendTemplateEmail`) — abstraction holds
+- Worker secret stored in Cloudflare Worker environment (separate from Vercel env vars)
+
+**Next Sprint Focus:**
+Sprint 3 (part 2) — live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e) + browser pass over interactive UI. Operational: deploy Cloudflare Worker, set secrets, configure `EMAIL_PROVIDER=cloudflare` in Vercel, run `npm run db:seed-admin`, self-promote owner, delete seed.

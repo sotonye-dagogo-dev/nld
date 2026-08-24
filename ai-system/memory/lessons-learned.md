@@ -1,8 +1,8 @@
 # Lessons Learned
 
 > **Metadata**
-> - last-updated-by: (set on first entry)
-> - last-verified-against-code: (set after lesson review)
+> - last-updated-by: update-ai-system (post-session 7)
+> - last-verified-against-code: 2026-08-24
 > - staleness-policy: each entry has its own staleness — check supersedes links
 
 > **Overview:** Practical knowledge accumulated during development — things that worked well, things that didn't, and patterns worth repeating. Different from `repair-system.md` (tracks errors); this file tracks development process insights and architectural wisdom. Uses supersedes/superseded-by links for evolving practices.
@@ -140,6 +140,29 @@ Add footer dev credit settings (`footerDevCreditName`, `footerDevCreditUrl`, `fo
 
 **Apply When:**
 Any "static" footer/header content that stakeholders might want to change. Make it config-driven from the start — the overhead is minimal (one DB column + default + admin form field).
+
+**Supersedes:** None
+**Superseded by:** None
+
+---
+
+### Cloudflare Workers + MailChannels: free email for Vercel subdomains
+
+**Context:**
+Resend requires domain verification and doesn't allow sending from unverified domains like `nldv.vercel.app`. The project needed a free, production-ready email service that works immediately without domain ownership.
+
+**What We Learned:**
+Cloudflare Workers + MailChannels provides a completely free email delivery path with no domain verification required. The architecture:
+1. App → HTTP POST to Cloudflare Worker (with Bearer secret)
+2. Worker → MailChannels API (free for Cloudflare users)
+3. MailChannels → Recipient
+
+The integration follows the existing email abstraction (`EmailClient` interface), so templates, variables, admin editor, and call sites remain unchanged. Only the transport layer is swapped.
+
+**Apply When:**
+- Need transactional email on a free Vercel subdomain (or any unverified domain)
+- Want zero-cost email with no sending limits
+- Want to maintain existing template system and admin workflows
 
 **Supersedes:** None
 **Superseded by:** None
