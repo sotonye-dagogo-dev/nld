@@ -31,6 +31,7 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
   const [measured, setMeasured] = useState(false);
   const rowRef = useRef<HTMLDivElement | null>(null);
   const moreRef = useRef<HTMLDivElement | null>(null);
+  const measuredRef = useRef(false);
 
   // Measure how many desktop links fit; the rest move into the "More"
   // dropdown. Post-mount only, so SSR is stable (no hydration mismatch).
@@ -41,21 +42,28 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
       const gap = 4; // px
       let available = row.clientWidth;
       if (available === 0) return; // Not rendered yet
+      const children = Array.from(row.children) as HTMLElement[];
+      if (children.length === 0) return;
       let fits = 0;
-      for (const child of Array.from(row.children) as HTMLElement[]) {
+      for (const child of children) {
         const w = child.offsetWidth + gap;
         if (available - w < 0) break;
         available -= w;
         fits += 1;
       }
       setOverflowCount(Math.max(0, links.length - fits));
-      setMeasured(true);
+      if (!measuredRef.current) {
+        measuredRef.current = true;
+        setMeasured(true);
+      }
     };
-    measure();
+    // Defer initial measurement to next frame to ensure layout is stable
+    const rafId = requestAnimationFrame(measure);
     const ro = new ResizeObserver(measure);
     ro.observe(row);
     window.addEventListener("resize", measure);
     return () => {
+      cancelAnimationFrame(rafId);
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };

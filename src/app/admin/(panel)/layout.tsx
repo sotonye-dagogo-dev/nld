@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSiteSettings } from "@/config/site";
 import { getAdminSession, isSuperAdmin } from "@/lib/admin-auth";
 import { AdminSidebar, type AdminNavItem } from "@/components/admin/sidebar";
 import { AdminErrorBoundary } from "@/components/admin/admin-error-boundary";
+import { ErrorState } from "@/components/ui/error-state";
 
 // Guarded admin panel shell. Every panel route resolves the admin session
 // server-side; unauthenticated or unknown users are bounced to /admin/login.
@@ -60,9 +62,27 @@ function AdminPanelLayoutInner({
   );
 }
 
+function AdminAuthFallback() {
+  return (
+    <div className="page-shell flex justify-center">
+      <ErrorState
+        title="Session expired"
+        message="Your admin session has expired or is invalid. Please sign in again."
+        retryLabel="Sign in"
+        onRetry={() => window.location.href = "/admin/login"}
+      />
+    </div>
+  );
+}
+
 export default async function AdminPanelLayout({ children }: { children: ReactNode }) {
   const admin = await getAdminSession();
-  if (!admin) redirect("/admin/login");
+  if (!admin) {
+    // Don't redirect - render a fallback to avoid redirect loops when auth
+    // validation fails due to transient errors. The middleware will catch
+    // missing cookies on subsequent navigations.
+    return <AdminAuthFallback />;
+  }
 
   const { value: settings } = await getSiteSettings();
   const superadmin = isSuperAdmin(admin);
