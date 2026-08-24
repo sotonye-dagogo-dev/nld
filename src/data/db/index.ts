@@ -18,7 +18,13 @@ export function getDb() {
   if (!env.databaseUrl) {
     throw new Error("DATABASE_URL is not set — cannot create DB client");
   }
-  client = postgres(env.databaseUrl, { max: 1, prepare: false });
+  client = postgres(env.databaseUrl, {
+    max: 1,
+    prepare: false,
+    connect_timeout: 10,
+    idle_timeout: 20,
+    max_lifetime: 60 * 30,
+  });
   dbInstance = drizzle(client, { schema });
   return dbInstance;
 }

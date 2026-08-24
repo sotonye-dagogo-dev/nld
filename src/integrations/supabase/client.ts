@@ -32,7 +32,11 @@ export async function validateAdminToken(
 ): Promise<AdminSessionResult> {
   if (!token) return { ok: false, error: "missing token" };
   try {
-    const { data, error } = await getAdminClient().auth.getUser(token);
+    const authPromise = getAdminClient().auth.getUser(token);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Auth validation timeout")), 10000)
+    );
+    const { data, error } = await Promise.race([authPromise, timeoutPromise]);
     if (error || !data.user) return { ok: false, error: error?.message ?? "invalid token" };
     return {
       ok: true,
@@ -57,7 +61,11 @@ export async function adminSignIn(
   password: string,
 ): Promise<AdminSessionResult & { token?: string }> {
   try {
-    const { data, error } = await getAdminClient().auth.signInWithPassword({ email, password });
+    const authPromise = getAdminClient().auth.signInWithPassword({ email, password });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Auth request timeout")), 15000)
+    );
+    const { data, error } = await Promise.race([authPromise, timeoutPromise]);
     if (error || !data.session) {
       return { ok: false, error: error?.message ?? "Invalid email or password." };
     }
