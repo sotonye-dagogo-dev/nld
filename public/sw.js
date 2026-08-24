@@ -6,19 +6,29 @@ const CACHE = "nld-shell-v1";
 
 const PRECACHE_ASSETS = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
 
+async function precacheAssets(cache) {
+  const results = await Promise.allSettled(
+    PRECACHE_ASSETS.map(async (asset) => {
+      try {
+        const response = await fetch(asset, { cache: "no-cache" });
+        if (response.ok) {
+          await cache.put(asset, response);
+        } else {
+          console.warn("[sw] precache failed for", asset, "status:", response.status);
+        }
+      } catch (err) {
+        console.warn("[sw] precache failed for", asset, err);
+      }
+    })
+  );
+  return results;
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) =>
-        Promise.allSettled(
-          PRECACHE_ASSETS.map((asset) =>
-            cache.add(asset).catch((err) => {
-              console.warn("[sw] precache failed for", asset, err);
-            })
-          )
-        )
-      )
+      .then((cache) => precacheAssets(cache))
       .then(() => self.skipWaiting()),
   );
 });
