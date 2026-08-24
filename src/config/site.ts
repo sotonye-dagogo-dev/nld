@@ -46,23 +46,31 @@ export function coerceValue<T>(key: keyof SiteSettings, raw: unknown, fallback: 
   }
 }
 
-export async function getSiteSettings(): Promise<ConfigValue<SiteSettings>> {
-  const out: SiteSettings = { ...DEFAULT_SETTINGS };
-  let readDb = false;
+// Shorter timeout for settings since they're non-critical and have fallbacks
+const SETTINGS_QUERY_TIMEOUT_MS = 1000;
 
+async function fetchSettingsFromDb(): Promise<Partial<SiteSettings>> {
   try {
-    const rows = await queryWithTimeout((db) => db.select().from(settings));
-    readDb = true;
+    const rows = await queryWithTimeout(
+      (db) => db.select().from(settings),
+      0, // no retries for settings - fail fast to fallbacks
+    );
+    const out: Partial<SiteSettings> = {};
     for (const row of rows) {
       const key = row.key as keyof SiteSettings;
       if (SETTING_KEYS.includes(key)) {
         const record = out as unknown as Record<string, string | number | boolean>;
-        record[key] = coerceValue(key, row.value, record[key]);
+        record[key] = coerceValue(key, row.value, record[key] ?? DEFAULT_SETTINGS[key]);
       }
     }
+    return out;
   } catch {
-    // DB unavailable → fall back to defaults (documented in defaults.ts)
+    return {};
   }
+}
 
-  return { value: out, source: readDb ? "db" : "fallback" };
+export async function getSiteSettings(): Promise<ConfigValue<SiteSettings>> {
+  const dbSettings = await fetchSettingsFromDb();
+  const out: SiteSettings = { ...DEFAULT_SETTINGS, ...dbSettings };
+  return { value: out, source: Object.keys(dbSettings).length > 0 ? "db" : "fallback" };
 }

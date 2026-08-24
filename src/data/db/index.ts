@@ -15,6 +15,8 @@ let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 const QUERY_TIMEOUT_MS = 5000;
 const CONNECT_TIMEOUT_MS = 3000;
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 500;
 
 function withTimeout<T>(promise: Promise<T>, ms: number = QUERY_TIMEOUT_MS): Promise<T> {
   return Promise.race([
@@ -25,15 +27,37 @@ function withTimeout<T>(promise: Promise<T>, ms: number = QUERY_TIMEOUT_MS): Pro
   ]);
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getPooledDatabaseUrl(): string {
+  if (!env.databaseUrl) return "";
+  // If using Supabase, prefer the pooler endpoint (port 6543) for serverless
+  // The pooler handles connection pooling better than direct connections
+  try {
+    const url = new URL(env.databaseUrl);
+    if (url.hostname.includes("supabase.co") && url.port === "5432") {
+      url.port = "6543";
+      url.searchParams.set("pgbouncer", "true");
+      return url.toString();
+    }
+  } catch {
+    // Ignore URL parsing errors, fall back to original
+  }
+  return env.databaseUrl;
+}
+
 function createPgClient() {
-  if (!env.databaseUrl) {
+  const databaseUrl = getPooledDatabaseUrl();
+  if (!databaseUrl) {
     throw new Error("DATABASE_URL is not set — cannot create DB client");
   }
   // Use a short connection timeout and disable prepared statements for PgBouncer compatibility
   // max: 1 to avoid connection pool exhaustion in serverless
   // connect_timeout: 3 seconds to fail fast
   // idle_timeout: 10 seconds, max_lifetime: 5 minutes
-  const pgClient = postgres(env.databaseUrl, {
+  const pgClient = postgres(databaseUrl, {
     max: 1,
     prepare: false,
     connect_timeout: CONNECT_TIMEOUT_MS / 1000,
@@ -59,9 +83,50 @@ export function getDb() {
   return dbInstance;
 }
 
-export async function queryWithTimeout<T>(fn: (db: ReturnType<typeof drizzle<typeof schema>>) => Promise<T>): Promise<T> {
+export async function queryWithTimeout<T>(
+  fn: (db: ReturnType<typeof drizzle<typeof schema>>) => Promise<T>,
+  retries = MAX_RETRIES,
+): Promise<T> {
   const db = getDb();
-  return withTimeout(fn(db));
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await withTimeout(fn(db));
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      
+      // Don't retry on timeout or abort errors - they're not transient
+      const message = lastError.message.toLowerCase();
+      if (
+        message.includes("timeout") ||
+        message.includes("abort") ||
+        message.includes("cancel")
+      ) {
+        throw lastError;
+      }
+
+      // On connection errors, reset the client to force fresh connection
+      if (
+        message.includes("econnrefused") ||
+        message.includes("enotfound") ||
+        message.includes("etimedout") ||
+        message.includes("connection") ||
+        message.includes("socket") ||
+        message.includes("eof")
+      ) {
+        dbInstance = null;
+        client = null;
+      }
+
+      if (attempt < retries) {
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+        continue;
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 export const db = getDb;
