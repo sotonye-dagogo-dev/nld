@@ -39,6 +39,7 @@ type AuditAction =
   | "admin.logout"
   | "admin.invite"
   | "admin.invite.accept"
+  | "admin.invite.resend"
   | "email_template.update"
   | "asset.upload"
   | "asset.delete";

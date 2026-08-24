@@ -13,8 +13,8 @@ import * as schema from "./schema";
 let client: ReturnType<typeof postgres> | null = null;
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-const QUERY_TIMEOUT_MS = 15000;
-const CONNECT_TIMEOUT_MS = 10000;
+const QUERY_TIMEOUT_MS = 30000;
+const CONNECT_TIMEOUT_MS = 15000;
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
@@ -54,11 +54,11 @@ function createPgClient() {
     throw new Error("DATABASE_URL is not set — cannot create DB client");
   }
   // Use a short connection timeout and disable prepared statements for PgBouncer compatibility
-  // max: 3 for serverless to handle concurrent requests
-  // connect_timeout: 10 seconds for cold starts
+  // max: 10 for serverless to handle concurrent requests
+  // connect_timeout: 15 seconds for cold starts
   // idle_timeout: 10 seconds, max_lifetime: 5 minutes
   const pgClient = postgres(databaseUrl, {
-    max: 3,
+    max: 10,
     prepare: false,
     connect_timeout: CONNECT_TIMEOUT_MS / 1000,
     idle_timeout: 10,
@@ -86,13 +86,14 @@ export function getDb() {
 export async function queryWithTimeout<T>(
   fn: (db: ReturnType<typeof drizzle<typeof schema>>) => Promise<T>,
   retries = MAX_RETRIES,
+  timeoutMs = QUERY_TIMEOUT_MS,
 ): Promise<T> {
   const db = getDb();
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await withTimeout(fn(db));
+      return await withTimeout(fn(db), timeoutMs);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       

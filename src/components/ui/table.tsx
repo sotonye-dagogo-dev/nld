@@ -10,6 +10,7 @@ export interface TableColumn<T> {
   header: string;
   render?: (row: T) => ReactNode;
   align?: "left" | "right";
+  cellClass?: string;
 }
 
 interface TableProps<T> {
@@ -59,7 +60,7 @@ export function Table<T>({
             rows.map((row) => (
               <tr key={String(row[rowKey as keyof T])} className="border-b border-border last:border-0 hover:bg-background/50">
                 {columns.map((c) => (
-                  <td key={c.key} className={cn("px-4 py-3 text-text-primary", c.align === "right" && "text-right")}>
+                  <td key={c.key} className={cn("px-4 py-3 text-text-primary", c.align === "right" && "text-right", c.cellClass)}>
                     {c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? "")}
                   </td>
                 ))}

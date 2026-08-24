@@ -10,6 +10,16 @@ import { events, purchases, devotionals } from "@/data/db/schema";
 import { conversionRate, fillDaySeries } from "@/lib/analytics";
 import { formatPrice } from "@/config/defaults";
 
+const ANALYTICS_QUERY_TIMEOUT_MS = 8000;
+
+async function queryAnalytics<T>(fn: (db: ReturnType<typeof import("@/data/db").getDb>) => Promise<T>): Promise<T | null> {
+  try {
+    return await queryWithTimeout(fn, ANALYTICS_QUERY_TIMEOUT_MS);
+  } catch {
+    return null;
+  }
+}
+
 export const metadata: Metadata = { title: "Admin — Analytics" };
 export const dynamic = "force-dynamic";
 
@@ -53,13 +63,12 @@ export default async function AdminAnalyticsPage() {
     | null = null;
   let loadError = false;
 
-  try {
-    const [typeRows, revenueRows, trendRows, purchaseTrendRows, topOpenRows, topPurchaseRows, recentRows] =
+  const [typeRows, revenueRows, trendRows, purchaseTrendRows, topOpenRows, topPurchaseRows, recentRows] =
       await Promise.all([
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db.select({ eventType: events.eventType, n: sql<number>`count(*)::int` }).from(events).groupBy(events.eventType)
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               n: sql<number>`count(*)::int`,
@@ -68,7 +77,7 @@ export default async function AdminAnalyticsPage() {
             .from(purchases)
             .where(eq(purchases.status, "success"))
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               eventType: events.eventType,
@@ -79,7 +88,7 @@ export default async function AdminAnalyticsPage() {
             .where(gte(events.createdAt, CUTOFF))
             .groupBy(events.eventType, TREND_DAY(events.createdAt))
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               day: TREND_DAY(purchases.createdAt),
@@ -89,7 +98,7 @@ export default async function AdminAnalyticsPage() {
             .where(and(eq(purchases.status, "success"), gte(purchases.createdAt, CUTOFF)))
             .groupBy(TREND_DAY(purchases.createdAt))
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               slug: events.slug,
@@ -103,7 +112,7 @@ export default async function AdminAnalyticsPage() {
             .orderBy(sql`count(*) desc`)
             .limit(10)
         ),
-        queryWithTimeout((db) =>
+        queryAnalytics((db) =>
           db
             .select({
               devotionalId: purchases.devotionalId,
@@ -119,48 +128,48 @@ export default async function AdminAnalyticsPage() {
             .orderBy(sql`count(*) desc`)
             .limit(10)
         ),
-        queryWithTimeout((db) => db.select().from(events).orderBy(desc(events.createdAt)).limit(8)),
+        queryAnalytics((db) => db.select().from(events).orderBy(desc(events.createdAt)).limit(8)),
       ]);
 
-    const countBy = new Map(typeRows.map((r) => [r.eventType, r.n]));
+    const countBy = new Map((typeRows ?? []).map((r) => [r.eventType, r.n]));
     const now = new Date();
     data = {
       totalVisits: countBy.get("page.view") ?? 0,
       totalOpens: countBy.get("devotional.open") ?? 0,
-      completedPurchases: revenueRows[0]?.n ?? 0,
-      revenue: revenueRows[0]?.total ?? 0,
-      conversion: conversionRate(revenueRows[0]?.n ?? 0, countBy.get("purchase.started") ?? 0),
+      completedPurchases: revenueRows?.[0]?.n ?? 0,
+      revenue: revenueRows?.[0]?.total ?? 0,
+      conversion: conversionRate(revenueRows?.[0]?.n ?? 0, countBy.get("purchase.started") ?? 0),
       visits: fillDaySeries(
-        trendRows
+        (trendRows ?? [])
           .filter((r) => r.eventType === "page.view")
           .map((r) => ({ day: r.day, count: r.n })),
         TREND_DAYS,
         now,
       ),
       opens: fillDaySeries(
-        trendRows
+        (trendRows ?? [])
           .filter((r) => r.eventType === "devotional.open")
           .map((r) => ({ day: r.day, count: r.n })),
         TREND_DAYS,
         now,
       ),
       purchases: fillDaySeries(
-        purchaseTrendRows.map((r) => ({ day: r.day, count: r.n })),
+        (purchaseTrendRows ?? []).map((r) => ({ day: r.day, count: r.n })),
         TREND_DAYS,
         now,
       ),
-      topOpens: topOpenRows.map((r) => ({
+      topOpens: (topOpenRows ?? []).map((r) => ({
         title: r.title ?? r.slug ?? "Unknown devotional",
         slug: r.slug ?? "",
         n: r.n,
       })),
-      topPurchases: topPurchaseRows.map((r) => ({
+      topPurchases: (topPurchaseRows ?? []).map((r) => ({
         title: r.title ?? r.slug ?? "Unknown devotional",
         slug: r.slug ?? "",
         n: r.n,
         revenue: r.revenue,
       })),
-      recent: recentRows.map((r) => ({
+      recent: (recentRows ?? []).map((r) => ({
         id: r.id,
         eventType: r.eventType,
         slug: r.slug,
@@ -168,9 +177,6 @@ export default async function AdminAnalyticsPage() {
         createdAt: r.createdAt,
       })),
     };
-  } catch {
-    loadError = true;
-  }
 
   const header = (
     <div>
