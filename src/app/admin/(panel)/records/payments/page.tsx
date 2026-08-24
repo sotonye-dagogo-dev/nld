@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { eq, desc, sql } from "drizzle-orm";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { purchases, devotionals } from "@/data/db/schema";
 import { getAdminSession } from "@/lib/admin-auth";
 import { clampInt } from "@/lib/utils";
@@ -41,26 +41,27 @@ export default async function PaymentsPage({
   let total = 0;
   let error = false;
   try {
-    const db = getDb();
     const [result, count] = await Promise.all([
-      db
-        .select({
-          id: purchases.id,
-          email: purchases.email,
-          devotionalTitle: devotionals.title,
-          devotionalSlug: devotionals.slug,
-          amountMinor: purchases.amountMinor,
-          currency: purchases.currency,
-          status: purchases.status,
-          reference: purchases.paystackReference,
-          created: purchases.createdAt,
-        })
-        .from(purchases)
-        .leftJoin(devotionals, eq(purchases.devotionalId, devotionals.id))
-        .orderBy(desc(purchases.createdAt))
-        .limit(PAGE_SIZE)
-        .offset((page - 1) * PAGE_SIZE),
-      db.select({ n: sql<number>`count(*)::int` }).from(purchases),
+      queryWithTimeout((db) =>
+        db
+          .select({
+            id: purchases.id,
+            email: purchases.email,
+            devotionalTitle: devotionals.title,
+            devotionalSlug: devotionals.slug,
+            amountMinor: purchases.amountMinor,
+            currency: purchases.currency,
+            status: purchases.status,
+            reference: purchases.paystackReference,
+            created: purchases.createdAt,
+          })
+          .from(purchases)
+          .leftJoin(devotionals, eq(purchases.devotionalId, devotionals.id))
+          .orderBy(desc(purchases.createdAt))
+          .limit(PAGE_SIZE)
+          .offset((page - 1) * PAGE_SIZE)
+      ),
+      queryWithTimeout((db) => db.select({ n: sql<number>`count(*)::int` }).from(purchases)),
     ]);
     rows = result.map((r) => ({
       id: r.id,

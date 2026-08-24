@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout, getDb } from "@/data/db";
 import { devotionals, devotionalDays } from "@/data/db/schema";
 import { requireAdmin, can } from "@/lib/admin-auth";
 import { recordAudit } from "@/lib/audit";
@@ -46,46 +46,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
   }
 
-  const db = getDb();
   const slug = payload.slug?.trim() || slugify(payload.title);
   if (!slug) {
     return NextResponse.json({ ok: false, error: "A slug is required." }, { status: 400 });
   }
 
-  const existing = await db.select().from(devotionals).where(eq(devotionals.slug, slug)).limit(1).catch(() => []);
+  const existing = await queryWithTimeout((db) => db.select().from(devotionals).where(eq(devotionals.slug, slug)).limit(1)).catch(() => []);
   if (existing[0]) {
     return NextResponse.json({ ok: false, error: "That slug is already in use." }, { status: 409 });
   }
 
   try {
-    const created = await db.transaction(async (tx) => {
-      const [devotional] = await tx
-        .insert(devotionals)
-        .values({
-          slug,
-          title: payload.title,
-          subtitle: payload.subtitle ?? "",
-          description: payload.description ?? "",
-          coverUrl: payload.coverUrl ?? "",
-          priceMinor: payload.priceMinor,
-          currency: payload.currency,
-          accessMode: payload.accessMode,
-          previewDays: payload.previewDays,
-          status: payload.status,
-        })
-        .returning();
-      if (!devotional) throw new Error("insert returned no row");
-      await tx.insert(devotionalDays).values(
-        payload.days.map((d) => ({
-          devotionalId: devotional.id,
-          dayNumber: d.dayNumber,
-          title: d.title,
-          content: d.content,
-          sermonUrl: d.sermonUrl || null,
-          contentFileUrl: d.contentFileUrl || null,
-        })),
-      );
-      return devotional;
+    const created = await queryWithTimeout(async () => {
+      const db = getDb();
+      return db.transaction(async (tx) => {
+        const [devotional] = await tx
+          .insert(devotionals)
+          .values({
+            slug,
+            title: payload.title,
+            subtitle: payload.subtitle ?? "",
+            description: payload.description ?? "",
+            coverUrl: payload.coverUrl ?? "",
+            priceMinor: payload.priceMinor,
+            currency: payload.currency,
+            accessMode: payload.accessMode,
+            previewDays: payload.previewDays,
+            status: payload.status,
+          })
+          .returning();
+        if (!devotional) throw new Error("insert returned no row");
+        await tx.insert(devotionalDays).values(
+          payload.days.map((d) => ({
+            devotionalId: devotional.id,
+            dayNumber: d.dayNumber,
+            title: d.title,
+            content: d.content,
+            sermonUrl: d.sermonUrl || null,
+            contentFileUrl: d.contentFileUrl || null,
+          })),
+        );
+        return devotional;
+      });
     });
 
     await recordAudit({

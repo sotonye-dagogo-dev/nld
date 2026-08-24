@@ -5,7 +5,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AnalyticsBars } from "@/components/admin/analytics-bars";
 import { getAdminSession } from "@/lib/admin-auth";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { events, purchases, devotionals } from "@/data/db/schema";
 import { conversionRate, fillDaySeries } from "@/lib/analytics";
 import { formatPrice } from "@/config/defaults";
@@ -54,64 +54,72 @@ export default async function AdminAnalyticsPage() {
   let loadError = false;
 
   try {
-    const db = getDb();
     const [typeRows, revenueRows, trendRows, purchaseTrendRows, topOpenRows, topPurchaseRows, recentRows] =
       await Promise.all([
-        db
-          .select({ eventType: events.eventType, n: sql<number>`count(*)::int` })
-          .from(events)
-          .groupBy(events.eventType),
-        db
-          .select({
-            n: sql<number>`count(*)::int`,
-            total: sql<number>`coalesce(sum(${purchases.amountMinor}), 0)::int`,
-          })
-          .from(purchases)
-          .where(eq(purchases.status, "success")),
-        db
-          .select({
-            eventType: events.eventType,
-            day: TREND_DAY(events.createdAt),
-            n: sql<number>`count(*)::int`,
-          })
-          .from(events)
-          .where(gte(events.createdAt, CUTOFF))
-          .groupBy(events.eventType, TREND_DAY(events.createdAt)),
-        db
-          .select({
-            day: TREND_DAY(purchases.createdAt),
-            n: sql<number>`count(*)::int`,
-          })
-          .from(purchases)
-          .where(and(eq(purchases.status, "success"), gte(purchases.createdAt, CUTOFF)))
-          .groupBy(TREND_DAY(purchases.createdAt)),
-        db
-          .select({
-            slug: events.slug,
-            title: devotionals.title,
-            n: sql<number>`count(*)::int`,
-          })
-          .from(events)
-          .leftJoin(devotionals, eq(events.slug, devotionals.slug))
-          .where(and(eq(events.eventType, "devotional.open"), isNotNull(events.slug)))
-          .groupBy(events.slug, devotionals.title)
-          .orderBy(sql`count(*) desc`)
-          .limit(10),
-        db
-          .select({
-            devotionalId: purchases.devotionalId,
-            title: devotionals.title,
-            slug: devotionals.slug,
-            n: sql<number>`count(*)::int`,
-            revenue: sql<number>`sum(${purchases.amountMinor})::int`,
-          })
-          .from(purchases)
-          .leftJoin(devotionals, eq(purchases.devotionalId, devotionals.id))
-          .where(eq(purchases.status, "success"))
-          .groupBy(purchases.devotionalId, devotionals.title, devotionals.slug)
-          .orderBy(sql`count(*) desc`)
-          .limit(10),
-        db.select().from(events).orderBy(desc(events.createdAt)).limit(8),
+        queryWithTimeout((db) =>
+          db.select({ eventType: events.eventType, n: sql<number>`count(*)::int` }).from(events).groupBy(events.eventType)
+        ),
+        queryWithTimeout((db) =>
+          db
+            .select({
+              n: sql<number>`count(*)::int`,
+              total: sql<number>`coalesce(sum(${purchases.amountMinor}), 0)::int`,
+            })
+            .from(purchases)
+            .where(eq(purchases.status, "success"))
+        ),
+        queryWithTimeout((db) =>
+          db
+            .select({
+              eventType: events.eventType,
+              day: TREND_DAY(events.createdAt),
+              n: sql<number>`count(*)::int`,
+            })
+            .from(events)
+            .where(gte(events.createdAt, CUTOFF))
+            .groupBy(events.eventType, TREND_DAY(events.createdAt))
+        ),
+        queryWithTimeout((db) =>
+          db
+            .select({
+              day: TREND_DAY(purchases.createdAt),
+              n: sql<number>`count(*)::int`,
+            })
+            .from(purchases)
+            .where(and(eq(purchases.status, "success"), gte(purchases.createdAt, CUTOFF)))
+            .groupBy(TREND_DAY(purchases.createdAt))
+        ),
+        queryWithTimeout((db) =>
+          db
+            .select({
+              slug: events.slug,
+              title: devotionals.title,
+              n: sql<number>`count(*)::int`,
+            })
+            .from(events)
+            .leftJoin(devotionals, eq(events.slug, devotionals.slug))
+            .where(and(eq(events.eventType, "devotional.open"), isNotNull(events.slug)))
+            .groupBy(events.slug, devotionals.title)
+            .orderBy(sql`count(*) desc`)
+            .limit(10)
+        ),
+        queryWithTimeout((db) =>
+          db
+            .select({
+              devotionalId: purchases.devotionalId,
+              title: devotionals.title,
+              slug: devotionals.slug,
+              n: sql<number>`count(*)::int`,
+              revenue: sql<number>`sum(${purchases.amountMinor})::int`,
+            })
+            .from(purchases)
+            .leftJoin(devotionals, eq(purchases.devotionalId, devotionals.id))
+            .where(eq(purchases.status, "success"))
+            .groupBy(purchases.devotionalId, devotionals.title, devotionals.slug)
+            .orderBy(sql`count(*) desc`)
+            .limit(10)
+        ),
+        queryWithTimeout((db) => db.select().from(events).orderBy(desc(events.createdAt)).limit(8)),
       ]);
 
     const countBy = new Map(typeRows.map((r) => [r.eventType, r.n]));

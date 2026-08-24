@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { emailTemplates } from "@/data/db/schema";
 import { listEmailTemplates } from "@/lib/email-templates";
 import { EMAIL_TEMPLATE_KEYS } from "@/config/defaults";
@@ -47,27 +47,28 @@ export async function POST(request: Request) {
   }
 
   try {
-    await getDb()
-      .insert(emailTemplates)
-      .values({
-        key: payload.key,
-        name: payload.name,
-        subject: payload.subject,
-        bodyHtml: payload.bodyHtml,
-        variables: payload.variables ?? {},
-        updatedBy: admin.email,
-      })
-      .onConflictDoUpdate({
-        target: emailTemplates.key,
-        set: {
+    await queryWithTimeout((db) =>
+      db.insert(emailTemplates)
+        .values({
+          key: payload.key,
           name: payload.name,
           subject: payload.subject,
           bodyHtml: payload.bodyHtml,
           variables: payload.variables ?? {},
           updatedBy: admin.email,
-          updatedAt: new Date(),
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: emailTemplates.key,
+          set: {
+            name: payload.name,
+            subject: payload.subject,
+            bodyHtml: payload.bodyHtml,
+            variables: payload.variables ?? {},
+            updatedBy: admin.email,
+            updatedAt: new Date(),
+          },
+        })
+    );
   } catch {
     return NextResponse.json(
       { ok: false, error: "Could not save the template. Please try again." },

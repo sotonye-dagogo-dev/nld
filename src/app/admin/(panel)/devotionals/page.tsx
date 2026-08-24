@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { devotionals } from "@/data/db/schema";
 import { formatPrice } from "@/config/defaults";
 
@@ -13,8 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminDevotionalsPage() {
   let rows: Devotional[] | null = null;
   try {
-    const db = getDb();
-    const result = await db.select().from(devotionals).orderBy(devotionals.createdAt);
+    const result = await queryWithTimeout((db) => db.select().from(devotionals).orderBy(devotionals.createdAt));
     rows = result as Devotional[];
   } catch {
     rows = null;

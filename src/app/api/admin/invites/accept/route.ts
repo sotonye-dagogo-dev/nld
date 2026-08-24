@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { adminInvites, admins } from "@/data/db/schema";
 import { adminSignIn, getAdminClient } from "@/integrations/supabase/client";
 import { createAdminSession } from "@/lib/admin-auth";
@@ -29,13 +29,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
   }
 
-  const db = getDb();
-  const invite = await db
-    .select()
-    .from(adminInvites)
-    .where(eq(adminInvites.token, payload.token))
-    .limit(1)
-    .catch(() => []);
+  const invite = await queryWithTimeout((db) =>
+    db.select().from(adminInvites).where(eq(adminInvites.token, payload.token)).limit(1)
+  ).catch(() => []);
 
   const row = invite[0];
   if (!row) {
@@ -93,15 +89,14 @@ export async function POST(request: Request) {
   }
 
   // Add/confirm the admins row at the invited role.
-  await db
-    .insert(admins)
-    .values({ authUserId, email: row.email, role: row.role })
-    .onConflictDoUpdate({
+  await queryWithTimeout((db) =>
+    db.insert(admins).values({ authUserId, email: row.email, role: row.role }).onConflictDoUpdate({
       target: admins.email,
       set: { authUserId, role: row.role },
-    });
+    })
+  );
 
-  await db.update(adminInvites).set({ status: "accepted" }).where(eq(adminInvites.id, row.id));
+  await queryWithTimeout((db) => db.update(adminInvites).set({ status: "accepted" }).where(eq(adminInvites.id, row.id)));
 
   await recordAudit({
     actor: row.email,

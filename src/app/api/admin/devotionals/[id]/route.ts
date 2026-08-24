@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
-import { getDb } from "@/data/db";
+import { queryWithTimeout, getDb } from "@/data/db";
 import { devotionals, devotionalDays } from "@/data/db/schema";
 import { requireAdmin, can } from "@/lib/admin-auth";
 import { recordAudit } from "@/lib/audit";
@@ -50,8 +50,7 @@ export async function PUT(
     return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
   }
 
-  const db = getDb();
-  const existing = await db.select().from(devotionals).where(eq(devotionals.id, id)).limit(1).catch(() => []);
+  const existing = await queryWithTimeout((db) => db.select().from(devotionals).where(eq(devotionals.id, id)).limit(1)).catch(() => []);
   if (!existing[0]) {
     return NextResponse.json({ ok: false, error: "Devotional not found." }, { status: 404 });
   }
@@ -60,12 +59,7 @@ export async function PUT(
   if (!slug) {
     return NextResponse.json({ ok: false, error: "A slug is required." }, { status: 400 });
   }
-  const clash = await db
-    .select()
-    .from(devotionals)
-    .where(eq(devotionals.slug, slug))
-    .limit(1)
-    .catch(() => []);
+  const clash = await queryWithTimeout((db) => db.select().from(devotionals).where(eq(devotionals.slug, slug)).limit(1)).catch(() => []);
   if (clash[0] && clash[0].id !== id) {
     return NextResponse.json({ ok: false, error: "That slug is already in use." }, { status: 409 });
   }
@@ -78,34 +72,37 @@ export async function PUT(
   };
 
   try {
-    await db.transaction(async (tx) => {
-      await tx
-        .update(devotionals)
-        .set({
-          slug,
-          title: payload.title,
-          subtitle: payload.subtitle ?? "",
-          description: payload.description ?? "",
-          coverUrl: payload.coverUrl ?? "",
-          priceMinor: payload.priceMinor,
-          currency: payload.currency,
-          accessMode: payload.accessMode,
-          previewDays: payload.previewDays,
-          status: payload.status,
-          updatedAt: new Date(),
-        })
-        .where(eq(devotionals.id, id));
-      await tx.delete(devotionalDays).where(eq(devotionalDays.devotionalId, id));
-      await tx.insert(devotionalDays).values(
-        payload.days.map((d) => ({
-          devotionalId: id,
-          dayNumber: d.dayNumber,
-          title: d.title,
-          content: d.content,
-          sermonUrl: d.sermonUrl || null,
-          contentFileUrl: d.contentFileUrl || null,
-        })),
-      );
+    await queryWithTimeout(async () => {
+      const db = getDb();
+      return db.transaction(async (tx) => {
+        await tx
+          .update(devotionals)
+          .set({
+            slug,
+            title: payload.title,
+            subtitle: payload.subtitle ?? "",
+            description: payload.description ?? "",
+            coverUrl: payload.coverUrl ?? "",
+            priceMinor: payload.priceMinor,
+            currency: payload.currency,
+            accessMode: payload.accessMode,
+            previewDays: payload.previewDays,
+            status: payload.status,
+            updatedAt: new Date(),
+          })
+          .where(eq(devotionals.id, id));
+        await tx.delete(devotionalDays).where(eq(devotionalDays.devotionalId, id));
+        await tx.insert(devotionalDays).values(
+          payload.days.map((d) => ({
+            devotionalId: id,
+            dayNumber: d.dayNumber,
+            title: d.title,
+            content: d.content,
+            sermonUrl: d.sermonUrl || null,
+            contentFileUrl: d.contentFileUrl || null,
+          })),
+        );
+      });
     });
 
     await recordAudit({
@@ -138,14 +135,13 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const db = getDb();
-  const existing = await db.select().from(devotionals).where(eq(devotionals.id, id)).limit(1).catch(() => []);
+  const existing = await queryWithTimeout((db) => db.select().from(devotionals).where(eq(devotionals.id, id)).limit(1)).catch(() => []);
   if (!existing[0]) {
     return NextResponse.json({ ok: false, error: "Devotional not found." }, { status: 404 });
   }
 
   try {
-    await db.delete(devotionals).where(eq(devotionals.id, id));
+    await queryWithTimeout((db) => db.delete(devotionals).where(eq(devotionals.id, id)));
   } catch {
     return NextResponse.json(
       { ok: false, error: "Cannot delete — this devotional has purchase or access-grant records." },
