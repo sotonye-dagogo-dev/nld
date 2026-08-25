@@ -130,6 +130,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             name="title"
             required
             label="Title"
+            type="text"
             placeholder="e.g. 30 Days of Prayer & Fasting"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -137,6 +138,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
           <Input
             name="subtitle"
             label="Subtitle"
+            type="text"
             placeholder="A short supporting line"
             value={form.subtitle}
             onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
@@ -146,6 +148,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             label="Slug (auto-derived from title if empty)"
             placeholder={derivedSlug}
             value={form.slug}
+            type="text"
             onChange={(e) => setForm({ ...form, slug: e.target.value })}
           />
           <FileUpload
@@ -205,6 +208,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             name="currency"
             label="Currency"
             placeholder="NGN"
+            type="text"
             value={form.currency}
             onChange={(e) => setForm({ ...form, currency: e.target.value })}
           />
@@ -235,6 +239,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
               required
               label="Title"
               value={day.title}
+              type="text"
               onChange={(e) => updateDay(i, { title: e.target.value })}
             />
             <label className="flex flex-col gap-1.5 text-sm font-medium text-text-primary">
@@ -258,6 +263,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
               label="Sermon URL (optional)"
               placeholder="https://..."
               value={day.sermonUrl}
+              type="url"
               onChange={(e) => updateDay(i, { sermonUrl: e.target.value })}
             />
           </div>
