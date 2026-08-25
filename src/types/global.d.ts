@@ -42,7 +42,10 @@ type AuditAction =
   | "admin.invite.resend"
   | "email_template.update"
   | "asset.upload"
-  | "asset.delete";
+  | "asset.delete"
+  | "bank_transfer.submit"
+  | "bank_transfer.verify"
+  | "bank_transfer.reject";
 
 /** Event names collected for platform analytics (visits, opens, views). */
 type PlatformEventType =
@@ -51,7 +54,23 @@ type PlatformEventType =
   | "devotional.preview"
   | "purchase.started"
   | "purchase.completed"
-  | "access.used";
+  | "access.used"
+  | "bank_transfer.submitted"
+  | "bank_transfer.verified";
+
+/** Bank account configured for transfer payments. */
+interface BankAccount {
+  id?: string;
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  currency: string;
+  sortCode?: string;
+  swiftCode?: string;
+  instructions?: string;
+  isActive: boolean;
+  displayOrder: number;
+}
 
 /** Shape of the admin-configurable settings store, mirrored with code fallbacks. */
 interface SiteSettings {
@@ -64,6 +83,8 @@ interface SiteSettings {
   accessMode: AccessMode;
   antiScreenshotEnabled: boolean;
   paymentsEnabled: boolean;
+  paystackEnabled: boolean;
+  bankTransferEnabled: boolean;
   emailFrom: string;
   supportEmail: string;
   /** Footer developer credit — name shown in footer */
@@ -72,6 +93,8 @@ interface SiteSettings {
   footerDevCreditUrl: string;
   /** Footer developer credit — whether to show the credit */
   footerDevCreditEnabled: boolean;
+  /** Bank accounts for transfer payments (fetched separately) */
+  bankAccounts?: BankAccount[];
 }
 
 /** A single devotional (metadata record; content lives in devotional_days). */

@@ -2,8 +2,8 @@
 
 > **Metadata**
 >
-> - last-updated-by: update-ai-system (post-session 7)
-> - last-verified-against-code: 2026-08-24
+> - last-updated-by: execute-feature (post-session 8)
+> - last-verified-against-code: 2026-08-25
 > - staleness-policy: historical entries do not go stale
 
 > **Overview:** Chronological log of completed development work. Each sprint ends with a summary entry. Agents add entries after completing tasks. Useful for understanding what has been built, when decisions were made, and what patterns have emerged.
@@ -167,3 +167,30 @@ Added Cloudflare Workers + MailChannels as a free, production-ready email provid
 
 **Next Sprint Focus:**
 Sprint 3 (part 2) — live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e) + browser pass over interactive UI. Operational: deploy Cloudflare Worker, set secrets, configure `EMAIL_PROVIDER=cloudflare` in Vercel, run `npm run db:seed-admin`, self-promote owner, delete seed.
+---
+
+## 2026-08-25 — Bank Transfer Payment Option
+
+**Summary:**
+Implemented a complete bank transfer payment option alongside the existing Paystack integration. Admins can configure multiple bank accounts with currency/region support; users submit proof of payment via upload; admins verify/reject in a dedicated panel; verified payments grant access passwords via email and on the access page with copy-to-clipboard.
+
+**Completed:**
+- Database: Added `bank_accounts` and `bank_transfers` tables with indexes, foreign keys, and migration `drizzle/0002_silent_typhoid_mary.sql`
+- Admin settings: Payment method toggles (Paystack + Bank Transfer, at least one required); bank account management UI with multiple accounts, currencies, sort/SWIFT codes, instructions, active toggle
+- User purchase flow: Payment method tabs in `PurchaseCheckout`; bank transfer form with account selection (copy account number), transfer reference, proof upload (image/PDF, max 10MB) to Supabase Storage
+- Admin verification: Bank transfers list page with pagination; detail page with purchaser/bank details, proof viewer, verify/reject actions; verify creates access grant + sends email; reject sends email with reason
+- Email templates: `bank_transfer_received` (admin notification with deep link), `bank_transfer_verified` (user access password), `bank_transfer_rejected` (user notification)
+- Access status: `/api/bank-transfer/status` endpoint + `BankTransferStatus` component; `/access?transferId=` page shows verification status and access password with copy/unlock
+- Audit/events: Added `bank_transfer.submit/verify/reject` to `AuditAction`; `bank_transfer.submitted/verified` to `PlatformEventType`
+- Public proof upload: `/api/bank-transfer/upload-proof` (no auth) for user file uploads
+- Fixed masked input issue in admin settings — non-password fields now use text type with visible values
+
+**Key Changes:**
+- Bank transfer access passwords derived from `BT-${reference}-${transferId}` using existing HMAC function (consistent with Paystack)
+- Payment method selection is now config-driven with validation (at least one method, active accounts when bank transfer enabled)
+- Admin verification is manual (no auto-verify); deep-linked email notification for new submissions
+- User receives access password via email AND on `/access` page — dual delivery as requested
+- Settings editor no longer masks non-secret fields (platform name, emails, currency, etc.)
+
+**Next Sprint Focus:**
+Sprint 3 live verification — real Paystack/Cloudflare/Supabase keys for both Paystack and bank transfer flows; deploy Cloudflare Worker; configure Vercel env vars; run migrations + seed-admin; bootstrap owner.

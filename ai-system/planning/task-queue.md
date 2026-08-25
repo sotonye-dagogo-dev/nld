@@ -1,9 +1,9 @@
 # Development Task Queue
 
 > **Metadata**
-> - last-updated-by: update-ai-system (post-session 7)
-> - last-verified-against-code: 2026-08-24
-> - last-synced: 2026-08-24 (update-ai-system)
+> - last-updated-by: execute-feature (post-session 8)
+> - last-verified-against-code: 2026-08-25
+> - last-synced: 2026-08-25 (execute-feature)
 > - staleness-policy: re-verify before each session
 
 > **Overview:** Sprint-level task queue with complexity tagging. Agents execute tasks top to bottom within the current sprint. Each task is sized so it can be completed in a single session.
@@ -110,6 +110,7 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 | Compliance run + global UI/UX pass (issue 5): lucide icons (§15), theme-toggle hydration fix, universal Pagination + back-to-top, responsive navbar/sidebar with hamburger + overflow dropdowns + collapsibility | [x] |
 | Sprint 3 completion: DB migrations + seed, Resend SMTP, asset uploads, destructive actions, footer config | [x] |
 | Cloudflare Workers + MailChannels email integration (free, works with nldv.vercel.app) | [x] |
+| Bank transfer payment option (admin bank accounts, user proof upload, admin verification, access password fallback) | [x] |
 
 ---
 
@@ -117,7 +118,7 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 
 | Size | Task |
 |------|------|
-| [M] | Live verification pass with real Paystack/Resend/Supabase keys (payment → email → unlock e2e) + browser pass over the new interactive UI (hamburger, sidebar drawer/collapse, back-to-top) |
+| [M] | Live verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e for both Paystack and bank transfer) + browser pass over the new interactive UI (hamburger, sidebar drawer/collapse, back-to-top) |
 
 ---
 
