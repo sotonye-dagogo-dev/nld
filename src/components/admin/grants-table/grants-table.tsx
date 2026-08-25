@@ -47,6 +47,7 @@ export function GrantsTable({
     toast("Access password copied to clipboard.", "success");
   }
 
+  // Add action column inside the component to avoid passing functions to client components
   const columnsWithAction: TableColumn<GrantRow>[] = [
     ...columns,
     {

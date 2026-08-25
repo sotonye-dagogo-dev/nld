@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   }
 
   if (file.size > MAX_SIZE) {
-    return NextResponse.json({ ok: false, error: "File too large (max 5MB)." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "File too large (max 10MB)." }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -70,8 +70,14 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
+    if (message.includes("timeout") || message.includes("Timeout")) {
+      return NextResponse.json(
+        { ok: false, error: "Upload timeout. Please try a smaller file or check your connection." },
+        { status: 504 },
+      );
+    }
     return NextResponse.json(
-      { ok: false, error: message },
+      { ok: false, error: `Upload failed: ${message}` },
       { status: 502 },
     );
   }
