@@ -15,7 +15,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 export function Input({ label, hint, error, className, id, showPasswordToggle, ...rest }: InputProps) {
   const inputId = id ?? rest.name;
   const [showPassword, setShowPassword] = useState(false);
-  const isPassword = rest.type === "password" && showPasswordToggle;
+  const isPassword = rest.type === "password" && showPasswordToggle || false;
 
   return (
     <div className="flex flex-col gap-1.5">
