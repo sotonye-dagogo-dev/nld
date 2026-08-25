@@ -150,6 +150,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
           value={form.platformName}
           onChange={(e) => setForm({ ...form, platformName: e.target.value })}
           type="text"
+          autoComplete="off"
         />
         <Input
           name="tagline"
@@ -157,6 +158,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
           value={form.tagline}
           onChange={(e) => setForm({ ...form, tagline: e.target.value })}
           type="text"
+          autoComplete="off"
         />
         <Input
           name="logoUrl"
@@ -165,6 +167,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
           value={form.logoUrl}
           onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
           type="text"
+          autoComplete="off"
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
@@ -174,6 +177,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             value={form.emailFrom}
             onChange={(e) => setForm({ ...form, emailFrom: e.target.value })}
             type="text"
+            autoComplete="off"
           />
           <Input
             name="supportEmail"
@@ -181,6 +185,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             label="Support email"
             value={form.supportEmail}
             onChange={(e) => setForm({ ...form, supportEmail: e.target.value })}
+            autoComplete="off"
           />
           <Input
             name="currency"
@@ -189,6 +194,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             value={form.currency}
             onChange={(e) => setForm({ ...form, currency: e.target.value })}
             type="text"
+            autoComplete="off"
           />
           <Input
             name="defaultPriceMinor"
@@ -198,6 +204,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             label="Default price (minor units)"
             value={form.defaultPriceMinor}
             onChange={(e) => setForm({ ...form, defaultPriceMinor: e.target.value })}
+            autoComplete="off"
           />
           <Input
             name="freePreviewDays"
@@ -206,6 +213,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             label="Free preview days"
             value={form.freePreviewDays}
             onChange={(e) => setForm({ ...form, freePreviewDays: e.target.value })}
+            autoComplete="off"
           />
           <label className="flex flex-col gap-1.5 text-sm font-medium text-text-primary">
             Default access mode
@@ -278,6 +286,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
                   value={acc.bankName}
                   onChange={(e) => updateBankAccount(index, "bankName", e.target.value)}
                   type="text"
+                  autoComplete="off"
                 />
                 <Input
                   label="Account name"
@@ -285,6 +294,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
                   value={acc.accountName}
                   onChange={(e) => updateBankAccount(index, "accountName", e.target.value)}
                   type="text"
+                  autoComplete="off"
                 />
                 <Input
                   label="Account number"
@@ -292,6 +302,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
                   value={acc.accountNumber}
                   onChange={(e) => updateBankAccount(index, "accountNumber", e.target.value)}
                   type="text"
+                  autoComplete="off"
                 />
                 <Input
                   label="Currency"
@@ -299,6 +310,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
                   value={acc.currency}
                   onChange={(e) => updateBankAccount(index, "currency", e.target.value)}
                   type="text"
+                  autoComplete="off"
                 />
                 <Input
                   label="Sort code (optional)"
@@ -306,6 +318,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
                   value={acc.sortCode ?? ""}
                   onChange={(e) => updateBankAccount(index, "sortCode", e.target.value)}
                   type="text"
+                  autoComplete="off"
                 />
                 <Input
                   label="SWIFT code (optional)"
@@ -313,6 +326,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
                   value={acc.swiftCode ?? ""}
                   onChange={(e) => updateBankAccount(index, "swiftCode", e.target.value)}
                   type="text"
+                  autoComplete="off"
                 />
               </div>
               <Input
@@ -321,6 +335,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
                 value={acc.instructions ?? ""}
                 onChange={(e) => updateBankAccount(index, "instructions", e.target.value)}
                 type="text"
+                autoComplete="off"
               />
               <label className="flex items-center gap-2 text-sm text-text-primary">
                 <input

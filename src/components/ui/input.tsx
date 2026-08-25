@@ -15,7 +15,8 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 export function Input({ label, hint, error, className, id, showPasswordToggle, ...rest }: InputProps) {
   const inputId = id ?? rest.name;
   const [showPassword, setShowPassword] = useState(false);
-  const isPassword = rest.type === "password" && showPasswordToggle || false;
+  const isPasswordField = rest.type === "password" && showPasswordToggle;
+  const effectiveType = isPasswordField && showPassword ? "text" : rest.type ?? "text";
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -27,18 +28,18 @@ export function Input({ label, hint, error, className, id, showPasswordToggle, .
       <div className="relative">
         <input
           id={inputId}
-          type={isPassword && showPassword ? "text" : "password"}
-          autoComplete={rest.autoComplete ?? (isPassword ? "current-password" : "off")}
+          type={effectiveType}
+          autoComplete={rest.autoComplete ?? (isPasswordField ? "current-password" : "off")}
           aria-invalid={Boolean(error)}
           className={cn(
             "rounded-lg border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-            isPassword ? "pr-12" : "pr-3",
+            isPasswordField ? "pr-12" : "pr-3",
             error ? "border-danger" : "border-border",
             className,
           )}
           {...rest}
         />
-        {isPassword && (
+        {isPasswordField && (
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
