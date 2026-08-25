@@ -8,7 +8,15 @@ const nextConfig = {
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      {
+        protocol: "https",
+        hostname: "*.supabase.in",
+        pathname: "/storage/v1/object/public/**",
+      },
     ],
+    // Allow unoptimized images for Supabase storage if optimization fails
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   async headers() {
     // Anti-screenshot / asset-protection default (admin-configurable at the app
@@ -19,7 +27,7 @@ const nextConfig = {
         source: "/devotionals/:path*",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; img-src 'self' data: https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; img-src 'self' data: https://*.supabase.co https://*.supabase.in; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'" },
         ],
       },
     ];

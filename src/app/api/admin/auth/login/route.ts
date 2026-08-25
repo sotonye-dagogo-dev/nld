@@ -42,7 +42,7 @@ export async function POST(request: Request) {
           eq(admins.email, user.email),
         ),
       ).limit(1)
-    , 0, 10000);
+    , 0, 15000); // Increased timeout
     adminRole = rows[0]?.role ?? null;
   } catch {
     // DB unavailable — do not allow login (authorization cannot be verified).
