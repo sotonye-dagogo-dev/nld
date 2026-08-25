@@ -20,6 +20,8 @@ export const accessStatusEnum = pgEnum("access_status", ["active", "revoked", "e
 export const devotionalStatusEnum = pgEnum("devotional_status", ["draft", "published", "archived"]);
 export const adminRoleEnum = pgEnum("admin_role", ["owner", "admin", "editor"]);
 export const inviteStatusEnum = pgEnum("invite_status", ["pending", "accepted", "revoked", "expired"]);
+export const transferStatusEnum = pgEnum("transfer_status", ["pending", "verified", "rejected"]);
+export const paymentMethodEnum = pgEnum("payment_method", ["paystack", "bank_transfer"]);
 
 // ---------------------------------------------------------------------------
 // settings — admin-configurable platform values (name, logo, pricing, toggles)
@@ -213,4 +215,60 @@ export const adminInvites = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("admin_invites_status_idx").on(table.status)],
+);
+
+// ---------------------------------------------------------------------------
+// bank_accounts — admin-configured bank accounts for transfer payments
+// Multiple accounts supported for different currencies/regions
+// ---------------------------------------------------------------------------
+export const bankAccounts = pgTable(
+  "bank_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    bankName: text("bank_name").notNull(),
+    accountName: text("account_name").notNull(),
+    accountNumber: text("account_number").notNull(),
+    currency: text("currency").notNull().default("NGN"),
+    sortCode: text("sort_code"), // optional, for international
+    swiftCode: text("swift_code"), // optional, for international
+    instructions: text("instructions"), // additional instructions for user
+    isActive: boolean("is_active").notNull().default(true),
+    displayOrder: integer("display_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("bank_accounts_active_idx").on(table.isActive)],
+);
+
+// ---------------------------------------------------------------------------
+// bank_transfers — user-submitted proof of bank transfer payments
+// Admin verifies these before granting access
+// ---------------------------------------------------------------------------
+export const bankTransfers = pgTable(
+  "bank_transfers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    devotionalId: uuid("devotional_id")
+      .notNull()
+      .references(() => devotionals.id, { onDelete: "restrict" }),
+    email: text("email").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: text("currency").notNull().default("NGN"),
+    bankAccountId: uuid("bank_account_id")
+      .notNull()
+      .references(() => bankAccounts.id, { onDelete: "restrict" }),
+    reference: text("reference").notNull(), // user-provided transfer reference
+    proofUrl: text("proof_url").notNull(), // uploaded proof image/document
+    status: transferStatusEnum("status").notNull().default("pending"),
+    verifiedBy: uuid("verified_by").references(() => admins.id, { onDelete: "set null" }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    rejectionReason: text("rejection_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("bank_transfers_status_idx").on(table.status),
+    index("bank_transfers_email_idx").on(table.email),
+    index("bank_transfers_devotional_idx").on(table.devotionalId),
+  ],
 );

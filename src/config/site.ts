@@ -2,7 +2,8 @@ import "server-only";
 
 import { DEFAULT_SETTINGS } from "./defaults";
 import { queryWithTimeout } from "@/data/db";
-import { settings } from "@/data/db/schema";
+import { settings, bankAccounts } from "@/data/db/schema";
+import { eq, asc } from "drizzle-orm";
 
 // Server-only loader for admin-configurable platform settings.
 //
@@ -20,6 +21,8 @@ const SETTING_KEYS: (keyof SiteSettings)[] = [
   "accessMode",
   "antiScreenshotEnabled",
   "paymentsEnabled",
+  "paystackEnabled",
+  "bankTransferEnabled",
   "emailFrom",
   "supportEmail",
   "footerDevCreditName",
@@ -35,7 +38,9 @@ export function coerceValue<T>(key: keyof SiteSettings, raw: unknown, fallback: 
       return (Number.isFinite(n) ? n : fallback) as T;
     }
     case "antiScreenshotEnabled":
-    case "paymentsEnabled": {
+    case "paymentsEnabled":
+    case "paystackEnabled":
+    case "bankTransferEnabled": {
       if (typeof raw === "boolean") return raw as T;
       if (raw === "true" || raw === "1") return true as T;
       if (raw === "false" || raw === "0") return false as T;
@@ -70,8 +75,32 @@ async function fetchSettingsFromDb(): Promise<Partial<SiteSettings>> {
   }
 }
 
+async function fetchBankAccountsFromDb(): Promise<BankAccount[]> {
+  try {
+    const rows = await queryWithTimeout(
+      (db) => db.select().from(bankAccounts).where(eq(bankAccounts.isActive, true)).orderBy(asc(bankAccounts.displayOrder)),
+      0,
+      1000,
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      bankName: r.bankName,
+      accountName: r.accountName,
+      accountNumber: r.accountNumber,
+      currency: r.currency,
+      sortCode: r.sortCode ?? undefined,
+      swiftCode: r.swiftCode ?? undefined,
+      instructions: r.instructions ?? undefined,
+      isActive: r.isActive,
+      displayOrder: r.displayOrder,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getSiteSettings(): Promise<ConfigValue<SiteSettings>> {
-  const dbSettings = await fetchSettingsFromDb();
-  const out: SiteSettings = { ...DEFAULT_SETTINGS, ...dbSettings };
+  const [dbSettings, accounts] = await Promise.all([fetchSettingsFromDb(), fetchBankAccountsFromDb()]);
+  const out: SiteSettings = { ...DEFAULT_SETTINGS, ...dbSettings, bankAccounts: accounts };
   return { value: out, source: Object.keys(dbSettings).length > 0 ? "db" : "fallback" };
 }
