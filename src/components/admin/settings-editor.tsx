@@ -149,12 +149,14 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
           label="Platform name"
           value={form.platformName}
           onChange={(e) => setForm({ ...form, platformName: e.target.value })}
+          type="text"
         />
         <Input
           name="tagline"
           label="Tagline"
           value={form.tagline}
           onChange={(e) => setForm({ ...form, tagline: e.target.value })}
+          type="text"
         />
         <Input
           name="logoUrl"
@@ -162,6 +164,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
           placeholder="https://..."
           value={form.logoUrl}
           onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
+          type="text"
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
@@ -170,6 +173,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             placeholder="Name <email@domain.com>"
             value={form.emailFrom}
             onChange={(e) => setForm({ ...form, emailFrom: e.target.value })}
+            type="text"
           />
           <Input
             name="supportEmail"
@@ -184,6 +188,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             placeholder="NGN"
             value={form.currency}
             onChange={(e) => setForm({ ...form, currency: e.target.value })}
+            type="text"
           />
           <Input
             name="defaultPriceMinor"
@@ -272,36 +277,42 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
                   placeholder="e.g. Access Bank, GTBank"
                   value={acc.bankName}
                   onChange={(e) => updateBankAccount(index, "bankName", e.target.value)}
+                  type="text"
                 />
                 <Input
                   label="Account name"
                   placeholder="e.g. Next Level Devotional Ltd"
                   value={acc.accountName}
                   onChange={(e) => updateBankAccount(index, "accountName", e.target.value)}
+                  type="text"
                 />
                 <Input
                   label="Account number"
                   placeholder="e.g. 1234567890"
                   value={acc.accountNumber}
                   onChange={(e) => updateBankAccount(index, "accountNumber", e.target.value)}
+                  type="text"
                 />
                 <Input
                   label="Currency"
                   placeholder="NGN"
                   value={acc.currency}
                   onChange={(e) => updateBankAccount(index, "currency", e.target.value)}
+                  type="text"
                 />
                 <Input
                   label="Sort code (optional)"
                   placeholder="e.g. 044"
                   value={acc.sortCode ?? ""}
                   onChange={(e) => updateBankAccount(index, "sortCode", e.target.value)}
+                  type="text"
                 />
                 <Input
                   label="SWIFT code (optional)"
                   placeholder="e.g. GTBINGLA"
                   value={acc.swiftCode ?? ""}
                   onChange={(e) => updateBankAccount(index, "swiftCode", e.target.value)}
+                  type="text"
                 />
               </div>
               <Input
@@ -309,6 +320,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
                 placeholder="Additional instructions for the user (e.g. include your email in reference)"
                 value={acc.instructions ?? ""}
                 onChange={(e) => updateBankAccount(index, "instructions", e.target.value)}
+                type="text"
               />
               <label className="flex items-center gap-2 text-sm text-text-primary">
                 <input
