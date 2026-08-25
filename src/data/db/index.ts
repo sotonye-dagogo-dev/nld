@@ -14,7 +14,7 @@ let client: ReturnType<typeof postgres> | null = null;
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 const QUERY_TIMEOUT_MS = 30000;
-const CONNECT_TIMEOUT_MS = 15000;
+const CONNECT_TIMEOUT_MS = 20000; // Increased for Vercel cold starts
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 

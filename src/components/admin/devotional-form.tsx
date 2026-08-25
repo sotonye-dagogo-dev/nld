@@ -107,7 +107,11 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        toast(data.error ?? "Could not save the devotional.", "error");
+        if (res.status === 409) {
+          toast("That slug is already in use. Please choose a different slug.", "error");
+        } else {
+          toast(data.error ?? "Could not save the devotional.", "error");
+        }
         return;
       }
       toast(isEdit ? "Devotional updated." : "Devotional published.", "success");
@@ -130,6 +134,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             name="title"
             required
             label="Title"
+            type="text"
             placeholder="e.g. 30 Days of Prayer & Fasting"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -137,6 +142,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
           <Input
             name="subtitle"
             label="Subtitle"
+            type="text"
             placeholder="A short supporting line"
             value={form.subtitle}
             onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
@@ -146,7 +152,9 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             label="Slug (auto-derived from title if empty)"
             placeholder={derivedSlug}
             value={form.slug}
+            type="text"
             onChange={(e) => setForm({ ...form, slug: e.target.value })}
+            hint="Must be unique. Used in the devotional URL (e.g. /devotionals/your-slug)"
           />
           <FileUpload
             label="Cover Image"
@@ -205,6 +213,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             name="currency"
             label="Currency"
             placeholder="NGN"
+            type="text"
             value={form.currency}
             onChange={(e) => setForm({ ...form, currency: e.target.value })}
           />
@@ -235,6 +244,8 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
               required
               label="Title"
               value={day.title}
+              type="text"
+              placeholder="e.g. Day 1: The Power of Prayer"
               onChange={(e) => updateDay(i, { title: e.target.value })}
             />
             <label className="flex flex-col gap-1.5 text-sm font-medium text-text-primary">
@@ -244,6 +255,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
                 rows={6}
                 value={day.content}
                 onChange={(e) => updateDay(i, { content: e.target.value })}
+                placeholder="The devotional content for this day. This is displayed in the free preview (up to the configured preview days) and fully unlocked after purchase. Supports basic HTML formatting."
                 className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </label>
@@ -258,6 +270,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
               label="Sermon URL (optional)"
               placeholder="https://..."
               value={day.sermonUrl}
+              type="url"
               onChange={(e) => updateDay(i, { sermonUrl: e.target.value })}
             />
           </div>
