@@ -17,6 +17,7 @@ import {
   Settings,
   UserPlus,
   X,
+  Banknote,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
@@ -42,6 +43,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/admin/invites": UserPlus,
   "/admin/email-templates": Mail,
   "/admin/records/payments": CreditCard,
+  "/admin/records/bank-transfers": Banknote,
   "/admin/records/grants": KeyRound,
   "/admin/records/audit": ScrollText,
   "/admin/settings": Settings,

@@ -25,6 +25,7 @@ const SUPERADMIN_NAV: AdminNavItem[] = [
 
 const RECORDS_NAV: AdminNavItem[] = [
   { href: "/admin/records/payments", label: "Payments" },
+  { href: "/admin/records/bank-transfers", label: "Bank transfers" },
   { href: "/admin/records/grants", label: "Access grants" },
   { href: "/admin/records/audit", label: "Audit log" },
 ];

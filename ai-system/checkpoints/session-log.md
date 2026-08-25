@@ -249,3 +249,40 @@ Sprint 3 task 2: live-key verification pass with real Paystack/Cloudflare/Supaba
 - QA gate: PASS (typecheck, lint, build all clean — verified in previous session)
 - Cloudflare Worker must be deployed separately (`wrangler deploy` from `cloudflare-worker/`)
 - Live-key verification pass still queued — requires real Paystack/Supabase keys and deployed Worker
+
+---
+
+## Session 8 — 2026-08-25
+
+**Completed:**
+Executed `execute-feature.md` to implement bank transfer payment option alongside Paystack, with admin-configurable bank accounts, proof-of-payment upload, admin verification workflow, and email notifications.
+
+- Database: Added `bank_accounts` and `bank_transfers` tables with proper indexes and foreign keys; generated migration `drizzle/0002_silent_typhoid_mary.sql`
+- Admin settings: Added payment method toggles (Paystack + Bank Transfer, at least one required); bank account management UI with multiple accounts, currencies, sort/SWIFT codes, instructions, active toggle; fixed masked input issue (non-password fields now use text type with visible values)
+- User purchase flow: Updated `PurchaseCheckout` with payment method tabs (Paystack / Bank Transfer); bank transfer form with account selection (copy account number), transfer reference input, proof upload (image/PDF, max 10MB); submission stores transfer record + uploads proof to Supabase Storage
+- Admin verification: Bank transfers list page (`/admin/records/bank-transfers`) with pagination; detail page with purchaser/bank details, proof image viewer, verify/reject actions; verify creates access grant + sends `bank_transfer_verified` email; reject sends `bank_transfer_rejected` email with reason
+- Email templates: Added `bank_transfer_received` (admin notification with verification link), `bank_transfer_verified` (user access password), `bank_transfer_rejected` (user notification with reason) to `DEFAULT_EMAIL_TEMPLATES`
+- Access status: New `/api/bank-transfer/status` endpoint + `BankTransferStatus` client component; `/access` page now shows verification status when `transferId` query param present; access password displayed with copy button + unlock link
+- Audit/event types: Added `bank_transfer.submit`, `bank_transfer.verify`, `bank_transfer.reject` to `AuditAction`; `bank_transfer.submitted`, `bank_transfer.verified` to `PlatformEventType`
+- Public proof upload: Created `/api/bank-transfer/upload-proof` (no auth required) for user file uploads to Supabase Storage
+
+**Files Modified:**
+- New: `src/app/api/bank-transfer/upload/route.ts`, `src/app/api/bank-transfer/upload-proof/route.ts`, `src/app/api/bank-transfer/status/route.ts`, `src/app/api/admin/bank-transfers/route.ts`, `src/app/api/admin/bank-accounts/route.ts`, `src/app/admin/(panel)/records/bank-transfers/page.tsx`, `src/app/admin/(panel)/records/bank-transfers/[id]/page.tsx`, `src/app/admin/(panel)/records/bank-transfers/[id]/bank-transfer-actions.tsx`, `src/components/access/bank-transfer-status.tsx`, `drizzle/0002_silent_typhoid_mary.sql`
+- Modified: `src/data/db/schema.ts`, `src/config/defaults.ts`, `src/config/site.ts`, `src/types/global.d.ts`, `src/components/admin/settings-editor.tsx`, `src/components/devotionals/purchase-checkout.tsx`, `src/app/access/page.tsx`, `src/app/admin/(panel)/layout.tsx`, `src/components/admin/sidebar.tsx`
+- Tests: All existing tests pass (55/55)
+- Docs: `ai-system/` — repo-map, dependency-graph, project-plan, task-queue, dev-history, checkpoints/in-progress, checkpoints/session-log
+
+**Next Task:**
+Sprint 3 task 2: live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e for both Paystack and bank transfer flows) + browser pass over interactive UI. Operational: deploy Cloudflare Worker, set secrets, configure Vercel env vars, run `npm run db:migrate` + `npm run db:seed-admin`, self-promote owner, delete seed.
+
+**Assumptions Made:**
+- Bank transfer access passwords derived from `BT-${reference}-${transferId}` using existing HMAC function (consistent with Paystack approach)
+- At least one payment method must be enabled; if bank transfer enabled, at least one active bank account required
+- Proof upload uses existing Supabase Storage integration; 10MB limit, JPG/PNG/WebP/PDF allowed
+- Admin verification is manual (no auto-verify); email sent to admin on new submission with deep link to detail page
+- User receives access password via email upon verification; also available on `/access?transferId=` page with copy-to-clipboard
+
+**Notes / Blockers:**
+- QA gate: PASS. `npm test` 55/55, typecheck clean, lint clean, production build 33 routes (3 new), HTTP smoke verified
+- Live-key verification pass still queued — requires real Paystack/Supabase keys and deployed Cloudflare Worker
+- Migration `drizzle/0002_silent_typhoid_mary.sql` must be applied to production DB (`npm run db:migrate`)
