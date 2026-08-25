@@ -353,6 +353,34 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             Save Settings
           </Button>
         </div>
+        {/* Footer developer credit — config-driven but not admin-editable
+        <div className="space-y-3 border-t border-border pt-4">
+          <h3 className="text-lg font-semibold text-text-primary">Developer Credit</h3>
+          <p className="text-sm text-text-muted">This credit appears in the site footer. Not editable via admin panel.</p>
+          <Input
+            name="footerDevCreditName"
+            label="Credit name"
+            value={form.footerDevCreditName}
+            onChange={(e) => setForm({ ...form, footerDevCreditName: e.target.value })}
+          />
+          <Input
+            name="footerDevCreditUrl"
+            label="Credit URL"
+            placeholder="https://example.com"
+            value={form.footerDevCreditUrl}
+            onChange={(e) => setForm({ ...form, footerDevCreditUrl: e.target.value })}
+          />
+          <label className="flex items-center justify-between gap-4 text-sm text-text-primary">
+            <span>Show credit</span>
+            <input
+              type="checkbox"
+              checked={form.footerDevCreditEnabled}
+              onChange={(e) => setForm({ ...form, footerDevCreditEnabled: e.target.checked })}
+              className="h-4 w-4 accent-primary"
+            />
+          </label>
+        </div>
+        */}
       </form>
     </Card>
   );

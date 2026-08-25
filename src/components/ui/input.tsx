@@ -28,6 +28,7 @@ export function Input({ label, hint, error, className, id, showPasswordToggle, .
         <input
           id={inputId}
           type={isPassword && showPassword ? "text" : "password"}
+          autoComplete={rest.autoComplete ?? (isPassword ? "current-password" : "off")}
           aria-invalid={Boolean(error)}
           className={cn(
             "rounded-lg border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
