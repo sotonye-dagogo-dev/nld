@@ -56,9 +56,22 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, path: result.path, publicUrl: result.publicUrl });
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Upload failed";
     console.error("[admin/assets/upload] failed:", err);
+    if (message.includes("bucket") || message.includes("Bucket")) {
+      return NextResponse.json(
+        { ok: false, error: "Storage bucket not configured. Please create 'devotional-assets' bucket in Supabase." },
+        { status: 500 },
+      );
+    }
+    if (message.includes("policy") || message.includes("Policy") || message.includes("permission") || message.includes("Permission")) {
+      return NextResponse.json(
+        { ok: false, error: "Storage permission denied. Check Supabase storage policies for 'devotional-assets' bucket." },
+        { status: 500 },
+      );
+    }
     return NextResponse.json(
-      { ok: false, error: "Upload failed. Please try again." },
+      { ok: false, error: message },
       { status: 502 },
     );
   }

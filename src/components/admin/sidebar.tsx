@@ -124,16 +124,16 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
             </div>
             <NavLinks nav={nav} onNavigate={() => setDrawerOpen(false)} />
             <div className="mt-auto border-t border-border pt-2">
-              <div className="flex items-center justify-between gap-2 px-3 py-2">
-                <span className="flex-1 text-xs text-text-muted break-all whitespace-normal">
-                  {email}
-                  {superadmin && (
-                    <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                      owner
-                    </span>
-                  )}
-                </span>
-                <Button
+<div className="flex items-center justify-between gap-2 px-3 py-2">
+              <span className="text-xs text-text-muted break-all whitespace-normal">
+                {email}
+                {superadmin && (
+                  <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                    owner
+                  </span>
+                )}
+              </span>
+              <Button
                   type="button"
                   variant="ghost"
                   size="sm"
@@ -191,7 +191,7 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
             </Button>
           ) : (
             <div className="flex items-center gap-2 px-3 py-2 min-w-0">
-              <span className="flex-1 text-xs text-text-muted break-all whitespace-normal">
+              <span className="text-xs text-text-muted break-all whitespace-normal">
                 {email}
                 {superadmin && (
                   <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
