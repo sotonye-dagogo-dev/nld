@@ -85,6 +85,7 @@ export function InviteSignupForm({
             hint="At least 8 characters."
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            showPasswordToggle
           />
           <Input
             name="confirm"
@@ -95,6 +96,7 @@ export function InviteSignupForm({
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             error={error ?? undefined}
+            showPasswordToggle
           />
           <Button type="submit" loading={loading} className="w-full">
             Create account & sign in

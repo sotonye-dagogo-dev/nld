@@ -132,6 +132,8 @@ export interface UploadResult {
   publicUrl: string;
 }
 
+const UPLOAD_TIMEOUT_MS = 30000;
+
 /** Upload a file to Supabase Storage (devotional-assets bucket). */
 export async function uploadAsset(
   file: Buffer,
@@ -139,11 +141,22 @@ export async function uploadAsset(
   contentType: string,
 ): Promise<UploadResult> {
   const client = getAdminClient();
-  const { data, error } = await client.storage
-    .from(supabaseConfig.storage.bucket)
-    .upload(path, file, { contentType, upsert: true });
-  if (error) throw new Error(`Storage upload failed: ${error.message}`);
-  return { path: data.path, publicUrl: `${supabaseConfig.storage.publicUrl}/${data.path}` };
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+  try {
+    const { data, error } = await client.storage
+      .from(supabaseConfig.storage.bucket)
+      .upload(path, file, { contentType, upsert: true });
+    if (error) throw new Error(`Storage upload failed: ${error.message}`);
+    return { path: data.path, publicUrl: `${supabaseConfig.storage.publicUrl}/${data.path}` };
+  } catch (err) {
+    if (err instanceof Error && (err.name === "AbortError" || err.name === "CancellationError" || err.message.includes("timeout"))) {
+      throw new Error("Upload timeout - file too large or network slow");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /** Delete a file from Supabase Storage. */

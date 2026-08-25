@@ -10,7 +10,7 @@ import { events, purchases, devotionals } from "@/data/db/schema";
 import { conversionRate, fillDaySeries } from "@/lib/analytics";
 import { formatPrice } from "@/config/defaults";
 
-const ANALYTICS_QUERY_TIMEOUT_MS = 8000;
+const ANALYTICS_QUERY_TIMEOUT_MS = 15000;
 
 async function queryAnalytics<T>(fn: (db: ReturnType<typeof import("@/data/db").getDb>) => Promise<T>): Promise<T | null> {
   try {
