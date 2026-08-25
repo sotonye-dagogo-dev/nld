@@ -107,7 +107,11 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        toast(data.error ?? "Could not save the devotional.", "error");
+        if (res.status === 409) {
+          toast("That slug is already in use. Please choose a different slug.", "error");
+        } else {
+          toast(data.error ?? "Could not save the devotional.", "error");
+        }
         return;
       }
       toast(isEdit ? "Devotional updated." : "Devotional published.", "success");
@@ -150,6 +154,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             value={form.slug}
             type="text"
             onChange={(e) => setForm({ ...form, slug: e.target.value })}
+            hint="Must be unique. Used in the devotional URL (e.g. /devotionals/your-slug)"
           />
           <FileUpload
             label="Cover Image"
@@ -240,6 +245,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
               label="Title"
               value={day.title}
               type="text"
+              placeholder="e.g. Day 1: The Power of Prayer"
               onChange={(e) => updateDay(i, { title: e.target.value })}
             />
             <label className="flex flex-col gap-1.5 text-sm font-medium text-text-primary">
@@ -249,6 +255,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
                 rows={6}
                 value={day.content}
                 onChange={(e) => updateDay(i, { content: e.target.value })}
+                placeholder="The devotional content for this day. This is displayed in the free preview (up to the configured preview days) and fully unlocked after purchase. Supports basic HTML formatting."
                 className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </label>

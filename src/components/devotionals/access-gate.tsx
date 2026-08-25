@@ -76,6 +76,19 @@ export function AccessGate({ devotional, settings }: AccessGateProps) {
                 />
               </div>
             )}
+            {day.contentFileUrl && (
+              <a
+                href={day.contentFileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex items-center gap-2 text-sm text-primary hover:underline"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>View/download content file (PDF/DOCX)</span>
+              </a>
+            )}
           </article>
         ))}
       </div>

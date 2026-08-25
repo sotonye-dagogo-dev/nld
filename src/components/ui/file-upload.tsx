@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Upload, X, Loader2, FileText, FileImage } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -27,6 +27,17 @@ function getAcceptType(type: FileUploadProps["type"]): string {
     default:
       return "image/*";
   }
+}
+
+function isImageUrl(url: string): boolean {
+  return /\.(jpeg|jpg|png|webp|gif)(\?.*)?$/i.test(url);
+}
+
+function getFileIcon(url: string) {
+  if (isImageUrl(url)) {
+    return <FileImage className="h-8 w-8 text-primary" />;
+  }
+  return <FileText className="h-8 w-8 text-primary" />;
 }
 
 export function FileUpload({ value, onChange, label, accept, type = "cover", disabled = false, preview = true }: FileUploadProps) {
@@ -74,6 +85,7 @@ export function FileUpload({ value, onChange, label, accept, type = "cover", dis
   };
 
   const displayUrl = previewUrl ?? value;
+  const isImage = displayUrl ? isImageUrl(displayUrl) : false;
 
   return (
     <div className="space-y-2">
@@ -106,13 +118,24 @@ export function FileUpload({ value, onChange, label, accept, type = "cover", dis
           ) : displayUrl ? (
             <>
               {preview && (
-                <Image
-                  src={displayUrl}
-                  alt="Preview"
-                  width={200}
-                  height={200}
-                  className="max-h-32 max-w-full rounded-lg object-cover border border-border"
-                />
+                <div className="max-h-32 max-w-full rounded-lg border border-border flex items-center justify-center bg-background">
+                  {isImage ? (
+                    <Image
+                      src={displayUrl}
+                      alt="Preview"
+                      width={200}
+                      height={200}
+                      className="max-h-32 max-w-full rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 p-4 text-center">
+                      {getFileIcon(displayUrl)}
+                      <span className="text-xs text-text-muted truncate max-w-[200px]">
+                        {displayUrl.split("/").pop()?.split(".").slice(0, -1).join(".") || "File"}
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
               <span className="text-sm text-text-muted">
                 {type === "cover" ? "Cover uploaded" : "Asset uploaded"}
