@@ -11,6 +11,7 @@ interface FileUploadProps {
   value?: string;
   onChange: (url: string | undefined) => void;
   label?: string;
+  hint?: string;
   accept?: string;
   type?: "cover" | "asset" | "sermon";
   disabled?: boolean;
@@ -40,7 +41,7 @@ function getFileIcon(url: string) {
   return <FileText className="h-8 w-8 text-primary" />;
 }
 
-export function FileUpload({ value, onChange, label, accept, type = "cover", disabled = false, preview = true }: FileUploadProps) {
+export function FileUpload({ value, onChange, label, hint, accept, type = "cover", disabled = false, preview = true }: FileUploadProps) {
   const effectiveAccept = accept ?? getAcceptType(type);
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -92,6 +93,7 @@ export function FileUpload({ value, onChange, label, accept, type = "cover", dis
       <label className="block text-sm font-medium text-text-primary">
         {label ?? (type === "cover" ? "Cover Image" : "Asset")}
       </label>
+      {hint && <p className="text-xs text-text-muted">{hint}</p>}
       <div className="relative">
         <input
           type="file"

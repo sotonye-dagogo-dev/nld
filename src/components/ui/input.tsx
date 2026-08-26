@@ -12,11 +12,11 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   showPasswordToggle?: boolean;
 }
 
-export function Input({ label, hint, error, className, id, showPasswordToggle, ...rest }: InputProps) {
+export function Input({ label, hint, error, className, id, showPasswordToggle, type, ...rest }: InputProps) {
   const inputId = id ?? rest.name;
   const [showPassword, setShowPassword] = useState(false);
-  const isPasswordField = rest.type === "password" && showPasswordToggle;
-  const effectiveType = isPasswordField && showPassword ? "text" : rest.type ?? "text";
+  const isPasswordField = type === "password" && showPasswordToggle;
+  const effectiveType = isPasswordField && showPassword ? "text" : type ?? "text";
 
   // Prevent browser autofill from treating non-password fields as passwords
   const autoComplete = rest.autoComplete ?? (isPasswordField ? "current-password" : "off");

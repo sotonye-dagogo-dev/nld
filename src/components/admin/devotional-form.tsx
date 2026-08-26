@@ -138,6 +138,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             placeholder="e.g. 30 Days of Prayer & Fasting"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
+            hint="The main title of the devotional (e.g. '30 Days of Prayer & Fasting')"
           />
           <Input
             name="subtitle"
@@ -146,6 +147,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             placeholder="A short supporting line"
             value={form.subtitle}
             onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
+            hint="Optional subtitle displayed below the title"
           />
           <Input
             name="slug"
@@ -154,7 +156,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             value={form.slug}
             type="text"
             onChange={(e) => setForm({ ...form, slug: e.target.value })}
-            hint="Must be unique. Used in the devotional URL (e.g. /devotionals/your-slug)"
+            hint="Must be unique. Used in the devotional URL (e.g. /devotionals/your-slug). Auto-generated from title if left empty."
           />
           <FileUpload
             label="Cover Image"
@@ -255,7 +257,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
                 rows={6}
                 value={day.content}
                 onChange={(e) => updateDay(i, { content: e.target.value })}
-                placeholder="The devotional content for this day. This is displayed in the free preview (up to the configured preview days) and fully unlocked after purchase. Supports basic HTML formatting."
+                placeholder="The devotional content for this day. This is displayed in the free preview (up to the configured preview days) and fully unlocked after purchase. Supports basic HTML formatting like <p>, <strong>, <em>, <ul>, <ol>, <li>."
                 className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </label>
@@ -264,6 +266,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
               value={day.contentFileUrl}
               onChange={(url) => updateDay(i, { contentFileUrl: url ?? "" })}
               type="asset"
+              hint="Upload a PDF or DOCX file for protected content. Preview is truncated for asset protection."
             />
             <Input
               name={`sermonUrl-${i}`}

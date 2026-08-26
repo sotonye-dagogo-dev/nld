@@ -6,7 +6,7 @@ import { getAdminSession } from "@/lib/admin-auth";
 import { clampInt } from "@/lib/utils";
 import { formatPrice } from "@/config/defaults";
 import { ErrorState } from "@/components/ui/error-state";
-import { RecordsTable, type TableColumn } from "@/components/admin/records-table";
+import { RecordsTable, type SimpleColumn } from "@/components/admin/records-table";
 
 export const metadata: Metadata = { title: "Admin — Bank Transfers" };
 export const dynamic = "force-dynamic";
@@ -86,7 +86,7 @@ export default async function BankTransfersPage({
     error = true;
   }
 
-  const columns: TableColumn<BankTransferRow>[] = [
+  const columns: SimpleColumn[] = [
     { key: "email", header: "Email" },
     { key: "devotional", header: "Devotional" },
     { key: "amount", header: "Amount" },

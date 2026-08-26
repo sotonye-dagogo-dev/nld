@@ -18,7 +18,6 @@ interface GrantRow {
 }
 
 interface GrantsTableProps {
-  columns: TableColumn<GrantRow>[];
   rows: GrantRow[];
   page: number;
   pageSize: number;
@@ -28,7 +27,6 @@ interface GrantsTableProps {
 }
 
 export function GrantsTable({
-  columns,
   rows,
   page,
   pageSize,
@@ -47,9 +45,13 @@ export function GrantsTable({
     toast("Access password copied to clipboard.", "success");
   }
 
-  // Add action column inside the component to avoid passing functions to client components
-  const columnsWithAction: TableColumn<GrantRow>[] = [
-    ...columns,
+  const columns: TableColumn<GrantRow>[] = [
+    { key: "email", header: "Email" },
+    { key: "devotional", header: "Devotional" },
+    { key: "status", header: "Status" },
+    { key: "password", header: "Access password", cellClass: "font-mono" },
+    { key: "granted", header: "Granted" },
+    { key: "expires", header: "Expires" },
     {
       key: "actions",
       header: "Actions",
@@ -74,7 +76,7 @@ export function GrantsTable({
   return (
     <>
       <Table
-        columns={columnsWithAction}
+        columns={columns}
         rows={rows}
         rowKey="id"
         page={page}

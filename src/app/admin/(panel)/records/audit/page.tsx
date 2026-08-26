@@ -5,7 +5,7 @@ import { auditLogs } from "@/data/db/schema";
 import { getAdminSession } from "@/lib/admin-auth";
 import { clampInt } from "@/lib/utils";
 import { ErrorState } from "@/components/ui/error-state";
-import { RecordsTable, type TableColumn } from "@/components/admin/records-table";
+import { RecordsTable, type SimpleColumn } from "@/components/admin/records-table";
 
 export const metadata: Metadata = { title: "Admin — Audit log" };
 export const dynamic = "force-dynamic";
@@ -69,7 +69,7 @@ export default async function AuditLogPage({
     error = true;
   }
 
-  const columns: TableColumn<AuditRow>[] = [
+  const columns: SimpleColumn[] = [
     { key: "created", header: "When" },
     { key: "actor", header: "Actor" },
     { key: "action", header: "Action" },

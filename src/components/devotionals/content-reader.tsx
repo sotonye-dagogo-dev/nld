@@ -14,7 +14,7 @@ interface ContentReaderProps {
   fileType: "pdf" | "docx";
   maxPreviewChars?: number;
   hasFullAccess?: boolean;
-  onUpgradeClick?: () => void;
+  upgradeHref?: string;
   className?: string;
 }
 
@@ -26,7 +26,7 @@ export function ContentReader({
   fileType,
   maxPreviewChars = DEFAULT_MAX_PREVIEW_CHARS,
   hasFullAccess = false,
-  onUpgradeClick,
+  upgradeHref,
   className,
 }: ContentReaderProps) {
   const [isLoading, setIsLoading] = useState(true);
@@ -85,12 +85,6 @@ export function ContentReader({
     const nextPage = currentPage + delta;
     if (nextPage >= 1 && nextPage <= totalPages) {
       setCurrentPage(nextPage);
-    }
-  };
-
-  const handleUpgrade = () => {
-    if (onUpgradeClick) {
-      onUpgradeClick();
     }
   };
 
@@ -158,14 +152,14 @@ export function ContentReader({
           )}
 
           {/* Upgrade prompt for truncated content */}
-          {isTruncated && !hasFullAccess && (
-            <button
-              onClick={handleUpgrade}
+          {isTruncated && !hasFullAccess && upgradeHref && (
+            <a
+              href={upgradeHref}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
             >
               <Lock className="h-4 w-4" aria-hidden="true" />
               Unlock Full Content
-            </button>
+            </a>
           )}
 
           {/* Fullscreen toggle */}
@@ -207,18 +201,18 @@ export function ContentReader({
             <div className="whitespace-pre-wrap text-text-primary select-none">
               {displayContent}
             </div>
-            {isTruncated && !hasFullAccess && (
+            {isTruncated && !hasFullAccess && upgradeHref && (
               <div className="mt-6 p-4 rounded-lg bg-background border border-border text-center animate-fade-in">
                 <p className="text-sm text-text-muted mb-3">
                   Preview truncated at {maxPreviewChars} characters for asset protection.
                 </p>
-                <button
-                  onClick={handleUpgrade}
+                <a
+                  href={upgradeHref}
                   className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
                 >
                   <Lock className="h-4 w-4" aria-hidden="true" />
                   Purchase to Unlock Full Content
-                </button>
+                </a>
               </div>
             )}
           </div>
