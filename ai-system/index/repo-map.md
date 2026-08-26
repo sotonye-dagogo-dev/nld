@@ -17,20 +17,20 @@ project-root/
 │
 ├── src/                        → Application source (Next.js App Router)
 │   ├── app/                    → Routes (public + admin + API)
-│   │   ├── devotionals/        → /devotionals/[slug] reader (preview-only SSR + unlock)
+│   │   ├── devotionals/        → /devotionals/[slug] reader (preview-only SSR + unlock + on-platform reader)
 │   │   ├── purchase/           → /purchase/[slug] checkout
 │   │   ├── access/             → /access password entry
 │   │   ├── admin/              → /admin/* panel (login, invite signup, guarded (panel) group)
-│   │   └── api/                → Route handlers (paystack, access, unlock, admin/*, assets)
+│   │   └── api/                → Route handlers (paystack, access, unlock, admin/*, assets, bank-transfer)
 │   ├── components/             → Universal UI catalog + feature components
 │   │   ├── ui/                 → Baseline catalog (Button, Input, Card, Navbar, Pagination, BackToTop, Modal, FileUpload, ConfirmAction, etc.)
-│   │   ├── admin/              → Admin feature components (forms, editors, tables, analytics, sidebar)
-│   │   ├── devotionals/        → Public devotional components (AccessGate, AntiScreenshot, PurchaseCheckout)
+│   │   ├── admin/              → Admin feature components (forms, editors, tables, analytics, sidebar, settings-editor)
+│   │   ├── devotionals/        → Public devotional components (AccessGate, AntiScreenshot, PurchaseCheckout, ContentReader)
 │   │   └── pwa/                → Service worker registration
 │   ├── config/                 → Admin-configurable settings + defaults with fallbacks
 │   ├── data/                   → Drizzle schema + DB client
 │   ├── integrations/           → Isolated SDK wrappers (paystack, resend, supabase, cloudflare)
-│   ├── lib/                    → Service logic (access, audit, utils, email templates/render/blocks, admin auth, analytics, pagination)
+│   ├── lib/                    → Service logic (access, audit, utils, email templates/render/blocks, admin auth, analytics, pagination, performance)
 │   ├── types/                  → Global type definitions (injected via tsconfig)
 │   └── hooks/                  → Shared React hooks (theme)
 │
@@ -58,11 +58,11 @@ project-root/
 | `src/app`           | Next.js App Router routes                    | layout.tsx, page.tsx, admin/*, api/* |
 | `src/components/ui` | Universal component catalog (baseline §13)   | button.tsx, navbar.tsx, table.tsx, pagination.tsx, back-to-top.tsx, theme-toggle.tsx, modal.tsx, file-upload.tsx, confirm-action.tsx |
 | `src/components/admin` | Admin feature components (forms, editors, tables, analytics, sidebar) | devotional-form.tsx, email-template-editor.tsx, records-table.tsx, analytics-bars.tsx, sidebar.tsx, settings-editor.tsx |
-| `src/components/devotionals` | Public devotional components (reader protection) | access-gate.tsx, anti-screenshot.tsx, purchase-checkout.tsx |
+| `src/components/devotionals` | Public devotional components (reader protection, on-platform reader) | access-gate.tsx, anti-screenshot.tsx, purchase-checkout.tsx, content-reader.tsx |
 | `src/config`        | Config-driven settings + defaults            | site.ts, defaults.ts              |
 | `src/data`          | Drizzle schema and DB client                 | db/schema.ts, db/index.ts         |
 | `src/integrations`  | SDK isolation wrappers (§17)                 | paystack/*, resend/*, supabase/*, cloudflare/* |
-| `src/lib`           | Business logic (access, audit, email, admin auth, pagination, analytics) | access.ts, audit.ts, email-templates.ts, email-render.ts, email-blocks.ts, admin-auth.ts, analytics.ts, pagination.ts |
+| `src/lib`           | Business logic (access, audit, email, admin auth, pagination, analytics, performance) | access.ts, audit.ts, email-templates.ts, email-render.ts, email-blocks.ts, admin-auth.ts, analytics.ts, pagination.ts, performance.ts |
 | `src/types`         | Global TS types (no import needed)           | global.d.ts                       |
 | `cloudflare-worker/`| MailChannels email relay via Cloudflare Worker | smtp-relay.ts, wrangler.toml      |
 | `drizzle/`          | Generated migrations                         | (generated)                       |
@@ -89,3 +89,5 @@ project-root/
 | Asset upload API       | `src/app/api/admin/assets/route.ts` |
 | Destructive action hook | `src/components/ui/confirm-action.tsx` |
 | File upload component  | `src/components/ui/file-upload.tsx` |
+| On-platform content reader | `src/components/devotionals/content-reader.tsx` |
+| Performance monitoring | `src/lib/performance.ts`        |

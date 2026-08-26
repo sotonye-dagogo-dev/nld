@@ -34,7 +34,7 @@ let emailClientInstance: EmailClient | null = null;
 export async function getEmailClient(): Promise<EmailClient> {
   if (emailClientInstance) return emailClientInstance;
 
-  const provider = process.env.EMAIL_PROVIDER ?? "cloudflare";
+  const provider = process.env.EMAIL_PROVIDER ?? "resend";
 
   switch (provider) {
     case "resend": {

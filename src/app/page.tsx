@@ -35,10 +35,10 @@ export default async function HomePage({
   recordEvent({ eventType: "page.view", meta: { path: "/", page } }).catch(() => undefined);
 
   return (
-    <div className="page-shell section-gap">
-      <section>
-        <h1 className="text-3xl font-bold text-text-primary">{settings.platformName}</h1>
-        {settings.tagline && <p className="mt-2 text-text-muted">{settings.tagline}</p>}
+    <div className="page-shell section-gap animate-fade-in">
+      <section className="mb-8">
+        <h1 className="text-4xl font-bold text-text-primary tracking-tight">{settings.platformName}</h1>
+        {settings.tagline && <p className="mt-3 text-lg text-text-muted">{settings.tagline}</p>}
       </section>
 
       {error ? (
@@ -53,7 +53,7 @@ export default async function HomePage({
         />
       ) : result ? (
         <>
-          <section className="card-grid">
+          <section className="devotional-grid" role="list">
             {result.rows.map((devotional) => (
               <DevotionalCard key={devotional.id} devotional={devotional} />
             ))}
@@ -63,7 +63,7 @@ export default async function HomePage({
             pageSize={result.pageSize}
             total={result.total}
             hrefForPage={(p) => `/?page=${p}`}
-            className="mt-6"
+            className="mt-10"
           />
         </>
       ) : null}
