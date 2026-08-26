@@ -1,8 +1,8 @@
 # Project Plan
 
 > **Metadata**
-> - last-updated-by: update-ai-system (post-session 7)
-> - last-verified-against-code: 2026-08-24
+> - last-updated-by: update-ai-system (post-session 9)
+> - last-verified-against-code: 2026-08-26
 > - staleness-policy: re-verify if project scope or phase changes
 
 > **Overview:** High-level feature checklist organized by development phase. See `planning/task-queue.md` for granular, sprint-level tasks. The MVP scope comes from `artifacts/genesis-directive.txt`; the beyond-MVP roadmap comes from the client Word brief (`artifacts/Next-Level-Devotional-App.md`) and platform suggestions.
@@ -63,6 +63,10 @@
 - [x] Global destructive action wrapper (confirmation modal + undo timeout pattern)
 - [x] Config-driven footer dev credit (name, URL, enable toggle) + dynamic copyright year
 - [x] Cloudflare Workers + MailChannels email integration (free, no domain verification, works with Vercel subdomain)
+- [x] **Design system overhaul: black/white brand colors, glassmorphism/bento layouts, responsive grid (1/2/3/4 columns)**
+- [x] **Asset protection: on-platform PDF/DOCX reader with preview truncation (no download/export)**
+- [x] **Performance monitoring: health checks, rate limiting, request timeouts, metrics recording**
+- [x] **Email provider: Resend as default with Cloudflare fallback**
 - [ ] Unit test coverage for core modules (config, access, pricing)
 - [ ] Integration tests for purchase + access flow
 - [ ] E2E tests for browse → purchase → unlock

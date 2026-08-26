@@ -1,40 +1,83 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Card, CardTitle } from "@/components/ui/card";
 import { formatPrice } from "@/config/defaults";
+import { BookOpen, Clock, Lock, Tag } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // Devotional listing card — metadata-driven from a Devotional record.
+// Uses bento/glassmorphism design with responsive layout.
 
-export function DevotionalCard({ devotional }: { devotional: Devotional }) {
+interface DevotionalCardProps {
+  devotional: Devotional;
+}
+
+export function DevotionalCard({ devotional }: DevotionalCardProps) {
   const previewNote = devotional.previewDays > 0
     ? `${devotional.previewDays} free day${devotional.previewDays === 1 ? "" : "s"}`
     : "Full access on purchase";
 
+  const isPaid = devotional.priceMinor > 0;
+
   return (
     <Link href={`/devotionals/${devotional.slug}`} className="group block h-full">
-      <Card className="flex h-full flex-col transition-shadow group-hover:shadow-md">
+      <Card variant="bento" className="flex h-full flex-col overflow-hidden">
         {devotional.coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={devotional.coverUrl}
-            alt={devotional.title}
-            className="mb-4 h-40 w-full rounded-lg object-cover"
-          />
+          <div className="mb-4 relative h-40 w-full overflow-hidden rounded-xl">
+            <Image
+              src={devotional.coverUrl}
+              alt={devotional.title}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          </div>
         ) : (
-          <div className="mb-4 flex h-40 w-full items-center justify-center rounded-lg bg-background text-text-muted">
-            {devotional.title}
+          <div className="mb-4 flex h-40 w-full items-center justify-center rounded-xl bg-surface border border-border">
+            <BookOpen className="h-12 w-12 text-text-muted" aria-hidden="true" />
           </div>
         )}
-        <CardTitle>{devotional.title}</CardTitle>
-        {devotional.subtitle && (
-          <p className="mt-1 text-sm text-text-muted">{devotional.subtitle}</p>
-        )}
-        <div className="mt-4 flex items-center justify-between text-sm">
-          <span className="font-semibold text-text-primary">
-            {devotional.priceMinor > 0
-              ? formatPrice(devotional.priceMinor, devotional.currency)
-              : "Free"}
-          </span>
-          <span className="text-text-muted">{previewNote}</span>
+        <div className="flex-1 flex flex-col p-4 pt-0">
+          <div className="flex items-center gap-2 text-xs text-text-muted mb-2">
+            <span className="flex items-center gap-1">
+              <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+              {devotional.previewDays > 0 ? `${devotional.previewDays} days preview` : "Locked content"}
+            </span>
+            {isPaid && (
+              <span className="flex items-center gap-1">
+                <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                Paid
+              </span>
+            )}
+          </div>
+          <CardTitle className="text-xl line-clamp-2 group-hover:text-primary transition-colors">
+            {devotional.title}
+          </CardTitle>
+          {devotional.subtitle && (
+            <p className="mt-2 text-sm text-text-muted line-clamp-2">{devotional.subtitle}</p>
+          )}
+        </div>
+        <div className="border-t border-border pt-4 mt-auto">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-semibold text-text-primary flex items-center gap-1.5">
+              {isPaid ? (
+                <>
+                  <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                  {formatPrice(devotional.priceMinor, devotional.currency)}
+                </>
+              ) : (
+                <>
+                  <span className="text-success font-medium">Free</span>
+                </>
+              )}
+            </span>
+            <span className="text-text-muted flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+              {previewNote}
+            </span>
+          </div>
         </div>
       </Card>
     </Link>

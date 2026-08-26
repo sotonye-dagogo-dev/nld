@@ -5,6 +5,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { AccessGate } from "@/components/devotionals/access-gate";
 import { AntiScreenshot } from "@/components/devotionals/anti-screenshot";
 import { AccessPasswordFallback } from "@/components/devotionals/access-password-fallback";
+import { ContentReader, truncateForPreview, MAX_PREVIEW_CHARS } from "@/components/devotionals/content-reader";
 import { getDevotionalBySlug, getDevotionalDays } from "@/lib/catalog";
 import { getSiteSettings } from "@/config/site";
 import { recordEvent } from "@/lib/audit";
@@ -68,21 +69,21 @@ export default async function DevotionalPage({
 
   return (
     <AntiScreenshot enabled={settings.antiScreenshotEnabled}>
-      <div className="page-shell section-gap">
-        <section className="flex-between flex-wrap gap-4">
+      <div className="page-shell section-gap animate-fade-in">
+        <section className="flex-between flex-wrap gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-text-primary">{devotional.title}</h1>
             {devotional.subtitle && <p className="mt-2 text-text-muted">{devotional.subtitle}</p>}
           </div>
           {devotional.priceMinor > 0 && (
-            <span className="rounded-lg bg-surface px-4 py-2 text-lg font-semibold text-text-primary">
+            <span className="rounded-lg bg-surface px-4 py-2 text-lg font-semibold text-text-primary border border-border">
               {formatPrice(devotional.priceMinor, devotional.currency)}
             </span>
           )}
         </section>
 
         {devotional.description && (
-          <p className="max-w-2xl text-text-muted">{devotional.description}</p>
+          <p className="max-w-2xl text-text-muted mb-8">{devotional.description}</p>
         )}
 
         {days.length === 0 ? (
@@ -94,7 +95,7 @@ export default async function DevotionalPage({
           <div className="section-gap">
             <section className="space-y-6">
               {visibleDays.map((day) => (
-                <article key={day.id} className="rounded-xl border border-border bg-surface p-6">
+                <article key={day.id} className="rounded-xl border border-border bg-surface p-6 animate-slide-up">
                   <h2 className="mb-2 text-xl font-semibold text-text-primary">
                     Day {day.dayNumber} — {day.title}
                   </h2>
@@ -110,17 +111,20 @@ export default async function DevotionalPage({
                     </div>
                   )}
                   {day.contentFileUrl && (
-                    <a
-                      href={day.contentFileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-4 inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      <span>View/download content file (PDF/DOCX)</span>
-                    </a>
+                    <div className="mt-4">
+                      <ContentReader
+                        fileUrl={day.contentFileUrl}
+                        fileName={day.contentFileUrl.split("/").pop()?.split(".").slice(0, -1).join(".") || "Content"}
+                        fileType={day.contentFileUrl.toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
+                        maxPreviewChars={MAX_PREVIEW_CHARS}
+                        hasFullAccess={!hasAccessControl}
+                        onUpgradeClick={() => {
+                          // Scroll to access gate or trigger purchase flow
+                          const gate = document.getElementById("access-gate");
+                          if (gate) gate.scrollIntoView({ behavior: "smooth" });
+                        }}
+                      />
+                    </div>
                   )}
                 </article>
               ))}
@@ -130,7 +134,13 @@ export default async function DevotionalPage({
               <AccessPasswordFallback reference={reference} devotionalSlug={devotional.title} />
             )}
 
-            {hasAccessControl && <AccessGate devotional={devotional} settings={settings} />}
+            {hasAccessControl && (
+              <AccessGate
+                id="access-gate"
+                devotional={devotional}
+                settings={settings}
+              />
+            )}
             {hasAccessControl === false && (
               <Card className="text-center">
                 <p className="text-sm text-text-muted">All {days.length} days are available for free.</p>

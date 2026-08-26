@@ -17,6 +17,7 @@ Public pages (src/app, src/app/devotionals, src/app/purchase, src/app/access)
   → src/config (site settings with fallbacks)
   → src/lib/access (verify), src/lib/utils
   → src/data (read devotionals / days)
+  → src/components/devotionals/content-reader (on-platform PDF/DOCX reader)
 
 Admin pages (src/app/admin/*)
   → src/components/ui
@@ -37,7 +38,7 @@ Analytics dashboard (src/app/admin/(panel)/analytics)
 
 Public reader + unlock (src/app/devotionals/[slug])
   → src/data (devotional + preview days only; NO locked days in SSR payload)
-  → src/components/devotionals (access-gate verifier, anti-screenshot)
+  → src/components/devotionals (access-gate verifier, anti-screenshot, content-reader)
   → POST /api/devotionals/[slug]/unlock (returns locked days after verification)
 
 Asset management (admin uploads)
@@ -60,7 +61,7 @@ API route handlers (src/app/api/*)
   → src/lib/audit
   → src/lib/email-templates (store + renderer + seed)
   → src/lib/admin-auth (API guards)
-  → src/data (purchases, access_grants, events, templates, invites, admins)
+  → src/data (purchases, access_grants, events, templates, invites, admins, bank_accounts, bank_transfers)
 
 src/lib/email-templates
   → src/config (defaults/fallbacks)
@@ -71,6 +72,7 @@ src/lib/email-render → pure functions (client-safe, used by editor preview)
 src/lib/email-blocks → pure block builder/serializer (client-safe, used by editor)
 src/lib/analytics → pure day-series/conversion helpers (client-safe, used by dashboard)
 src/lib/pagination → pure page-range/count helpers (client-safe, used by Pagination + Table)
+src/lib/performance → metrics recording, health checks, rate limiting, request timeouts (server-only)
 
 Universal UI catalog (src/components/ui)
   → lucide-react (icons per §15)
@@ -106,7 +108,7 @@ src/integrations/cloudflare
 | ------------------- | ------------------------------------ | ----------------------- |
 | next, react         | App framework                        | src/app                 |
 | tailwindcss         | Styling                              | global CSS, components  |
-| lucide-react        | Icon library (no emoji / raw SVG)    | src/components/ui, src/components/admin |
+| lucide-react        | Icon library (no emoji / raw SVG)    | src/components/ui, src/components/admin, src/components/devotionals |
 | drizzle-orm         | Typed SQL                            | src/data                |
 | postgres            | Postgres driver (Supabase)           | src/data/db             |
 | @supabase/supabase-js | Admin auth + client helpers + storage | src/integrations/supabase |

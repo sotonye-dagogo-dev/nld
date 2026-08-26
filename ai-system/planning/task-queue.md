@@ -111,6 +111,11 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 | Sprint 3 completion: DB migrations + seed, Resend SMTP, asset uploads, destructive actions, footer config | [x] |
 | Cloudflare Workers + MailChannels email integration (free, works with nldv.vercel.app) | [x] |
 | Bank transfer payment option (admin bank accounts, user proof upload, admin verification, access password fallback) | [x] |
+| **Design system overhaul: black/white brand colors + glassmorphism/bento layouts** | [x] |
+| **Asset protection: on-platform PDF/DOCX reader with preview truncation (no download/export)** | [x] |
+| **Responsive devotional grid (1/2/3/4 columns based on screen size)** | [x] |
+| **Performance monitoring + health checks + rate limiting utilities** | [x] |
+| **Email provider: Resend as default with Cloudflare fallback** | [x] |
 
 ---
 
