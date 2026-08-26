@@ -4,6 +4,12 @@ import { useRouter } from "next/navigation";
 import { Table, type TableColumn } from "@/components/ui/table";
 
 export type { TableColumn } from "@/components/ui/table";
+export interface SimpleColumn {
+  key: string;
+  header: string;
+  align?: "left" | "right";
+  cellClass?: string;
+}
 
 // Server-driven paginated table for records views. Rows are fetched and
 // rendered by a server page; this thin client wrapper wires the universal
@@ -19,7 +25,7 @@ export function RecordsTable<T>({
   basePath,
   emptyMessage,
 }: {
-  columns: TableColumn<T>[];
+  columns: SimpleColumn[];
   rows: T[];
   rowKey: keyof T | string;
   page: number;
@@ -29,9 +35,18 @@ export function RecordsTable<T>({
   emptyMessage?: string;
 }) {
   const router = useRouter();
+  
+  // Convert simple columns to TableColumn (without render functions)
+  const tableColumns: TableColumn<T>[] = columns.map((c) => ({
+    key: c.key,
+    header: c.header,
+    align: c.align,
+    cellClass: c.cellClass,
+  }));
+
   return (
     <Table
-      columns={columns}
+      columns={tableColumns}
       rows={rows}
       rowKey={rowKey}
       page={page}

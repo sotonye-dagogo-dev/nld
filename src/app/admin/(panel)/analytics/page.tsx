@@ -10,7 +10,7 @@ import { events, purchases, devotionals } from "@/data/db/schema";
 import { conversionRate, fillDaySeries } from "@/lib/analytics";
 import { formatPrice } from "@/config/defaults";
 
-const ANALYTICS_QUERY_TIMEOUT_MS = 30000;
+const ANALYTICS_QUERY_TIMEOUT_MS = 10000;
 
 async function queryAnalytics<T>(fn: (db: ReturnType<typeof import("@/data/db").getDb>) => Promise<T>): Promise<T | null> {
   try {
@@ -63,74 +63,92 @@ export default async function AdminAnalyticsPage() {
     | null = null;
   let loadError = false;
 
-  const [typeRows, revenueRows, trendRows, purchaseTrendRows, topOpenRows, topPurchaseRows, recentRows] =
-      await Promise.all([
-        queryAnalytics((db) =>
-          db.select({ eventType: events.eventType, n: sql<number>`count(*)::int` }).from(events).groupBy(events.eventType)
-        ),
-        queryAnalytics((db) =>
-          db
-            .select({
-              n: sql<number>`count(*)::int`,
-              total: sql<number>`coalesce(sum(${purchases.amountMinor}), 0)::int`,
-            })
-            .from(purchases)
-            .where(eq(purchases.status, "success"))
-        ),
-        queryAnalytics((db) =>
-          db
-            .select({
-              eventType: events.eventType,
-              day: TREND_DAY(events.createdAt),
-              n: sql<number>`count(*)::int`,
-            })
-            .from(events)
-            .where(gte(events.createdAt, CUTOFF))
-            .groupBy(events.eventType, TREND_DAY(events.createdAt))
-        ),
-        queryAnalytics((db) =>
-          db
-            .select({
-              day: TREND_DAY(purchases.createdAt),
-              n: sql<number>`count(*)::int`,
-            })
-            .from(purchases)
-            .where(and(eq(purchases.status, "success"), gte(purchases.createdAt, CUTOFF)))
-            .groupBy(TREND_DAY(purchases.createdAt))
-        ),
-        queryAnalytics((db) =>
-          db
-            .select({
-              slug: events.slug,
-              title: devotionals.title,
-              n: sql<number>`count(*)::int`,
-            })
-            .from(events)
-            .leftJoin(devotionals, eq(events.slug, devotionals.slug))
-            .where(and(eq(events.eventType, "devotional.open"), isNotNull(events.slug)))
-            .groupBy(events.slug, devotionals.title)
-            .orderBy(sql`count(*) desc`)
-            .limit(10)
-        ),
-        queryAnalytics((db) =>
-          db
-            .select({
-              devotionalId: purchases.devotionalId,
-              title: devotionals.title,
-              slug: devotionals.slug,
-              n: sql<number>`count(*)::int`,
-              revenue: sql<number>`sum(${purchases.amountMinor})::int`,
-            })
-            .from(purchases)
-            .leftJoin(devotionals, eq(purchases.devotionalId, devotionals.id))
-            .where(eq(purchases.status, "success"))
-            .groupBy(purchases.devotionalId, devotionals.title, devotionals.slug)
-            .orderBy(sql`count(*) desc`)
-            .limit(10)
-        ),
-        queryAnalytics((db) => db.select().from(events).orderBy(desc(events.createdAt)).limit(8)),
-      ]);
+  const [
+    typeRows,
+    revenueRows,
+    trendRows,
+    purchaseTrendRows,
+    topOpenRows,
+    topPurchaseRows,
+    recentRows,
+  ] = await Promise.all([
+    queryAnalytics((db) =>
+      db.select({ eventType: events.eventType, n: sql<number>`count(*)::int` }).from(events).groupBy(events.eventType)
+    ),
+    queryAnalytics((db) =>
+      db
+        .select({
+          n: sql<number>`count(*)::int`,
+          total: sql<number>`coalesce(sum(${purchases.amountMinor}), 0)::int`,
+        })
+        .from(purchases)
+        .where(eq(purchases.status, "success"))
+    ),
+    queryAnalytics((db) =>
+      db
+        .select({
+          eventType: events.eventType,
+          day: TREND_DAY(events.createdAt),
+          n: sql<number>`count(*)::int`,
+        })
+        .from(events)
+        .where(gte(events.createdAt, CUTOFF))
+        .groupBy(events.eventType, TREND_DAY(events.createdAt))
+    ),
+    queryAnalytics((db) =>
+      db
+        .select({
+          day: TREND_DAY(purchases.createdAt),
+          n: sql<number>`count(*)::int`,
+        })
+        .from(purchases)
+        .where(and(eq(purchases.status, "success"), gte(purchases.createdAt, CUTOFF)))
+        .groupBy(TREND_DAY(purchases.createdAt))
+    ),
+    queryAnalytics((db) =>
+      db
+        .select({
+          slug: events.slug,
+          title: devotionals.title,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(events)
+        .leftJoin(devotionals, eq(events.slug, devotionals.slug))
+        .where(and(eq(events.eventType, "devotional.open"), isNotNull(events.slug)))
+        .groupBy(events.slug, devotionals.title)
+        .orderBy(sql`count(*) desc`)
+        .limit(10)
+    ),
+    queryAnalytics((db) =>
+      db
+        .select({
+          devotionalId: purchases.devotionalId,
+          title: devotionals.title,
+          slug: devotionals.slug,
+          n: sql<number>`count(*)::int`,
+          revenue: sql<number>`sum(${purchases.amountMinor})::int`,
+        })
+        .from(purchases)
+        .leftJoin(devotionals, eq(purchases.devotionalId, devotionals.id))
+        .where(eq(purchases.status, "success"))
+        .groupBy(purchases.devotionalId, devotionals.title, devotionals.slug)
+        .orderBy(sql`count(*) desc`)
+        .limit(10)
+    ),
+    queryAnalytics((db) => db.select().from(events).orderBy(desc(events.createdAt)).limit(8)),
+  ]);
 
+  if (
+    typeRows === null ||
+    revenueRows === null ||
+    trendRows === null ||
+    purchaseTrendRows === null ||
+    topOpenRows === null ||
+    topPurchaseRows === null ||
+    recentRows === null
+  ) {
+    loadError = true;
+  } else {
     const countBy = new Map((typeRows ?? []).map((r) => [r.eventType, r.n]));
     const now = new Date();
     data = {
@@ -177,6 +195,7 @@ export default async function AdminAnalyticsPage() {
         createdAt: r.createdAt,
       })),
     };
+  }
 
   const header = (
     <div>

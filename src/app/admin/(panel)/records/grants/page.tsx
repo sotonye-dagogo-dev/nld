@@ -5,7 +5,7 @@ import { accessGrants, devotionals } from "@/data/db/schema";
 import { getAdminSession } from "@/lib/admin-auth";
 import { clampInt } from "@/lib/utils";
 import { ErrorState } from "@/components/ui/error-state";
-import { GrantsTable, type TableColumn } from "@/components/admin/grants-table";
+import { GrantsTable } from "@/components/admin/grants-table";
 
 export const metadata: Metadata = { title: "Admin — Access grants" };
 export const dynamic = "force-dynamic";
@@ -74,15 +74,6 @@ export default async function AccessGrantsPage({
     error = true;
   }
 
-  const columns: TableColumn<GrantRow>[] = [
-    { key: "email", header: "Email" },
-    { key: "devotional", header: "Devotional" },
-    { key: "status", header: "Status" },
-    { key: "password", header: "Access password", cellClass: "font-mono" },
-    { key: "granted", header: "Granted" },
-    { key: "expires", header: "Expires" },
-  ];
-
   return (
     <div className="space-y-6">
       <div>
@@ -95,7 +86,6 @@ export default async function AccessGrantsPage({
         <ErrorState title="Could not load access grants" message="Records could not be fetched." />
       ) : (
         <GrantsTable
-          columns={columns}
           rows={rows}
           page={page}
           pageSize={PAGE_SIZE}
