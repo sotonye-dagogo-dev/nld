@@ -1,8 +1,8 @@
 # System Architecture
 
 > **Metadata**
-> - last-updated-by: update-ai-system (post-session 6)
-> - last-verified-against-code: 2026-08-24
+> - last-updated-by: update-ai-system (post-session 9)
+> - last-verified-against-code: 2026-08-26
 > - staleness-policy: re-verify before trusting if any architecture-affecting commits have been made since last-verified-against-code
 
 > **Overview:** How the system is structured — layers, modules, data flow, and configuration. Agents designing or changing structure must read this first.
@@ -40,12 +40,13 @@ Integration wrappers (isolated SDKs): Supabase, Paystack, Resend, Cloudflare (Wo
 | Config layer       | Admin-configurable settings with code fallbacks   | `src/config/site.ts`            | drizzle settings table |
 | Public UI          | Browse + read + purchase + access pages           | `src/app`, `src/components/ui`  | config, data, lib      |
 | Admin UI           | Content upload, records, analytics, settings, assets | `src/app/admin`                 | config, data, lib      |
-| API layer          | Paystack init/webhook, access verification, assets | `src/app/api`                   | integrations, data     |
-| Service logic      | Access password gen/verify, audit, pricing, analytics | `src/lib/access.ts`, `src/lib/audit.ts`, `src/lib/analytics.ts` | config, data, integrations |
+| API layer          | Paystack init/webhook, access verification, assets, bank-transfer | `src/app/api`                   | integrations, data     |
+| Service logic      | Access password gen/verify, audit, pricing, analytics, performance | `src/lib/access.ts`, `src/lib/audit.ts`, `src/lib/analytics.ts`, `src/lib/performance.ts` | config, data, integrations |
 | Data layer         | Drizzle schema + DB client                        | `src/data/db/schema.ts`         | drizzle-orm, postgres  |
 | Integration layer  | SDK isolation per §17                             | `src/integrations/{paystack,resend,supabase,cloudflare}` | vendor SDKs / HTTP     |
 | Destructive actions | Global confirmation + undo pattern               | `src/components/ui/confirm-action.tsx` | modal, button, hooks |
 | File uploads       | Asset management via Supabase Storage            | `src/components/ui/file-upload.tsx`, `src/app/api/admin/assets/route.ts` | supabase storage |
+| Content reader     | On-platform PDF/DOCX viewer with asset protection | `src/components/devotionals/content-reader.tsx` | lucide-react, lib/utils |
 
 ---
 
@@ -73,11 +74,22 @@ Purchase/[slug] collects email
 
 ### Asset Upload Flow (Admin)
 ```
-/admin/devotionals (create/edit) → FileUpload component
+Admin/devotionals (create/edit) → FileUpload component
   → POST /api/admin/assets (multipart/form-data)
   → uploadAsset → Supabase Storage (devotional-assets bucket)
   → returns publicUrl → saved as devotional.coverUrl
   → recordAudit (asset.upload)
+```
+
+### On-Platform Content Reader Flow (Asset Protection)
+```
+Devotional reader page / access gate → ContentReader component
+  → Secure iframe/pdf.js for PDF / text truncation for DOCX
+  → Preview limited to 2000 chars (configurable) for non-authorized users
+  → Full access users see complete content
+  → Watermark overlay for protected content
+  → No download/export capability — content stays in-platform
+  → Upgrade prompt when preview truncated
 ```
 
 ### Destructive Action Pattern (Global)
@@ -156,6 +168,7 @@ No project CLI exists yet. Verification is via `npm run typecheck`, `npm run lin
 | Payments   | Paystack                        | API v3       |
 | Email      | Resend (API + SMTP) / Cloudflare Workers + MailChannels | SDK + nodemailer / HTTP |
 | Auth (admin only) | Supabase Auth            | —            |
+| Icons      | lucide-react                    | latest       |
 
 ---
 
@@ -168,6 +181,8 @@ No project CLI exists yet. Verification is via `npm run typecheck`, `npm run lin
 - Supabase Storage bucket `devotional-assets` must exist and be public (or use signed URLs for private assets).
 - Destructive action undo is UI-level only; actual data rollback must be implemented by the consumer (e.g., soft-delete, re-create from audit log).
 - Cloudflare email worker secret must be set in Cloudflare Worker environment (not in Vercel) — separate secret management.
+- On-platform content reader: preview truncation is enforced client-side for non-authorized users; server-side enforcement via `/api/devotionals/[slug]/unlock` is the true boundary.
+- Content reader does not support full DOCX rendering client-side (requires server-side conversion or mammoth.js); currently shows placeholder with upgrade prompt.
 
 ---
 

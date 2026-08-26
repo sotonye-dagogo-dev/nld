@@ -166,3 +166,70 @@ The integration follows the existing email abstraction (`EmailClient` interface)
 
 **Supersedes:** None
 **Superseded by:** None
+
+---
+
+### Black/white design system with glassmorphism replaces colorful palette
+
+**Context:**
+The organization brand is strictly black and white. The previous indigo/sky color palette didn't match the brand guidelines. A modern design system with glassmorphism, bento layouts, and responsive grids was needed.
+
+**What We Learned:**
+- CSS custom properties in `globals.css` provide a single source of truth for design tokens (per engineering principles §5)
+- Glassmorphism effects work well on both light and dark themes when using proper CSS variables for `--glass-bg`, `--glass-border`, `--glass-shadow`, `--glass-blur`
+- Responsive grids using `auto-fit`/`minmax` eliminate the need for multiple media query breakpoints
+- Card component variants (default, glass, bento, elevated) provide flexibility while maintaining consistency
+- Animation utilities (slide-up, fade-in, scale-in) should be defined once in globals and consumed via utility classes
+
+**Apply When:**
+- Rebranding to match organization colors
+- Implementing modern design trends (glassmorphism, bento grids)
+- Creating responsive layouts that work across all screen sizes
+
+**Supersedes:** None
+**Superseded by:** None
+
+---
+
+### On-platform content reader enforces asset protection at UI layer
+
+**Context:**
+Uploaded PDF/DOCX files were previously accessible via direct download links, allowing users to share/export content. The requirement was to render content on-platform without download/export capability, with preview truncation for non-authorized users.
+
+**What We Learned:**
+- Client-side preview truncation (2000 chars default) provides immediate asset protection while server-side `/unlock` endpoint remains the true security boundary
+- `ContentReader` component for PDF uses iframe with `toolbar=0&navpanes=0` to hide browser PDF controls; DOCX shows truncated text with upgrade prompt
+- Watermark overlay ("PROTECTED CONTENT") adds visual deterrent without blocking readability
+- Fullscreen mode and page navigation improve UX for authorized users
+- Next.js Image component for cover images improves LCP vs raw `<img>` tags
+
+**Apply When:**
+- Protecting uploaded documents from unauthorized download/distribution
+- Implementing tiered content access (preview vs full access)
+- Building secure document viewers for sensitive content
+
+**Supersedes:** None
+**Superseded by:** None
+
+---
+
+### Performance monitoring utilities ready for load balancer integration
+
+**Context:**
+The platform needs to scale to 100k+ users with proper health checks, rate limiting, and performance metrics for ACID compliance and load balancing readiness.
+
+**What We Learned:**
+- In-memory metrics buffer with `recordMetric()` and `withTiming()` wrapper provides zero-dependency performance tracking
+- Health checks for DB (latency), Resend, Paystack, Supabase Storage enable comprehensive `/health` endpoints for load balancers
+- Simple rate limiting using `Map` works for single-instance; Redis-backed version needed for multi-instance clusters
+- Request timeout wrapper prevents hanging requests from blocking serverless functions
+- ACID compliance verified in existing transaction-heavy operations (devotional creation, access unlock)
+
+**Apply When:**
+- Adding performance monitoring to any Next.js/Node.js service
+- Preparing for horizontal scaling with load balancers
+- Implementing rate limiting for public APIs
+- Verifying transaction integrity in critical paths
+
+**Supersedes:** None
+**Superseded by:** None
