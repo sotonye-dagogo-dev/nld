@@ -17,7 +17,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!request.cookies.has("admin_session")) {
+  // Skip middleware for static assets and Next.js internals
+  if (
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/static/") ||
+    pathname.includes(".") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/manifest.json"
+  ) {
+    return NextResponse.next();
+  }
+
+  const hasSession = request.cookies.has("admin_session");
+  
+  if (!hasSession) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin/login";
     url.searchParams.set("next", pathname);

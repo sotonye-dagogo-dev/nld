@@ -7,13 +7,10 @@ import { BackToTop } from "@/components/ui/back-to-top";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import { getSiteSettings } from "@/config/site";
 import { ErrorBoundaryProvider } from "@/components/ui/error-boundary-provider";
+import { generateGlobalMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Next Level Devotional",
-  description: "Daily devotionals for your walk with God",
-  manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Next Level Devotional" },
-};
+export const metadataBase = new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000");
+export const metadata: Promise<Metadata> = generateGlobalMetadata();
 
 export const viewport: Viewport = {
   themeColor: "#4f46e5",

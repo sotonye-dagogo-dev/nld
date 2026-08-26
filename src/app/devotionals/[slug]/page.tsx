@@ -11,6 +11,7 @@ import { getSiteSettings } from "@/config/site";
 import { recordEvent } from "@/lib/audit";
 import { clampInt } from "@/lib/utils";
 import { formatPrice } from "@/config/defaults";
+import { generateDevotionalMetadata } from "@/lib/metadata";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const devotional = await getDevotionalBySlug(slug);
-  return { title: devotional?.title ?? "Devotional" };
+  const { value: settings } = await getSiteSettings();
+  if (!devotional) return { title: "Devotional Not Found" };
+  return generateDevotionalMetadata(devotional, settings);
 }
 
 export default async function DevotionalPage({
@@ -110,22 +113,18 @@ export default async function DevotionalPage({
                       />
                     </div>
                   )}
-                  {day.contentFileUrl && (
-                    <div className="mt-4">
-                      <ContentReader
-                        fileUrl={day.contentFileUrl}
-                        fileName={day.contentFileUrl.split("/").pop()?.split(".").slice(0, -1).join(".") || "Content"}
-                        fileType={day.contentFileUrl.toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
-                        maxPreviewChars={MAX_PREVIEW_CHARS}
-                        hasFullAccess={!hasAccessControl}
-                        onUpgradeClick={() => {
-                          // Scroll to access gate or trigger purchase flow
-                          const gate = document.getElementById("access-gate");
-                          if (gate) gate.scrollIntoView({ behavior: "smooth" });
-                        }}
-                      />
-                    </div>
-                  )}
+{day.contentFileUrl && (
+                      <div className="mt-4">
+                        <ContentReader
+                          fileUrl={day.contentFileUrl}
+                          fileName={day.contentFileUrl.split("/").pop()?.split(".").slice(0, -1).join(".") || "Content"}
+                          fileType={day.contentFileUrl.toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
+                          maxPreviewChars={MAX_PREVIEW_CHARS}
+                          hasFullAccess={!hasAccessControl}
+                          upgradeHref={hasAccessControl ? "#access-gate" : undefined}
+                        />
+                      </div>
+                    )}
                 </article>
               ))}
             </section>
