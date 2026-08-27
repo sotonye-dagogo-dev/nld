@@ -19,6 +19,7 @@ export function Input({ label, hint, error, className, id, showPasswordToggle, t
   const effectiveType = isPasswordField && showPassword ? "text" : type ?? "text";
 
   // Prevent browser autofill from treating non-password fields as passwords
+  // Explicitly use "off" for non-password fields to avoid browser password manager interference
   const autoComplete = rest.autoComplete ?? (isPasswordField ? "current-password" : "off");
 
   return (
@@ -45,8 +46,11 @@ export function Input({ label, hint, error, className, id, showPasswordToggle, t
         {isPasswordField && (
           <button
             type="button"
-            onClick={() => setShowPassword((prev) => !prev)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowPassword((prev) => !prev);
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded cursor-pointer transition-colors"
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
           >

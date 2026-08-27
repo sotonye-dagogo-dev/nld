@@ -13,7 +13,7 @@ interface LogoProps {
 export function Logo({ name, logoUrl, className }: LogoProps) {
   if (logoUrl) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={logoUrl} alt={`${name} logo`} className={cn("h-8 w-auto", className)} />;
+    return <img src={logoUrl} alt={`${name} logo`} className={cn("h-8 w-auto rounded-full", className)} />;
   }
   const initials = name
     .split(/\s+/)
@@ -22,7 +22,7 @@ export function Logo({ name, logoUrl, className }: LogoProps) {
     .join("");
   return (
     <span className={cn("flex items-center gap-2", className)}>
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-white">
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
         {initials || "NL"}
       </span>
       <span className="font-semibold text-text-primary">{name}</span>
