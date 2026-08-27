@@ -13,10 +13,12 @@ import * as schema from "./schema";
 let client: ReturnType<typeof postgres> | null = null;
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-const QUERY_TIMEOUT_MS = 30000;
-const CONNECT_TIMEOUT_MS = 20000; // Increased for Vercel cold starts
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
+// Reduced timeouts for Vercel serverless compatibility (max 10s hobby, 60s pro)
+// Use shorter timeouts to avoid function timeouts
+const QUERY_TIMEOUT_MS = 8000; // 8 seconds - well within Vercel limits
+const CONNECT_TIMEOUT_MS = 5000; // 5 seconds for connection
+const MAX_RETRIES = 2; // Reduced retries to fail faster
+const RETRY_DELAY_MS = 500; // Faster retry
 
 function withTimeout<T>(promise: Promise<T>, ms: number = QUERY_TIMEOUT_MS): Promise<T> {
   return Promise.race([
@@ -54,15 +56,15 @@ function createPgClient() {
     throw new Error("DATABASE_URL is not set — cannot create DB client");
   }
   // Use a short connection timeout and disable prepared statements for PgBouncer compatibility
-  // max: 10 for serverless to handle concurrent requests
-  // connect_timeout: 15 seconds for cold starts
-  // idle_timeout: 10 seconds, max_lifetime: 5 minutes
+  // max: 3 for serverless to limit concurrent connections (prevents pool exhaustion)
+  // connect_timeout: 5 seconds for cold starts
+  // idle_timeout: 5 seconds, max_lifetime: 3 minutes (shorter for serverless)
   const pgClient = postgres(databaseUrl, {
-    max: 10,
+    max: 3,
     prepare: false,
     connect_timeout: CONNECT_TIMEOUT_MS / 1000,
-    idle_timeout: 10,
-    max_lifetime: 60 * 5,
+    idle_timeout: 5,
+    max_lifetime: 60 * 3,
     // Fail fast on connection issues
     onnotice: () => {},
     transform: {

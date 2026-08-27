@@ -8,8 +8,8 @@ import { supabaseConfig } from "./config";
 
 let serviceClient: ReturnType<typeof createClient> | null = null;
 
-const AUTH_TIMEOUT_MS = 30000; // Increased for Vercel cold starts
-const VALIDATE_TIMEOUT_MS = 20000; // Increased for Vercel cold starts
+const AUTH_TIMEOUT_MS = 8000; // Reduced for Vercel serverless
+const VALIDATE_TIMEOUT_MS = 5000; // Reduced for Vercel serverless
 
 function withAbortTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   const controller = new AbortController();
@@ -132,7 +132,7 @@ export interface UploadResult {
   publicUrl: string;
 }
 
-const UPLOAD_TIMEOUT_MS = 30000;
+const UPLOAD_TIMEOUT_MS = 15000;
 
 /** Upload a file to Supabase Storage (devotional-assets bucket). */
 export async function uploadAsset(
