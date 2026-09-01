@@ -13,6 +13,32 @@ const nextConfig = {
         hostname: "*.supabase.in",
         pathname: "/storage/v1/object/public/**",
       },
+      // External cover URLs (admin-pasted) — gstatic is used in seed data;
+      // keep wide to avoid RSC digest crash for any https coverUrl.
+      {
+        protocol: "https",
+        hostname: "**.gstatic.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.cloudinary.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.amazonaws.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.supabase.co",
+      },
+      {
+        protocol: "https",
+        hostname: "**.supabase.in",
+      },
     ],
     // Allow unoptimized images for Supabase storage if optimization fails
     dangerouslyAllowSVG: true,
@@ -22,12 +48,13 @@ const nextConfig = {
     // Anti-screenshot / asset-protection default (admin-configurable at the app
     // layer): frame-busting + conservative sniffing header. Config-driven at
     // runtime via settings; the CSP below is a safe baseline.
-    // Allow Supabase storage for images, PDF iframe loading, and fetch connections
+    // img-src must allow external cover URLs (admin can paste any https image);
+    // gstatic appears in current seed data and is explicitly needed.
     const csp = [
       "default-src 'self'",
-      "img-src 'self' data: https://*.supabase.co https://*.supabase.in",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in",
-      "frame-src 'self' https://*.supabase.co https://*.supabase.in",
+      "img-src 'self' data: blob: https: https://*.supabase.co https://*.supabase.in https://*.gstatic.com https://*.googleusercontent.com",
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in https:",
+      "frame-src 'self' https://*.supabase.co https://*.supabase.in https:",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "font-src 'self' data:",

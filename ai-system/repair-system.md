@@ -199,3 +199,27 @@ Header section rendered price as non-interactive badge; `AccessGate` purchase li
 `src/app/devotionals/[slug]/page.tsx`
 **Date:** 2026-09-01
 **Status:** Active
+
+### Next.js — CSP Blocks External Cover Images + RSC Digest 3220325878 (fix-build 2026-09-01)
+
+**Symptom:**
+Production: `Loading the image 'https://encrypted-tbn0.gstatic.com/...' violates CSP directive: "img-src 'self' data: https://*.supabase.co https://*.supabase.in"` — blocked, repeated. Concurrent `An error occurred in the Server Components render. ... digest: '3220325878'` (production-omitted message) causes page to 500. Root is devotional `coverUrl` pasted as external `gstatic.com` URL, not Supabase storage.
+
+**Root Cause:**
+1. `next.config.mjs:images.remotePatterns` allowed only `*.supabase.co`/`*.supabase.in` `/storage/v1/object/public/**` — any external `coverUrl` (gstatic, cloudinary, etc.) rejected by `next/image` optimizer, throwing in Server Component.
+2. `next.config.mjs:headers()` CSP `img-src` similarly restricted to `self data: supabase` — browser blocked external image even if optimizer bypassed.
+3. `src/components/devotionals/devotional-card.tsx` used `<Image>` without `unoptimized` fallback, so every external host required optimizer allowlist.
+4. `src/app/devotionals/[slug]/page.tsx:generateMetadata` had no try/catch — DB throw during metadata bubbled as RSC error, also surfacing as digest.
+
+**Fix Applied:**
+- `next.config.mjs`: expand `images.remotePatterns` with `**.gstatic.com`, `**.googleusercontent.com`, `**.cloudinary.com`, `**.amazonaws.com`, plus wildcard `**.supabase.*`; expand CSP to `img-src 'self' data: blob: https: https://*.supabase.co https://*.supabase.in https://*.gstatic.com https://*.googleusercontent.com` and relax `connect-src`/`frame-src` to allow `https:` for external assets; keep dangerousAllowSVG.
+- `src/components/devotionals/devotional-card.tsx`: add `isOptimizedImageHost()` helper (supabase-only), set `unoptimized={coverIsExternal}` so external `coverUrl` bypasses optimizer and never throws, eliminating RSC digest.
+- `src/app/devotionals/[slug]/page.tsx:generateMetadata`: wrap in try/catch returning fallback `{title:"Devotional"}` on DB error.
+
+**Prevention:**
+- Treat `coverUrl` as user-controlled `https:` URL, not supabase-only; keep `images.remotePatterns` wide or use `unoptimized` for non-supabase hosts; keep CSP `img-src https:` permissive and audit after seeding external URLs; wrap all `generateMetadata` DB calls in try/catch.
+
+**Files Affected:**
+`next.config.mjs`, `src/components/devotionals/devotional-card.tsx`, `src/app/devotionals/[slug]/page.tsx`
+**Date:** 2026-09-01
+**Status:** Active

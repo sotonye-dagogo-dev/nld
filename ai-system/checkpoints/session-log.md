@@ -355,3 +355,33 @@ Run `update-ai-system.md` to complete deep sync of all ai-system docs with curre
 **Notes / Blockers:**
 - Build SSG transient `CONNECTION_DESTROYED` during `Generating static pages` is non-fatal (pool teardown race in build, not runtime); removed explicit statement_timeout option to avoid pooler rejection.
 - One test remains locale-sensitive (analytics dayLabel) — pre-existing, not introduced here.
+
+---
+
+## Session 11 — 2026-09-01 (fix-build — CSP + RSC digest)
+
+**Completed:**
+- Executed `fix-build.md` for directive: `Server Components render digest 3220325878` + `CSP img-src violates ... https://encrypted-tbn0.gstatic.com ... blocked`.
+- Diagnosed: `next.config.mjs:4` `images.remotePatterns` only allowed `*.supabase.co/in` `/storage/v1/object/public/**` — external `coverUrl` (gstatic) rejected by optimizer → RSC throw digest; `headers()` CSP `img-src 'self' data: supabase` blocked browser load; `devotional-card.tsx:26` `<Image>` no `unoptimized` fallback; `devotionals/[slug]/page.tsx:18` `generateMetadata` no try/catch bubbled DB error as RSC digest.
+- Fixed `next.config.mjs`: added remotePatterns for `**.gstatic.com`, `**.googleusercontent.com`, `**.cloudinary.com`, `**.amazonaws.com`, `**.supabase.*`; expanded CSP to `img-src 'self' data: blob: https: supabase gstatic googleusercontent` and relaxed `connect-src`/`frame-src` to `https:`.
+- Fixed `src/components/devotionals/devotional-card.tsx`: added `isOptimizedImageHost()` and `unoptimized={coverIsExternal}` so external covers bypass optimizer and never crash RSC.
+- Fixed `src/app/devotionals/[slug]/page.tsx:18` `generateMetadata` wrapped in try/catch with fallback title.
+- Verification: `tsc --noEmit` clean, `next build` 23/23 (SSG transient CONNECTION_DESTROYED non-fatal), `next lint` clean, `vitest` 54/55 (same locale failure), no CSP block on second build.
+- Updated `ai-system/repair-system.md` with CSP/RSC pattern; sync-context: repo-map dependency-graph still accurate (no structural drift, images patterns additive, no arch rewrite).
+
+**Files Modified:**
+- `next.config.mjs` — remotePatterns + CSP
+- `src/components/devotionals/devotional-card.tsx` — unoptimized external fallback
+- `src/app/devotionals/[slug]/page.tsx` — generateMetadata try/catch
+- `ai-system/repair-system.md`
+- `ai-system/checkpoints/session-log.md`
+
+**Next Task:**
+- Confirm in production that gstatic cover now loads and digest gone; consider adding generic `https` remotePattern if more external CDNs appear; optionally normalize `coverUrl` upload to supabase storage only to avoid future CSP drift.
+
+**Assumptions Made:**
+- `coverUrl` is admin-controlled and may be any https URL; optimizing only supabase hosts is safe, external bypass via `unoptimized` is acceptable LCP trade-off vs RSC crash.
+
+**Notes / Blockers:**
+- Pre-existing analytics locale test still fails; not introduced here.
+- SSG `CONNECTION_DESTROYED` persists but remains non-fatal build artifact from pool `end()` during static generation.

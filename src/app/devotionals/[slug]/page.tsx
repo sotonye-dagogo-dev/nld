@@ -22,10 +22,14 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const devotional = await getDevotionalBySlug(slug);
-  const { value: settings } = await getSiteSettings();
-  if (!devotional) return { title: "Devotional Not Found" };
-  return generateDevotionalMetadata(devotional, settings);
+  try {
+    const devotional = await getDevotionalBySlug(slug);
+    const { value: settings } = await getSiteSettings();
+    if (!devotional) return { title: "Devotional Not Found" };
+    return generateDevotionalMetadata(devotional, settings);
+  } catch {
+    return { title: "Devotional" };
+  }
 }
 
 export default async function DevotionalPage({
