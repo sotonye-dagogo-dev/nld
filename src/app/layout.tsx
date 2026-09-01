@@ -34,7 +34,10 @@ export default async function RootLayout({
               <Navbar
                 platformName={settings.platformName}
                 logoUrl={settings.logoUrl}
-                links={[{ href: "/", label: "Devotionals" }]}
+                links={[
+                  { href: "/", label: "Devotionals" },
+                  { href: "/purchase", label: "Purchase" },
+                ]}
                 trailing={
                   <a
                     href="/admin"

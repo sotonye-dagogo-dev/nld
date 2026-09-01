@@ -46,3 +46,11 @@ export async function getDevotionalDays(devotionalId: string): Promise<Devotiona
   );
   return rows as DevotionalDay[];
 }
+
+/** All published devotionals with a price > 0 (purchasable). */
+export async function getPurchasableDevotionals(): Promise<Devotional[]> {
+  const rows = await queryWithTimeout((db) =>
+    db.select().from(devotionals).where(and(eq(devotionals.status, "published"), sql`${devotionals.priceMinor} > 0`)).orderBy(sql`${devotionals.createdAt} desc`)
+  );
+  return rows as Devotional[];
+}
