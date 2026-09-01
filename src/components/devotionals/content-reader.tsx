@@ -43,6 +43,13 @@ export function ContentReader({
   // For DOCX, we convert to HTML on the client (limited) or show a placeholder
 
   useEffect(() => {
+    // Only attempt to load content if user has full access
+    // For preview mode, we don't fetch the actual file to protect assets
+    if (!hasFullAccess) {
+      setIsLoading(false);
+      return;
+    }
+
     async function loadContent() {
       setIsLoading(true);
       setError(null);
@@ -72,7 +79,7 @@ export function ContentReader({
     }
 
     loadContent();
-  }, [fileUrl, fileType]);
+  }, [fileUrl, fileType, hasFullAccess]);
 
   // Truncate content for preview
   const displayContent = hasFullAccess || showFullContent
@@ -185,34 +192,64 @@ export function ContentReader({
       <div ref={containerRef} className="relative min-h-[400px] max-h-[70vh]">
         {fileType === "pdf" ? (
           <div className="w-full h-full">
-            <iframe
-              ref={iframeRef}
-              src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
-              title={`${fileName} preview`}
-              className="w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin"
-              loading="lazy"
-            />
-            {/* Overlay to prevent right-click/context menu on PDF */}
-            <div className="absolute inset-0 pointer-events-none" />
+            {hasFullAccess ? (
+              <>
+                <iframe
+                  ref={iframeRef}
+                  src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                  title={`${fileName} preview`}
+                  className="w-full h-full border-0"
+                  sandbox="allow-scripts allow-same-origin"
+                  loading="lazy"
+                />
+                {/* Overlay to prevent right-click/context menu on PDF */}
+                <div className="absolute inset-0 pointer-events-none" />
+              </>
+            ) : (
+              // Preview mode - show placeholder with upgrade prompt
+              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-surface">
+                <FileText className="h-16 w-16 text-text-muted/50 mb-4" aria-hidden="true" />
+                <p className="text-lg font-medium text-text-primary mb-2">Protected PDF Content</p>
+                <p className="text-text-muted mb-6 max-w-md">
+                  This PDF is protected and only accessible after purchasing full access to this devotional.
+                </p>
+                {upgradeHref && (
+                  <a
+                    href={upgradeHref}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
+                  >
+                    <Lock className="h-4 w-4" aria-hidden="true" />
+                    Purchase to Unlock Full Content
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div className="w-full h-full p-6 overflow-y-auto prose-devotional max-h-[70vh]">
-            <div className="whitespace-pre-wrap text-text-primary select-none">
-              {displayContent}
-            </div>
-            {isTruncated && !hasFullAccess && upgradeHref && (
-              <div className="mt-6 p-4 rounded-lg bg-background border border-border text-center animate-fade-in">
-                <p className="text-sm text-text-muted mb-3">
-                  Preview truncated at {maxPreviewChars} characters for asset protection.
+            {hasFullAccess ? (
+              <>
+                <div className="whitespace-pre-wrap text-text-primary select-none">
+                  {displayContent}
+                </div>
+              </>
+            ) : (
+              // Preview mode - show placeholder with upgrade prompt
+              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
+                <FileText className="h-16 w-16 text-text-muted/50 mb-4" aria-hidden="true" />
+                <p className="text-lg font-medium text-text-primary mb-2">Protected DOCX Content</p>
+                <p className="text-text-muted mb-6 max-w-md">
+                  This document is protected and only accessible after purchasing full access to this devotional.
                 </p>
-                <a
-                  href={upgradeHref}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
-                >
-                  <Lock className="h-4 w-4" aria-hidden="true" />
-                  Purchase to Unlock Full Content
-                </a>
+                {upgradeHref && (
+                  <a
+                    href={upgradeHref}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
+                  >
+                    <Lock className="h-4 w-4" aria-hidden="true" />
+                    Purchase to Unlock Full Content
+                  </a>
+                )}
               </div>
             )}
           </div>

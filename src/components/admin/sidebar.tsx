@@ -125,14 +125,16 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
             <NavLinks nav={nav} onNavigate={() => setDrawerOpen(false)} />
             <div className="mt-auto border-t border-border pt-2">
               <div className="flex items-center justify-between gap-2 px-3 py-2">
-                <span className="text-xs text-text-muted truncate flex-1">
-                  {email}
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="text-xs text-text-muted truncate">
+                    {email}
+                  </span>
                   {superadmin && (
-                    <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                    <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary shrink-0 whitespace-nowrap">
                       owner
                     </span>
                   )}
-                </span>
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
@@ -191,14 +193,16 @@ export function AdminSidebar({ platformName, nav, email, superadmin }: AdminSide
             </Button>
           ) : (
             <div className="flex items-center gap-2 px-3 py-2 min-w-0">
-              <span className="text-xs text-text-muted truncate flex-1">
-                {email}
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <span className="text-xs text-text-muted truncate">
+                  {email}
+                </span>
                 {superadmin && (
-                  <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                  <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary shrink-0 whitespace-nowrap">
                     owner
                   </span>
                 )}
-              </span>
+              </div>
               <Button
                 type="button"
                 variant="ghost"
