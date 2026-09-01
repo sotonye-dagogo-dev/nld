@@ -12,12 +12,22 @@ interface DevotionalCardProps {
   devotional: Devotional;
 }
 
+function isOptimizedImageHost(url: string): boolean {
+  try {
+    const h = new URL(url).hostname;
+    return h.endsWith(".supabase.co") || h.endsWith(".supabase.in");
+  } catch {
+    return false;
+  }
+}
+
 export function DevotionalCard({ devotional }: DevotionalCardProps) {
   const previewNote = devotional.previewDays > 0
     ? `${devotional.previewDays} free day${devotional.previewDays === 1 ? "" : "s"}`
     : "Full access on purchase";
 
   const isPaid = devotional.priceMinor > 0;
+  const coverIsExternal = Boolean(devotional.coverUrl) && !isOptimizedImageHost(devotional.coverUrl);
 
   return (
     <Link href={`/devotionals/${devotional.slug}`} className="group block h-full">
@@ -28,6 +38,7 @@ export function DevotionalCard({ devotional }: DevotionalCardProps) {
               src={devotional.coverUrl}
               alt={devotional.title}
               fill
+              unoptimized={coverIsExternal}
               className="object-cover transition-transform duration-500 group-hover:scale-105"
               loading="lazy"
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
