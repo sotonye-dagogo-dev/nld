@@ -22,12 +22,11 @@ async function countRows(): Promise<number> {
 export async function getPublishedDevotionals(page: number, pageSize?: number) {
   const size = clampInt(pageSize ?? DEFAULT_PAGE_SIZE, 1, 60);
   const p = clampInt(page, 1, Number.MAX_SAFE_INTEGER);
-  const [rows, total] = await Promise.all([
-    queryWithTimeout((db) =>
-      db.select().from(devotionals).where(eq(devotionals.status, "published")).orderBy(sql`${devotionals.createdAt} desc`).limit(size).offset((p - 1) * size)
-    ),
-    countRows(),
-  ]);
+  // Sequential to avoid pool deadlock when max=2 and concurrent callers exist
+  const rows = await queryWithTimeout((db) =>
+    db.select().from(devotionals).where(eq(devotionals.status, "published")).orderBy(sql`${devotionals.createdAt} desc`).limit(size).offset((p - 1) * size)
+  );
+  const total = await countRows();
   return { rows: rows as Devotional[], total, page: p, pageSize: size };
 }
 

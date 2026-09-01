@@ -52,14 +52,14 @@ export function coerceValue<T>(key: keyof SiteSettings, raw: unknown, fallback: 
 }
 
 // Shorter timeout for settings since they're non-critical and have fallbacks
-const SETTINGS_QUERY_TIMEOUT_MS = 1000;
+const SETTINGS_QUERY_TIMEOUT_MS = 3500;
 
 async function fetchSettingsFromDb(): Promise<Partial<SiteSettings>> {
   try {
     const rows = await queryWithTimeout(
       (db) => db.select().from(settings),
       0, // no retries for settings - fail fast to fallbacks
-      1000, // 1 second timeout for settings
+      SETTINGS_QUERY_TIMEOUT_MS,
     );
     const out: Partial<SiteSettings> = {};
     for (const row of rows) {
@@ -80,7 +80,7 @@ async function fetchBankAccountsFromDb(): Promise<BankAccount[]> {
     const rows = await queryWithTimeout(
       (db) => db.select().from(bankAccounts).where(eq(bankAccounts.isActive, true)).orderBy(asc(bankAccounts.displayOrder)),
       0,
-      1000,
+      SETTINGS_QUERY_TIMEOUT_MS,
     );
     return rows.map((r) => ({
       id: r.id,
@@ -100,7 +100,9 @@ async function fetchBankAccountsFromDb(): Promise<BankAccount[]> {
 }
 
 export async function getSiteSettings(): Promise<ConfigValue<SiteSettings>> {
-  const [dbSettings, accounts] = await Promise.all([fetchSettingsFromDb(), fetchBankAccountsFromDb()]);
+  // Sequential to avoid pool contention on max=2
+  const dbSettings = await fetchSettingsFromDb();
+  const accounts = await fetchBankAccountsFromDb();
   const out: SiteSettings = { ...DEFAULT_SETTINGS, ...dbSettings, bankAccounts: accounts };
   return { value: out, source: Object.keys(dbSettings).length > 0 ? "db" : "fallback" };
 }
