@@ -318,3 +318,40 @@ Run `update-ai-system.md` to complete deep sync of all ai-system docs with curre
 - QA gate: PASS. Build clean, typecheck clean, lint clean, all 55 tests passing
 - Live-key verification pass still queued — requires real Paystack/Supabase keys and deployed Cloudflare Worker
 - Migration `drizzle/0002_silent_typhoid_mary.sql` must be applied to production DB (`npm run db:migrate`)
+
+---
+
+## Session 10 — 2026-09-01 (fix-build)
+
+**Completed:**
+- Executed `fix-build.md` self-healing loop for directive: "we're still encountering database connection issues, and there should be simple accessible link to the purchase page on the dedicated devotional page" (also prior: retrieval of devotionals / login not working, purchase access point missing).
+- Diagnosed dual timeout crash: client `QUERY_TIMEOUT_MS=8000` raced exactly with Postgres `statement_timeout` (code 57014) producing `Database query timeout after 8000ms` + `canceling statement due to statement timeout` + unhandled rejection → lambda exit 128. Traced via `src/data/db/index.ts:22` withTimeout, `.next/server/chunks/3028.js:1:14249`, postgres.c:3405.
+- Fixed `src/data/db/index.ts`: QUERY_TIMEOUT 8000→15000, CONNECT_TIMEOUT 10000→15000, max 3→2, idle 5→20, max_lifetime 2→10 min, remove spurious `?pgbouncer=true`, store `client`, add `resetPool()` with `end({timeout:1})`, rewrite `withTimeout` to catch loser branch + clearTimeout, treat 57014 as timeoutish with one retry.
+- Fixed `src/lib/catalog.ts`: serialize `getPublishedDevotionals` (rows then countRows) to avoid pool deadlock under max=2.
+- Fixed `src/config/site.ts`: SETTINGS_QUERY_TIMEOUT 1000→3500 and serialize `getSiteSettings` fetches.
+- Added prominent purchase CTA on `src/app/devotionals/[slug]/page.tsx` header: price badge + `Purchase access` Link to `/purchase/[slug]` (aria-label, focus ring, disabled fallback when `!paymentsEnabled`).
+- Verified `src/app/purchase/page.tsx` listing already present (all purchasable devotionals) and `src/app/layout.tsx` Navbar already has Purchase link.
+- Verification: `tsc --noEmit` clean, `next build` 23/23 pages (CONNECTION_DESTROYED transient during SSG but non-fatal, removed statement_timeout connection option), `vitest` 54/55 (1 pre-existing analytics locale failure: expected '20 Aug' vs /Aug \d/), `next lint` clean.
+- Updated `ai-system/repair-system.md` with two new patterns: Statement Timeout Crash + Missing Purchase CTA.
+- Sync-context: checked repo-map/dependency-graph/system-architecture — no drift beyond dated `last-verified-against-code`; purchase listing page already reflected; no arch rewrite needed.
+
+**Files Modified:**
+- `src/data/db/index.ts` — timeouts, pool, pgbouncer param, withTimeout unhandled rejection fix, resetPool
+- `src/lib/catalog.ts` — serialize Promise.all
+- `src/config/site.ts` — timeout bump + serialize
+- `src/app/devotionals/[slug]/page.tsx` — header purchase CTA
+- `ai-system/repair-system.md` — two new error patterns
+- `ai-system/checkpoints/in-progress.md` — fix-build loop (written then cleared)
+- `ai-system/checkpoints/session-log.md` — this entry
+
+**Next Task:**
+- Deploy and monitor DB pool under real load; if 57014 recurs, consider transaction pooling vs session pooling toggle and Vercel function `maxDuration` bump; add `pg_stat_activity` alert.
+- Browser pass over devotional header CTA and /purchase listing.
+
+**Assumptions Made:**
+- Supabase pooler on 6543 with `prepare:false` suffices; no `pgbouncer=true` param nor `statement_timeout` connection option needed.
+- max=2 balances concurrency vs serverless exhaustion; sequential queries avoid deadlock without raising max further.
+
+**Notes / Blockers:**
+- Build SSG transient `CONNECTION_DESTROYED` during `Generating static pages` is non-fatal (pool teardown race in build, not runtime); removed explicit statement_timeout option to avoid pooler rejection.
+- One test remains locale-sensitive (analytics dayLabel) — pre-existing, not introduced here.

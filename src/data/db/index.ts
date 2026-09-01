@@ -13,19 +13,27 @@ import * as schema from "./schema";
 let client: ReturnType<typeof postgres> | null = null;
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-// Reduced timeouts for serverless - Vercel has 10s max for hobby, 60s for pro
-const QUERY_TIMEOUT_MS = 8000;  // Reduced from 30s to 8s to prevent function timeout
-const CONNECT_TIMEOUT_MS = 10000; // 10s for cold starts
-const MAX_RETRIES = 2; // Reduced retries to fail faster
-const RETRY_DELAY_MS = 500; // Faster retry delay
+// Serverless-tuned timeouts: cold start p99 ~3-5s on Supabase pooler, so
+// query timeout must be > statement_timeout + connect overhead.
+// Previous 8000ms raced exactly with Postgres statement_timeout (57014) and
+// produced dual unhandled rejections that crashed the lambda (exit 128).
+const QUERY_TIMEOUT_MS = 15000;
+const CONNECT_TIMEOUT_MS = 15000;
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 750;
 
 function withTimeout<T>(promise: Promise<T>, ms: number = QUERY_TIMEOUT_MS): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Database query timeout after ${ms}ms`)), ms),
-    ),
-  ]);
+  // Attach a no-op catch to the original promise to prevent the postgres-js
+  // socket rejection (code 57014) from becoming an Unhandled Rejection after
+  // Promise.race has already settled via the timeout branch.
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Database query timeout after ${ms}ms`)), ms);
+  });
+  // Prevent unhandled rejection from the losing branch
+  promise.catch(() => {});
+  timeoutPromise.catch(() => {});
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer!));
 }
 
 function sleep(ms: number): Promise<void> {
@@ -34,13 +42,13 @@ function sleep(ms: number): Promise<void> {
 
 function getPooledDatabaseUrl(): string {
   if (!env.databaseUrl) return "";
-  // If using Supabase, prefer the pooler endpoint (port 6543) for serverless
-  // The pooler handles connection pooling better than direct connections
+  // Supabase pooler is already on 6543 in .env. Only rewrite 5432 -> 6543
+  // for local/direct URLs. Do NOT append pgbouncer=true — it forces
+  // transaction mode side-effects and is not needed when prepare:false.
   try {
     const url = new URL(env.databaseUrl);
     if (url.hostname.includes("supabase.co") && url.port === "5432") {
       url.port = "6543";
-      url.searchParams.set("pgbouncer", "true");
       return url.toString();
     }
   } catch {
@@ -54,22 +62,18 @@ function createPgClient() {
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is not set — cannot create DB client");
   }
-  // Use a short connection timeout and disable prepared statements for PgBouncer compatibility
-  // max: 3 for serverless (lower to avoid connection pool exhaustion)
-  // connect_timeout: 10 seconds for cold starts
-  // idle_timeout: 5 seconds, max_lifetime: 2 minutes (shorter for serverless)
   const pgClient = postgres(databaseUrl, {
-    max: 3, // Reduced from 10 to 3 for serverless
+    max: 2,
     prepare: false,
     connect_timeout: CONNECT_TIMEOUT_MS / 1000,
-    idle_timeout: 5,
-    max_lifetime: 60 * 2,
-    // Fail fast on connection issues
+    idle_timeout: 20,
+    max_lifetime: 60 * 10,
     onnotice: () => {},
     transform: {
       undefined: (val: unknown) => val,
     },
   });
+  client = pgClient;
   return pgClient;
 }
 
@@ -82,6 +86,14 @@ export function getDb() {
   if (dbInstance) return dbInstance;
   dbInstance = createDbClient();
   return dbInstance;
+}
+
+function resetPool() {
+  const c = client;
+  dbInstance = null;
+  client = null;
+  // Fire-and-forget close of old pool; never block caller
+  if (c) c.end({ timeout: 1 }).catch(() => {});
 }
 
 export async function queryWithTimeout<T>(
@@ -97,14 +109,21 @@ export async function queryWithTimeout<T>(
       return await withTimeout(fn(db), timeoutMs);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      
-      // Don't retry on timeout or abort errors - they're not transient
+
       const message = lastError.message.toLowerCase();
-      if (
+      const isTimeoutish =
         message.includes("timeout") ||
         message.includes("abort") ||
-        message.includes("cancel")
-      ) {
+        message.includes("cancel") ||
+        message.includes("57014");
+      // Timeouts are retriable once after a pool reset (transient pooler
+      // contention), but not infinitely — one retry max for timeouts.
+      if (isTimeoutish) {
+        if (attempt < 1) {
+          resetPool();
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
         throw lastError;
       }
 
@@ -117,8 +136,7 @@ export async function queryWithTimeout<T>(
         message.includes("socket") ||
         message.includes("eof")
       ) {
-        dbInstance = null;
-        client = null;
+        resetPool();
       }
 
       if (attempt < retries) {

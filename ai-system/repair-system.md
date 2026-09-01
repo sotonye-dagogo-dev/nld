@@ -153,3 +153,49 @@
 - Files Affected: `public/sw.js`, `src/components/pwa/service-worker-registration.tsx`
 - Date: 2026-08-24
 - Status: Active
+
+### Database / Serverless — Statement Timeout Crash (fix-build 2026-09-01)
+
+**Symptom:**
+`[events] write failed (non-fatal): Error: Database query timeout after 8000ms` at `Timeout._onTimeout (.next/server/chunks/3028.js:1:14249)` + `k: canceling statement due to statement timeout` code `57014` severity ERROR at `postgres.c:3405` + `Unhandled Rejection: k: canceling statement...` leads to `Node.js process exited with exit status: 128`. Downstream: `getDevotionalBySlug`, `getPublishedDevotionals`, `adminSignIn` hang and devotional retrieval / login fail.
+
+**Root Cause:**
+1. Client `QUERY_TIMEOUT_MS=8000` raced exactly with Postgres `statement_timeout` (Supabase default 8s via pooler) — both rejected at same wall-clock, producing dual promise rejections; the postgres-js socket rejection was not attached to a handler after `Promise.race` settled, surfacing as `Unhandled Rejection` that crashed the lambda.
+2. `getPooledDatabaseUrl` appended `?pgbouncer=true` spuriously — transaction-mode artifact not needed when `prepare:false`; contaminated pooler URL.
+3. `client` variable never assigned (`createPgClient` created `pgClient` but not stored) so `queryWithTimeout` reset logic (`client=null`) was dead code; pool never recycled on transient `57014`.
+4. `max:10` then `max:3` with `Promise.all` in `getPublishedDevotionals` and `getSiteSettings` caused pool deadlock under `max=1-2` contention; `SETTINGS_QUERY_TIMEOUT=1000` too short for cold start.
+5. `withTimeout` leaked the loser branch (no `catch`/`clearTimeout` coordination).
+
+**Fix Applied:**
+- `src/data/db/index.ts`: bump `QUERY_TIMEOUT_MS` to `15000` and `CONNECT_TIMEOUT_MS` to `15000` (outside server statement_timeout), `MAX_RETRIES=2`/`RETRY_DELAY=750`, `max:2` (concurrency safe), `idle_timeout:20`/`max_lifetime:600`, store `client` on creation, add `resetPool()` that `end({timeout:1})` old pool fire-and-forget, rewrite `withTimeout` to `catch(()=>{})` both branches and `clearTimeout` in `finally`, treat `57014` as timeoutish with one retriable reset, remove `pgbouncer=true` append.
+- `src/lib/catalog.ts`: serialize `getPublishedDevotionals` (rows then countRows) to avoid pool deadlock.
+- `src/config/site.ts`: raise `SETTINGS_QUERY_TIMEOUT_MS` to `3500` and serialize `getSiteSettings` fetch.
+- Verified `src/lib/audit.ts` already swallows DB errors non-fatally; no change needed beyond longer timeout.
+- Added prominent purchase CTA on `src/app/devotionals/[slug]/page.tsx` header (price badge + `Purchase access` link to `/purchase/[slug]`, disabled state when `paymentsEnabled=false`, `aria-label`).
+
+**Prevention:**
+- Keep client timeout > server `statement_timeout` + cold-start p99 (3-5s); monitor `pg_stat_activity` and Vercel `FUNCTION_INVOCATION_TIMEOUT`; never `Promise.race` without attaching `catch` to loser; use `max=2` for serverless and serialize concurrent queries; test pooler URL without extra params; add startup check that logs effective `DATABASE_URL` host/port.
+
+**Files Affected:**
+`src/data/db/index.ts`, `src/lib/catalog.ts`, `src/config/site.ts`, `src/app/devotionals/[slug]/page.tsx`
+**Date:** 2026-09-01
+**Status:** Active
+
+### UI — Missing Purchase CTA on Devotional Page (fix-build 2026-09-01)
+
+**Symptom:**
+No simple accessible purchase link on dedicated devotional page (`/devotionals/[slug]`); price shown as static `<span>`, purchase only via bottom `AccessGate` after scrolling past preview days — users couldn't discover `Purchase` flow.
+
+**Root Cause:**
+Header section rendered price as non-interactive badge; `AccessGate` purchase link buried below content; no top-of-page CTA.
+
+**Fix Applied:**
+- `src/app/devotionals/[slug]/page.tsx`: import `Link`, replace price-only badge with `flex` group: price `<span>` + `<Link href="/purchase/${slug}">Purchase access</Link>` (primary button, `aria-label`, `focus-visible:ring`), with disabled `<span>` fallback when `!paymentsEnabled`. Respects existing `AccessGate` at bottom.
+
+**Prevention:**
+- Every paid devotional view must expose a primary CTA above the fold; audit devotional routes for header CTA during UI review; keep `AccessGate` secondary.
+
+**Files Affected:**
+`src/app/devotionals/[slug]/page.tsx`
+**Date:** 2026-09-01
+**Status:** Active

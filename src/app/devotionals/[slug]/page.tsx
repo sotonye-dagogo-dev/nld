@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
@@ -79,9 +80,27 @@ export default async function DevotionalPage({
             {devotional.subtitle && <p className="mt-2 text-text-muted">{devotional.subtitle}</p>}
           </div>
           {devotional.priceMinor > 0 && (
-            <span className="rounded-lg bg-surface px-4 py-2 text-lg font-semibold text-text-primary border border-border">
-              {formatPrice(devotional.priceMinor, devotional.currency)}
-            </span>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="rounded-lg bg-surface px-4 py-2 text-lg font-semibold text-text-primary border border-border">
+                {formatPrice(devotional.priceMinor, devotional.currency)}
+              </span>
+              {settings.paymentsEnabled ? (
+                <Link
+                  href={`/purchase/${devotional.slug}`}
+                  aria-label={`Purchase access to ${devotional.title}`}
+                  className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
+                >
+                  Purchase access
+                </Link>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  className="rounded-lg bg-text-muted px-5 py-2.5 text-sm font-semibold text-white opacity-60 cursor-not-allowed"
+                >
+                  Payments disabled
+                </span>
+              )}
+            </div>
           )}
         </section>
 
