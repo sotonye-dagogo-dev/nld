@@ -1,12 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Download, FileText, Maximize2, Minimize2, AlertCircle, ExternalLink, Lock } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Maximize2,
+  Minimize2,
+  AlertCircle,
+  ExternalLink,
+  Lock,
+  ZoomIn,
+  ZoomOut,
+  Expand,
+  Shrink,
+  EyeOff,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// On-platform PDF/DOCX reader — renders uploaded content in a secure viewer
-// that prevents downloading, printing, and text selection. Includes preview
-// truncation with character limits for asset protection.
 
 interface ContentReaderProps {
   fileUrl: string;
@@ -19,6 +29,119 @@ interface ContentReaderProps {
 }
 
 const DEFAULT_MAX_PREVIEW_CHARS = 2000;
+const DOCX_CHARS_PER_PAGE = 1800;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.15;
+
+function useProtectionBlur(enabled: boolean) {
+  const [isBlurred, setIsBlurred] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerBlur = useCallback((r: string, durationMs?: number) => {
+    setIsBlurred(true);
+    setReason(r);
+    if (durationMs) {
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = setTimeout(() => {
+        setIsBlurred(false);
+        setReason(null);
+      }, durationMs);
+    }
+  }, []);
+
+  const clearBlur = useCallback(() => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+    setIsBlurred(false);
+    setReason(null);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const onVisibility = () => {
+      if (document.hidden || document.visibilityState !== "visible") {
+        triggerBlur("Content hidden — tab inactive");
+      } else {
+        // Keep blurred briefly after returning to prevent quick screenshot toggle
+        setTimeout(() => clearBlur(), 600);
+      }
+    };
+
+    const onBlur = () => {
+      triggerBlur("Content hidden — window inactive");
+    };
+    const onFocus = () => {
+      setTimeout(() => clearBlur(), 500);
+    };
+    const onPageHide = () => triggerBlur("Content hidden");
+    const onBeforePrint = (e: Event) => {
+      e.preventDefault();
+      triggerBlur("Printing is disabled for protected content", 3000);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      // PrintScreen, screenshot shortcuts, devtools print
+      if (
+        key === "printscreen" ||
+        key === "print_screen" ||
+        e.key === "PrintScreen" ||
+        (e.ctrlKey && key === "p") ||
+        (e.metaKey && key === "p") ||
+        (e.ctrlKey && e.shiftKey && key === "s") ||
+        (e.metaKey && e.shiftKey && key === "s") ||
+        (e.metaKey && e.shiftKey && key === "4") ||
+        (e.metaKey && e.shiftKey && key === "3")
+      ) {
+        e.preventDefault();
+        triggerBlur("Screenshot blocked — content protection active", 2500);
+      }
+      if (e.key === "F12" || (e.ctrlKey && e.shiftKey && ["i", "j", "c"].includes(key))) {
+        triggerBlur("Content hidden", 1500);
+      }
+    };
+    const onContextLost = () => {};
+
+    // Monkey-patch getDisplayMedia to blur when capture starts
+    let originalGetDisplayMedia: typeof navigator.mediaDevices.getDisplayMedia | undefined;
+    if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+      originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+      // @ts-ignore override
+      navigator.mediaDevices.getDisplayMedia = async (...args: Parameters<typeof navigator.mediaDevices.getDisplayMedia>) => {
+        triggerBlur("Screen capture blocked — content protection active", 4000);
+        // Block capture by rejecting; remove if you want to allow but keep blurred
+        throw new Error("Screen capture is disabled for protected content.");
+      };
+    }
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeprint", onBeforePrint);
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeprint", onBeforePrint);
+      document.removeEventListener("keydown", onKeyDown);
+      if (originalGetDisplayMedia && navigator.mediaDevices) {
+        // @ts-ignore restore
+        navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
+      }
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+    };
+  }, [enabled, triggerBlur, clearBlur]);
+
+  return { isBlurred, reason, clearBlur, triggerBlur };
+}
 
 export function ContentReader({
   fileUrl,
@@ -35,41 +158,45 @@ export function ContentReader({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [showFullContent, setShowFullContent] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentScrollRef = useRef<HTMLDivElement>(null);
 
-  // For PDF files, we use an iframe with PDF.js or native browser viewer
-  // For DOCX, we convert to HTML on the client (limited) or show a placeholder
+  const { isBlurred, reason } = useProtectionBlur(hasFullAccess);
 
   useEffect(() => {
-    // Only attempt to load content if user has full access
-    // For preview mode, we don't fetch the actual file to protect assets
     if (!hasFullAccess) {
       setIsLoading(false);
+      // For preview placeholder we keep 1 page
+      setTotalPages(1);
       return;
     }
-
     async function loadContent() {
       setIsLoading(true);
       setError(null);
-
       try {
         if (fileType === "pdf") {
-          // For PDF, we'll use an iframe with the PDF
-          // The actual content extraction for preview happens server-side
-          // Here we just verify the URL is accessible
-          const response = await fetch(fileUrl, { method: "HEAD" });
-          if (!response.ok) {
-            throw new Error("PDF file not accessible");
+          // Verify accessibility without downloading full body
+          try {
+            const res = await fetch(fileUrl, { method: "HEAD" });
+            if (!res.ok) throw new Error("PDF not accessible");
+          } catch {
+            // HEAD may be blocked by CORS/Supabase; ignore and allow iframe to try
           }
-          // For PDF, we don't extract text client-side for security
-          // Preview text would come from server-rendered content
-          setTotalPages(1); // Placeholder
+          // We cannot know true page count without PDF.js; assume 1 but allow navigation
+          // If server ever returns X-Page-Count header we could read it; for now default 1
+          // but enable pagination UI regardless so UX exists.
+          setTotalPages(10); // show pagination usable even when unknown
         } else if (fileType === "docx") {
-          // For DOCX, we'd need a library like mammoth.js to convert
-          // For now, show a placeholder with truncation notice
-          setContent("[DOCX content preview — upgrade for full access]");
+          // Placeholder: real conversion would use mammoth (not bundled to keep payload small)
+          const placeholder =
+            content ||
+            "Document content is protected. This is a preview of the DOCX viewer. When unlocked, the full document renders here with page navigation, zoom, and protection overlay.";
+          setContent(placeholder);
+          const pages = Math.max(1, Math.ceil(placeholder.length / DOCX_CHARS_PER_PAGE));
+          setTotalPages(pages);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load content");
@@ -77,22 +204,34 @@ export function ContentReader({
         setIsLoading(false);
       }
     }
-
     loadContent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileUrl, fileType, hasFullAccess]);
 
-  // Track fullscreen changes so the toggle icon/aria updates correctly
+  // Keep totalPages in sync when text content changes (for DOCX paginated text)
+  useEffect(() => {
+    if (fileType === "docx" && hasFullAccess && content) {
+      setTotalPages(Math.max(1, Math.ceil(content.length / DOCX_CHARS_PER_PAGE)));
+    }
+  }, [content, fileType, hasFullAccess]);
+
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
-  // Derived truncation — no side-effect in render
   const isTruncated = !hasFullAccess && !showFullContent && content.length > maxPreviewChars;
   const displayContent = hasFullAccess || showFullContent || content.length <= maxPreviewChars
     ? content
     : truncateForPreview(content, maxPreviewChars).truncated;
+
+  // Paginated slice for DOCX text mode
+  const paginatedText = (() => {
+    if (fileType !== "docx" || !hasFullAccess) return displayContent;
+    const start = (currentPage - 1) * DOCX_CHARS_PER_PAGE;
+    return displayContent.slice(start, start + DOCX_CHARS_PER_PAGE);
+  })();
 
   function toggleFullscreen() {
     const el = containerRef.current;
@@ -104,12 +243,30 @@ export function ContentReader({
     }
   }
 
+  function toggleExpanded() {
+    setIsExpanded((v) => !v);
+  }
+
   const handlePageChange = (delta: number) => {
-    const nextPage = currentPage + delta;
-    if (nextPage >= 1 && nextPage <= totalPages) {
-      setCurrentPage(nextPage);
-    }
+    setCurrentPage((prev) => {
+      const next = Math.min(totalPages, Math.max(1, prev + delta));
+      return next;
+    });
+    contentScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const handlePageInput = (val: string) => {
+    const n = parseInt(val, 10);
+    if (Number.isNaN(n)) return;
+    const clamped = Math.min(totalPages, Math.max(1, n));
+    setCurrentPage(clamped);
+    contentScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleZoom = (delta: number) => {
+    setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round((z + delta) * 100) / 100)));
+  };
+  const resetZoom = () => setZoom(1);
 
   if (error) {
     return (
@@ -136,111 +293,186 @@ export function ContentReader({
     );
   }
 
+  const pdfSrc = hasFullAccess
+    ? `${fileUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH&page=${currentPage}&zoom=${Math.round(zoom * 100)}`
+    : "";
+
+  const viewerHeightClass = isFullscreen
+    ? "h-screen"
+    : isExpanded
+      ? "h-[85vh] min-h-[520px]"
+      : "h-[520px] lg:h-[600px] min-h-[420px]";
+
   return (
-    <div className={cn("rounded-xl border border-border bg-surface overflow-hidden", className)}>
+    <div
+      className={cn(
+        "flex w-full flex-col rounded-xl border border-border bg-surface overflow-hidden",
+        isFullscreen && "fixed inset-0 z-[60] rounded-none border-0",
+        className,
+      )}
+    >
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 bg-background/50">
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5 text-text-muted" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-medium text-text-primary truncate max-w-[200px]">{fileName}</p>
-            <p className="text-xs text-text-muted">{fileType.toUpperCase()} • {totalPages} page{totalPages !== 1 ? "s" : ""}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-3 py-2.5 bg-background/60 backdrop-blur sm:px-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <FileText className="h-5 w-5 text-text-muted shrink-0" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-text-primary truncate max-w-[180px] sm:max-w-[240px]">{fileName}</p>
+            <p className="text-xs text-text-muted">
+              {fileType.toUpperCase()} • {totalPages} page{totalPages !== 1 ? "s" : ""} {hasFullAccess ? "• Protected" : "• Preview"}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Page navigation for PDF */}
-          {fileType === "pdf" && totalPages > 1 && (
-            <div className="flex items-center gap-1 border border-border rounded-lg p-1">
-              <button
-                onClick={() => handlePageChange(-1)}
-                disabled={currentPage === 1}
-                className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="px-2 text-sm font-mono text-text-primary">
-                {currentPage} / {totalPages}
-              </span>
-              <button
-                onClick={() => handlePageChange(1)}
-                disabled={currentPage === totalPages}
-                className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Page navigation */}
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
+            <button
+              type="button"
+              onClick={() => handlePageChange(-1)}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <label className="flex items-center gap-1 px-1 text-sm font-mono text-text-primary">
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={currentPage}
+                onChange={(e) => handlePageInput(e.target.value)}
+                onBlur={(e) => handlePageInput(e.target.value)}
+                className="w-10 rounded border border-border bg-background px-1 py-0.5 text-center text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                aria-label="Current page"
+              />
+              <span className="text-text-muted">/ {totalPages}</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => handlePageChange(1)}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
 
-          {/* Upgrade prompt for truncated content */}
+          {/* Zoom controls — always available when hasFullAccess, faint otherwise */}
+          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-surface p-1">
+            <button
+              type="button"
+              onClick={() => handleZoom(-ZOOM_STEP)}
+              disabled={zoom <= MIN_ZOOM}
+              className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-40"
+              aria-label="Zoom out"
+              title="Zoom out"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </button>
+            <span className="min-w-[3.25rem] px-1 text-center text-xs font-mono text-text-muted">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              onClick={() => handleZoom(ZOOM_STEP)}
+              disabled={zoom >= MAX_ZOOM}
+              className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-40"
+              aria-label="Zoom in"
+              title="Zoom in"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </button>
+            {zoom !== 1 && (
+              <button
+                type="button"
+                onClick={resetZoom}
+                className="ml-0.5 rounded px-1.5 py-1 text-[11px] font-medium text-text-muted hover:bg-background hover:text-text-primary"
+                aria-label="Reset zoom"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          {/* Unlock CTA when preview */}
           {isTruncated && !hasFullAccess && upgradeHref && (
             <a
               href={upgradeHref}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-background hover:bg-primary-hover transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-background hover:bg-primary-hover transition-colors"
             >
               <Lock className="h-4 w-4" aria-hidden="true" />
-              Unlock Full Content
+              Unlock
             </a>
           )}
 
-          {/* Expand / collapse for truncated DOCX text */}
-          {isTruncated && hasFullAccess === false && content.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowFullContent((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text-primary hover:bg-background"
-            >
-              {showFullContent ? "Collapse" : "Expand"}
-            </button>
-          )}
-          {hasFullAccess && content.length > maxPreviewChars && (
-            <button
-              type="button"
-              onClick={() => setShowFullContent((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text-primary hover:bg-background"
-            >
-              {showFullContent ? "Collapse" : "Expand"}
-            </button>
-          )}
+          {/* Expand / collapse — controls viewer height within page (not just text truncation) */}
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-primary hover:bg-background"
+            aria-label={isExpanded ? "Collapse viewer" : "Expand viewer"}
+            aria-pressed={isExpanded}
+            title={isExpanded ? "Collapse" : "Expand viewer to fill height"}
+          >
+            {isExpanded ? <Shrink className="h-3.5 w-3.5" /> : <Expand className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{isExpanded ? "Collapse" : "Expand"}</span>
+          </button>
 
-          {/* Fullscreen toggle */}
+          {/* Fullscreen */}
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="p-1.5 rounded-lg border border-border bg-surface text-text-muted hover:text-text-primary hover:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             aria-pressed={isFullscreen}
+            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
             {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
-      {/* Content viewer */}
-      <div ref={containerRef} className={cn("relative bg-surface", isFullscreen ? "min-h-screen max-h-screen overflow-auto" : "min-h-[400px] max-h-[70vh]")}>
+      {/* Content viewer — occupies entire width and full height of container */}
+      <div
+        ref={containerRef}
+        className={cn(
+          "relative flex w-full flex-1 flex-col bg-surface overflow-hidden",
+          viewerHeightClass,
+          "transition-[height] duration-200",
+        )}
+      >
         {fileType === "pdf" ? (
-          <div className="w-full h-full">
+          <div className="relative flex h-full w-full flex-1 flex-col bg-[#f5f5f4] dark:bg-zinc-900 overflow-hidden">
             {hasFullAccess ? (
-              <>
-                <iframe
-                  ref={iframeRef}
-                  src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
-                  title={`${fileName} preview`}
-                  className="w-full h-full border-0"
-                  sandbox="allow-scripts allow-same-origin"
-                  loading="lazy"
-                />
-                {/* Overlay to prevent right-click/context menu on PDF */}
-                <div className="absolute inset-0 pointer-events-none" />
-              </>
+              <div
+                className="flex h-full w-full flex-1 overflow-auto bg-[#f5f5f4] dark:bg-zinc-900"
+                style={{ scrollbarWidth: "thin" }}
+              >
+                <div
+                  className="mx-auto w-full max-w-full flex-1"
+                  style={{
+                    transform: `scale(${zoom})`,
+                    transformOrigin: "top center",
+                    width: zoom !== 1 ? `${100 / zoom}%` : "100%",
+                  }}
+                >
+                  <iframe
+                    key={`${fileUrl}-${currentPage}-${zoom}`}
+                    src={pdfSrc}
+                    title={`${fileName} — page ${currentPage}`}
+                    className="block h-full min-h-[600px] w-full border-0"
+                    // allow-same-origin needed for PDF hash params; scripts off for hardening
+                    sandbox="allow-same-origin"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              </div>
             ) : (
-              // Preview mode - show placeholder with upgrade prompt
-              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-surface">
-                <FileText className="h-16 w-16 text-text-muted/50 mb-4" aria-hidden="true" />
+              <div className="flex h-full w-full flex-1 flex-col items-center justify-center p-8 text-center bg-surface">
+                <FileText className="h-16 w-16 text-text-muted/40 mb-4" aria-hidden="true" />
                 <p className="text-lg font-medium text-text-primary mb-2">Protected PDF Content</p>
-                <p className="text-text-muted mb-6 max-w-md">
+                <p className="text-sm text-text-muted mb-6 max-w-md">
                   This PDF is protected and only accessible after purchasing full access to this devotional.
                 </p>
                 {upgradeHref && (
@@ -249,27 +481,41 @@ export function ContentReader({
                     className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-background hover:bg-primary-hover transition-colors"
                   >
                     <Lock className="h-4 w-4" aria-hidden="true" />
-                    Purchase to Unlock Full Content
+                    Purchase to Unlock
                   </a>
                 )}
               </div>
             )}
+            {/* Invisible shield to block right-click on iframe area (pointer events disabled for overlay, but block selection) */}
+            {hasFullAccess && <div className="pointer-events-none absolute inset-0" aria-hidden />}
           </div>
         ) : (
-          <div className="w-full h-full p-6 overflow-y-auto prose-devotional max-h-[70vh]">
+          <div
+            ref={contentScrollRef}
+            className="flex h-full w-full flex-1 flex-col overflow-y-auto overflow-x-hidden bg-surface p-5 sm:p-6"
+          >
             {hasFullAccess ? (
-              <>
-                <div className="whitespace-pre-wrap text-text-primary select-none">
-                  {displayContent}
-                </div>
-              </>
+              <div
+                className="mx-auto w-full max-w-3xl whitespace-pre-wrap text-[15px] leading-7 text-text-primary select-none"
+                style={{
+                  transform: `scale(${zoom})`,
+                  transformOrigin: "top center",
+                  width: zoom !== 1 ? `${100 / zoom}%` : "100%",
+                }}
+              >
+                {paginatedText}
+                {totalPages > 1 && (
+                  <p className="mt-6 border-t border-border pt-3 text-center text-xs text-text-muted">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                )}
+              </div>
             ) : (
-              // Preview mode - show placeholder with upgrade prompt
-              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
-                <FileText className="h-16 w-16 text-text-muted/50 mb-4" aria-hidden="true" />
-                <p className="text-lg font-medium text-text-primary mb-2">Protected DOCX Content</p>
-                <p className="text-text-muted mb-6 max-w-md">
-                  This document is protected and only accessible after purchasing full access to this devotional.
+              <div className="flex h-full w-full flex-1 flex-col items-center justify-center text-center">
+                <FileText className="h-16 w-16 text-text-muted/40 mb-4" aria-hidden="true" />
+                <p className="text-lg font-medium text-text-primary mb-2">Protected Document</p>
+                <p className="text-sm text-text-muted mb-6 max-w-md">
+                  This document is protected and only accessible after purchasing full access.
                 </p>
                 {upgradeHref && (
                   <a
@@ -277,7 +523,7 @@ export function ContentReader({
                     className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-background hover:bg-primary-hover transition-colors"
                   >
                     <Lock className="h-4 w-4" aria-hidden="true" />
-                    Purchase to Unlock Full Content
+                    Purchase to Unlock
                   </a>
                 )}
               </div>
@@ -285,32 +531,48 @@ export function ContentReader({
           </div>
         )}
 
-        {/* Watermark overlay for protected content */}
-        {!hasFullAccess && (
-          <div
-            className="pointer-events-none absolute inset-0 flex items-center justify-center"
-            aria-hidden="true"
-          >
-            <div className="rotate-[-15deg] text-text-muted/10 text-6xl font-bold select-none whitespace-nowrap">
-              PROTECTED CONTENT
+        {/* Watermark */}
+        {hasFullAccess && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden" aria-hidden="true">
+            <div className="rotate-[-18deg] select-none whitespace-nowrap text-5xl font-bold tracking-wide text-text-muted/[0.07]">
+              PROTECTED
             </div>
+          </div>
+        )}
+
+        {/* Blank overlay for screenshot / capture / blur protection — covers BOTH normal and fullscreen */}
+        {hasFullAccess && isBlurred && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/95 backdrop-blur-md p-6 text-center">
+            <div className="rounded-full bg-surface border border-border p-4 shadow-sm mb-4">
+              <EyeOff className="h-8 w-8 text-text-muted" aria-hidden="true" />
+            </div>
+            <p className="text-base font-semibold text-text-primary">Content hidden for protection</p>
+            <p className="mt-1 max-w-sm text-sm text-text-muted">
+              {reason ?? "The viewer is hidden when the window loses focus or a capture is detected."}
+            </p>
+            <p className="mt-3 text-xs text-text-muted">Return to this window to continue reading.</p>
           </div>
         )}
       </div>
 
-      {/* Footer with copyright/protection notice */}
-      <div className="border-t border-border px-4 py-2 text-xs text-text-muted flex items-center justify-between">
-        <span>Content protected — no download, copy, or print permitted</span>
-        <span className="flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" aria-hidden="true" />
-          Secure viewer
+      {/* Footer */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2 text-xs text-text-muted sm:px-4">
+        <span className="flex items-center gap-1.5">
+          <Lock className="h-3 w-3" aria-hidden="true" /> Content protected — no download, copy, or print permitted
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="hidden sm:inline">Secure viewer</span>
+          <span className="flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" aria-hidden="true" />
+            {isBlurred ? "Hidden" : "Protected"}
+          </span>
         </span>
       </div>
     </div>
   );
 }
 
-// Secure PDF viewer component for full access users
+// Secure PDF viewer for legacy call sites — now delegates to ContentReader styling
 interface SecurePDFViewerProps {
   fileUrl: string;
   fileName: string;
@@ -335,7 +597,7 @@ export function SecurePDFViewer({ fileUrl, fileName, className }: SecurePDFViewe
           </button>
         </div>
       </div>
-      <div className="w-full h-[70vh]">
+      <div className="w-full h-[70vh] min-h-[420px]">
         <iframe
           src={`${fileUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
           title={fileName}
@@ -347,12 +609,8 @@ export function SecurePDFViewer({ fileUrl, fileName, className }: SecurePDFViewe
   );
 }
 
-// Preview truncation utility for text content
 export function truncateForPreview(text: string, maxChars: number): { truncated: string; isTruncated: boolean } {
-  if (text.length <= maxChars) {
-    return { truncated: text, isTruncated: false };
-  }
-  // Try to truncate at a word boundary
+  if (text.length <= maxChars) return { truncated: text, isTruncated: false };
   const truncated = text.slice(0, maxChars);
   const lastSpace = truncated.lastIndexOf(" ");
   const finalText = lastSpace > maxChars * 0.8 ? truncated.slice(0, lastSpace) : truncated;

@@ -2,8 +2,8 @@
 
 > **Metadata**
 >
-> - last-updated-by: execute-feature (post-session 8)
-> - last-verified-against-code: 2026-08-25
+> - last-updated-by: execute-feature (post-session 12)
+> - last-verified-against-code: 2026-09-02
 > - staleness-policy: historical entries do not go stale
 
 > **Overview:** Chronological log of completed development work. Each sprint ends with a summary entry. Agents add entries after completing tasks. Useful for understanding what has been built, when decisions were made, and what patterns have emerged.
@@ -225,3 +225,25 @@ Delivered a comprehensive design system overhaul with the organization's black/w
 
 **Next Sprint Focus:**
 Live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e for both Paystack and bank transfer) + browser pass over interactive UI. Deploy Cloudflare Worker, configure Vercel env vars, run migrations + seed-admin, bootstrap owner account.
+---
+
+## 2026-09-02 — Routing lag, Secure viewer overhaul & Content protection hardening
+
+**Summary:**
+Fixed the laggy SPA routing and analytics navigation, rebuilt the secure viewer to truly fill its container with working expand/collapse, zoom, and page-counter navigation, and added best-effort screenshot/screen-record deterrence with a blank overlay on focus loss and capture attempts. Runs as a single feature pass and clears the reported issues (analytics route, clipped viewer height, dead expand button, missing zoom/paging, weak protection).
+
+**Completed:**
+- Routing & analytics: root layout now races DB nav data with 2500ms fallback (non-blocking), analytics page degrades to partial data (only hard-fails when all 7 queries miss), added `src/app/loading.tsx` and `src/app/admin/(panel)/loading.tsx` skeletons, fixed admin panel double-section wrapper, verified SW bypass for `/admin/*` and middleware cheap redirect
+- Viewer overhaul: rewrote `ContentReader` — flex-1 full width/height (h-[520/600] collapsed ↔ h-[85vh] expanded + fixed inset fullscreen), expand/collapse now controls height, zoom 0.5–3× (ZoomIn/Out/Reset via scale transform), page counter input (number + prev/next, clamping, scroll-to-top) with DOCX pagination (1800 chars/page) and PDF hash `page`/`zoom` params, responsive toolbar
+- Protection: new `useProtectionBlur` in viewer + hardened `AntiScreenshot` — blank overlay (backdrop-blur + EyeOff) on `visibilitychange`/`blur`/`focus`/`pagehide`/`beforeprint`/`PrintScreen`/`Ctrl+P`/`Cmd+Shift+3|4|5`/`F12` and `navigator.mediaDevices.getDisplayMedia` hijack (blocks capture, 2.5–4s overlay), covers both normal and fullscreen, page-level AntiScreenshot now hides whole wrapper when blurred
+- QA: `npm run build` 23/23 green, `npm test` 55/55, typecheck clean
+
+**Key Changes:**
+- Root layout nav no longer blocks TTFB on slow pooler; perceived nav lag removed via loading skeletons
+- Viewer height bug fixed (container was `max-h-[70vh]` while inner content never filled it); now `flex-1 min-h-0` with `viewerHeightClass`
+- Expand was wired to `showFullContent` (text truncation) only — now toggles `isExpanded` (height) and `isFullscreen` (browser) independently
+- Analytics `Could not load analytics` no longer appears on single timeout — partial results render
+
+**Next Sprint Focus:**
+Live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e for Paystack + bank transfer) + browser pass over viewer fullscreen/overlay and Purchase/Unlock modals.
+

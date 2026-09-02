@@ -138,15 +138,18 @@ export default async function AdminAnalyticsPage() {
     queryAnalytics((db) => db.select().from(events).orderBy(desc(events.createdAt)).limit(8)),
   ]);
 
-  if (
-    typeRows === null ||
-    revenueRows === null ||
-    trendRows === null ||
-    purchaseTrendRows === null ||
-    topOpenRows === null ||
-    topPurchaseRows === null ||
-    recentRows === null
-  ) {
+  // Resilient: partial failures degrade to empty arrays rather than full-page error.
+  // Only hard-fail when EVERY query failed (likely DB is fully unreachable).
+  const allFailed =
+    typeRows === null &&
+    revenueRows === null &&
+    trendRows === null &&
+    purchaseTrendRows === null &&
+    topOpenRows === null &&
+    topPurchaseRows === null &&
+    recentRows === null;
+
+  if (allFailed) {
     loadError = true;
   } else {
     const countBy = new Map((typeRows ?? []).map((r) => [r.eventType, r.n]));
