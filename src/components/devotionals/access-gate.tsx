@@ -28,11 +28,26 @@ export function AccessGate({ devotional, settings, id }: AccessGateProps) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState<DevotionalDay[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function mapError(msg: string): Record<string, string> {
+    const low = msg.toLowerCase();
+    if (low.includes("email")) return { email: msg };
+    if (low.includes("password") || low.includes("access")) return { password: msg };
+    if (low.includes("expired") || low.includes("no active")) return { email: msg };
+    return { password: msg };
+  }
 
   async function verify(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    const errs: Record<string, string> = {};
+    if (!email.trim()) errs.email = "Email is required.";
+    if (!password.trim()) errs.password = "Access password is required.";
+    if (Object.keys(errs).length) {
+      setFieldErrors(errs);
+      return;
+    }
+    setFieldErrors({});
     setLoading(true);
     try {
       const res = await fetch(`/api/devotionals/${encodeURIComponent(devotional.slug)}/unlock`, {
@@ -42,13 +57,13 @@ export function AccessGate({ devotional, settings, id }: AccessGateProps) {
       });
       const data = (await res.json()) as { ok: boolean; days?: DevotionalDay[]; error?: string };
       if (!res.ok || !data.ok || !data.days) {
-        setError(data.error ?? "That password did not work.");
+        setFieldErrors(mapError(data.error ?? "That password did not work."));
         return;
       }
       setDays(data.days);
       toast("Access granted. Enjoy!", "success");
     } catch {
-      setError("Something went wrong. Please try again.");
+      setFieldErrors({ _general: "Something went wrong. Please try again." });
     } finally {
       setLoading(false);
     }
@@ -115,7 +130,7 @@ export function AccessGate({ devotional, settings, id }: AccessGateProps) {
       <p className="text-sm text-text-muted">
         Already purchased? Enter the email you paid with and the access password from your email.
       </p>
-      <form onSubmit={verify} className="space-y-4">
+      <form onSubmit={verify} className="space-y-4" noValidate>
         <Input
           name="email"
           type="email"
@@ -124,6 +139,7 @@ export function AccessGate({ devotional, settings, id }: AccessGateProps) {
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          error={fieldErrors.email}
         />
         <Input
           name="password"
@@ -134,19 +150,19 @@ export function AccessGate({ devotional, settings, id }: AccessGateProps) {
           placeholder="e.g. AB2CDEFG3HJK"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          error={error ?? undefined}
+          error={fieldErrors.password}
           showPasswordToggle
         />
+        {fieldErrors._general && (
+          <div className="flex items-center gap-2 text-sm text-danger bg-danger/5 p-3 rounded-lg" role="alert">
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{fieldErrors._general}</span>
+          </div>
+        )}
         <Button type="submit" loading={loading} className="w-full">
           Unlock devotional
         </Button>
       </form>
-      {error && (
-        <div className="flex items-center gap-2 text-sm text-danger bg-danger/5 p-3 rounded-lg">
-          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
       <div className="flex-between border-t border-border pt-4">
         <p className="text-sm text-text-muted">Haven&apos;t purchased yet?</p>
         <Link

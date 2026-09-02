@@ -51,7 +51,9 @@ export default async function PurchasePage({
         </div>
       );
     }
-    const totalMinor = purchasables.reduce((s, d) => s + d.priceMinor, 0);
+    const totalMinor = settings.accessMode === "one-time" && settings.defaultPriceMinor > 0
+      ? settings.defaultPriceMinor
+      : purchasables.reduce((s, d) => s + d.priceMinor, 0);
     const currency = purchasables[0].currency;
     // Synthetic devotional for bundle checkout (uses first devotional's id as anchor)
     const bundleDevotional: Devotional = {

@@ -56,6 +56,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
   });
   const [dayDrafts, setDayDrafts] = useState<DayDraft[]>(() => initialDays(days));
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const derivedSlug = form.slug || slugify(form.title);
 
@@ -79,6 +80,19 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setFieldErrors({});
+    // Client-side validation with per-field errors
+    const errs: Record<string, string> = {};
+    if (!form.title.trim()) errs.title = "Title is required.";
+    // Slug validation: must be lowercase alphanumeric + hyphens if provided
+    if (form.slug.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug.trim())) {
+      errs.slug = "Slug must be lowercase letters, numbers and hyphens only (e.g. my-devotional).";
+    }
+    if (Object.keys(errs).length) {
+      setFieldErrors(errs);
+      toast("Please fix the highlighted fields.", "error");
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
@@ -108,9 +122,14 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !data.ok) {
         if (res.status === 409) {
-          toast("That slug is already in use. Please choose a different slug.", "error");
+          setFieldErrors({ slug: "That slug is already in use. Please choose a different slug." });
+          toast("That slug is already in use.", "error");
         } else {
-          toast(data.error ?? "Could not save the devotional.", "error");
+          const msg = data.error ?? "Could not save the devotional.";
+          const low = msg.toLowerCase();
+          if (low.includes("slug")) setFieldErrors({ slug: msg });
+          else if (low.includes("title")) setFieldErrors({ title: msg });
+          else toast(msg, "error");
         }
         return;
       }
@@ -129,7 +148,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
         <h1 className="mb-4 text-xl font-semibold text-text-primary">
           {isEdit ? "Edit devotional" : "Upload devotional"}
         </h1>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <Input
             name="title"
             required
@@ -139,6 +158,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             hint="The main title of the devotional (e.g. '30 Days of Prayer & Fasting')"
+            error={fieldErrors.title}
           />
           <Input
             name="subtitle"
@@ -155,8 +175,9 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             placeholder={derivedSlug}
             value={form.slug}
             type="text"
-            onChange={(e) => setForm({ ...form, slug: e.target.value })}
-            hint="Must be unique. Used in the devotional URL (e.g. /devotionals/your-slug). Auto-generated from title if left empty."
+            onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })}
+            hint="Must be unique, lowercase letters, numbers and hyphens only. Used in URL (e.g. /devotionals/your-slug). Auto-generated from title if left empty."
+            error={fieldErrors.slug}
           />
           <FileUpload
             label="Cover Image"

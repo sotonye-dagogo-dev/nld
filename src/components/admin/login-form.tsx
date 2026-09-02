@@ -16,11 +16,25 @@ export function AdminLoginForm({ next }: { next: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function mapLoginError(msg: string): Record<string, string> {
+    const low = msg.toLowerCase();
+    if (low.includes("email") || low.includes("not authorized") || low.includes("admin")) return { email: msg };
+    if (low.includes("password") || low.includes("invalid")) return { password: msg };
+    return { password: msg };
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    const errs: Record<string, string> = {};
+    if (!email.trim()) errs.email = "Email is required.";
+    if (!password.trim()) errs.password = "Password is required.";
+    if (Object.keys(errs).length) {
+      setFieldErrors(errs);
+      return;
+    }
+    setFieldErrors({});
     setLoading(true);
     try {
       const res = await fetch("/api/admin/auth/login", {
@@ -30,13 +44,17 @@ export function AdminLoginForm({ next }: { next: string }) {
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Login failed.");
+        setFieldErrors(mapLoginError(data.error ?? "Login failed."));
         return;
       }
       toast("Welcome back.", "success");
-      router.push(next.startsWith("/") ? next : "/admin");
+      // Use hard navigation so the new HttpOnly cookie is sent on the next request.
+      // router.push alone can leave the RSC fetch without the freshly-set cookie,
+      // causing the guarded layout to bounce back to /admin/login.
+      const dest = next.startsWith("/") ? next : "/admin";
+      window.location.assign(dest);
     } catch {
-      setError("Network error. Please try again.");
+      setFieldErrors({ _general: "Network error. Please try again." });
     } finally {
       setLoading(false);
     }
@@ -49,7 +67,7 @@ export function AdminLoginForm({ next }: { next: string }) {
         <p className="mb-4 text-sm text-text-muted">
           Sign in with your admin account to manage the platform.
         </p>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="space-y-4" noValidate>
           <Input
             name="email"
             type="email"
@@ -59,6 +77,7 @@ export function AdminLoginForm({ next }: { next: string }) {
             placeholder="admin@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            error={fieldErrors.email}
           />
           <Input
             name="password"
@@ -68,9 +87,10 @@ export function AdminLoginForm({ next }: { next: string }) {
             label="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            error={error ?? undefined}
+            error={fieldErrors.password}
             showPasswordToggle
           />
+          {fieldErrors._general && <p className="text-xs text-danger" role="alert">{fieldErrors._general}</p>}
           <Button type="submit" loading={loading} className="w-full">
             Sign in
           </Button>
