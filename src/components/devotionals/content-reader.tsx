@@ -34,7 +34,7 @@ export function ContentReader({
   const [content, setContent] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [isTruncated, setIsTruncated] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFullContent, setShowFullContent] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,12 +81,28 @@ export function ContentReader({
     loadContent();
   }, [fileUrl, fileType, hasFullAccess]);
 
-  // Truncate content for preview
-  const displayContent = hasFullAccess || showFullContent
+  // Track fullscreen changes so the toggle icon/aria updates correctly
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  // Derived truncation — no side-effect in render
+  const isTruncated = !hasFullAccess && !showFullContent && content.length > maxPreviewChars;
+  const displayContent = hasFullAccess || showFullContent || content.length <= maxPreviewChars
     ? content
-    : content.length > maxPreviewChars
-      ? (setIsTruncated(true), content.slice(0, maxPreviewChars) + "…")
-      : content;
+    : truncateForPreview(content, maxPreviewChars).truncated;
+
+  function toggleFullscreen() {
+    const el = containerRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined);
+    } else {
+      void el.requestFullscreen().catch(() => undefined);
+    }
+  }
 
   const handlePageChange = (delta: number) => {
     const nextPage = currentPage + delta;
@@ -169,27 +185,41 @@ export function ContentReader({
             </a>
           )}
 
+          {/* Expand / collapse for truncated DOCX text */}
+          {isTruncated && hasFullAccess === false && content.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowFullContent((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text-primary hover:bg-background"
+            >
+              {showFullContent ? "Collapse" : "Expand"}
+            </button>
+          )}
+          {hasFullAccess && content.length > maxPreviewChars && (
+            <button
+              type="button"
+              onClick={() => setShowFullContent((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text-primary hover:bg-background"
+            >
+              {showFullContent ? "Collapse" : "Expand"}
+            </button>
+          )}
+
           {/* Fullscreen toggle */}
           <button
-            onClick={() => {
-              if (containerRef.current) {
-                if (document.fullscreenElement) {
-                  document.exitFullscreen();
-                } else {
-                  containerRef.current.requestFullscreen();
-                }
-              }
-            }}
-            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
-            aria-label="Toggle fullscreen"
+            type="button"
+            onClick={toggleFullscreen}
+            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            aria-pressed={isFullscreen}
           >
-            <Maximize2 className="h-4 w-4" />
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
       {/* Content viewer */}
-      <div ref={containerRef} className="relative min-h-[400px] max-h-[70vh]">
+      <div ref={containerRef} className={cn("relative bg-surface", isFullscreen ? "min-h-screen max-h-screen overflow-auto" : "min-h-[400px] max-h-[70vh]")}>
         {fileType === "pdf" ? (
           <div className="w-full h-full">
             {hasFullAccess ? (

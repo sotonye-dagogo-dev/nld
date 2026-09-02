@@ -72,8 +72,12 @@ export async function POST(request: Request) {
     if (!bundleDevotionals || bundleDevotionals.length === 0) {
       return NextResponse.json({ ok: false, error: "No devotionals available for bundle purchase." }, { status: 404 });
     }
-    // Use sum of all purchasable (or could be a bundle discount price from settings)
-    amountMinor = bundleDevotionals.reduce((sum, d) => sum + d.priceMinor, 0);
+    // Config-driven bundle fee: platform one-time fee if set, else sum
+    if (settings.accessMode === "one-time" && settings.defaultPriceMinor > 0) {
+      amountMinor = settings.defaultPriceMinor;
+    } else {
+      amountMinor = bundleDevotionals.reduce((sum, d) => sum + d.priceMinor, 0);
+    }
     currency = bundleDevotionals[0].currency;
     devotionalId = bundleDevotionals[0].id;
     callbackSlug = "all";
