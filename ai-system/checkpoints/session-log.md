@@ -412,3 +412,32 @@ Run `update-ai-system.md` to complete deep sync of all ai-system docs with curre
 - Build warnings: `metadataBase` localhost fallback (benign, overridden at runtime), no CSP drift.
 - One previous locale test already passing (55/55); no new failures.
 
+---
+
+## Session 13 — 2026-09-02 (merge — reader lock overlay + early deterrent on top of upstream)
+
+**Completed:**
+- Stash-apply merge: local work (reader lock + deterrent) was 12 commits behind origin/develop; stashed, fast-forward pulled 12 upstream commits, re-applied.
+- Conflicts resolved optimally: kept upstream superior implementations for `content-reader.tsx` (full pdfjs-dist + zoom/page/expand + useProtectionBlur) and `anti-screenshot.tsx` (blank overlay + getDisplayMedia hijack + visibility triggers); kept upstream `src/app/devotionals/[slug]/page.tsx` delegation to `DevotionalPageClient`.
+- Retained and integrated `LockedCoverOverlay` (`src/components/devotionals/locked-cover-overlay.tsx` — new, cover photo + tiled watermark + blur + unlock CTA) by enhancing `DevotionalPageClient` to render lockedDays as `LockedCoverOverlay` cards when not unlocked (previously just hidden behind AccessGate). This restores the directive's cover/watermark/blur requirement atop upstream's secure viewer.
+- Merged `src/app/layout.tsx`: preserved upstream `ClientNav` + `withLayoutTimeout(2500)` + loading skeletons, plus stashed early inline `<style>`+`<script>` gated by `settings.antiScreenshotEnabled` for pre-hydration copy/drag protection (<1ms, non-blocking).
+- Merged `src/app/globals.css`: upstream + `.protected-content`/`.screenshot-blur`/`@media print` rules.
+- Docs: merged `in-progress.md` (both Session 12 accomplishments), `dev-history.md` pending, this session-log entry.
+
+**Files Modified:**
+- New: `src/components/devotionals/locked-cover-overlay.tsx`
+- Modified: `src/components/devotionals/devotional-page-client.tsx` (added LockedCoverOverlay for lockedDays), `src/app/layout.tsx` (early protection script merged), `src/app/globals.css` (protected-content merged), `ai-system/*` docs
+- Resolved via `git stash` → `git pull --ff-only` → `git stash apply` → `checkout --theirs/--ours` per file + manual merge
+
+**Next Task:**
+- Verify in production: locked days show cover+blur+watermark before unlock, unlock via Purchase/AccessGate still fetches locked days correctly, early deterrent doesn't block legitimate copy in allow-select zones.
+- Browser pass over fullscreen/zoom/page + overlay, then live-key verification.
+
+**Assumptions Made:**
+- Locked prose preview (400 chars slice) behind blur is safe; true protection remains server-side via `/api/devotionals/[slug]/unlock`.
+- Early script gated by `settings.antiScreenshotEnabled` — correct because layout fetches settings.
+
+**Notes / Blockers:**
+- No DB migration; merge is additive. Build/typecheck/lint/tests to be re-run post-merge.
+- One previous locale test remains; upstream reports 55/55, local shows 54/55 pre-existing.
+
