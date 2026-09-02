@@ -28,23 +28,38 @@ const SETTING_KEYS: (keyof SiteSettings)[] = [
   "footerDevCreditName",
   "footerDevCreditUrl",
   "footerDevCreditEnabled",
+  "bundleEnabled",
+  "bundlePriceMinor",
+  "bundleAccessMode",
+  "bundleDurationDays",
+  "allowIndividualPurchase",
+  "durationAccessDays",
 ];
 
 export function coerceValue<T>(key: keyof SiteSettings, raw: unknown, fallback: T): T {
   switch (key) {
     case "defaultPriceMinor":
-    case "freePreviewDays": {
+    case "freePreviewDays":
+    case "bundlePriceMinor":
+    case "bundleDurationDays":
+    case "durationAccessDays": {
       const n = Number(raw);
       return (Number.isFinite(n) ? n : fallback) as T;
     }
     case "antiScreenshotEnabled":
     case "paymentsEnabled":
     case "paystackEnabled":
-    case "bankTransferEnabled": {
+    case "bankTransferEnabled":
+    case "bundleEnabled":
+    case "allowIndividualPurchase": {
       if (typeof raw === "boolean") return raw as T;
       if (raw === "true" || raw === "1") return true as T;
       if (raw === "false" || raw === "0") return false as T;
       return fallback; // unrecognized string → safe default
+    }
+    case "bundleAccessMode": {
+      if (raw === "one-time" || raw === "monthly" || raw === "duration") return raw as T;
+      return fallback;
     }
     default:
       return (typeof raw === "string" && raw.length > 0 ? raw : fallback) as T;

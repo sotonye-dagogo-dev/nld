@@ -130,6 +130,7 @@ export default async function DevotionalPage({
                           maxPreviewChars={MAX_PREVIEW_CHARS}
                           hasFullAccess={!hasAccessControl}
                           upgradeHref={hasAccessControl ? "#access-gate" : undefined}
+                          coverUrl={devotional.coverUrl}
                         />
                       </div>
                     )}

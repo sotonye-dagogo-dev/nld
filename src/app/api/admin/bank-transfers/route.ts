@@ -89,9 +89,10 @@ export async function POST(request: Request) {
     // Derive access password from transfer reference (consistent with Paystack approach)
     const accessPassword = deriveAccessPassword(`BT-${transfer.reference}-${transfer.id}`);
 
-    // Platform-config-driven expiry (devotional mode → site fallback)
+    // Platform-config-driven expiry (devotional mode → site fallback), config-driven duration
     const effectiveMode: AccessMode = (devotional.accessMode as AccessMode) ?? settings.accessMode ?? "one-time";
-    const expiresAt = computeExpiry(effectiveMode);
+    const durationDays = (settings as SiteSettings).durationAccessDays ?? (settings as SiteSettings).bundleDurationDays ?? 60;
+    const expiresAt = computeExpiry(effectiveMode, durationDays);
 
     // Create access grant (idempotent)
     const existingGrant = await queryWithTimeout((db) =>
@@ -126,12 +127,19 @@ export async function POST(request: Request) {
         db.select({ id: devotionals.id, slug: devotionals.slug, accessMode: devotionals.accessMode, priceMinor: devotionals.priceMinor }).from(devotionals).where(eq(devotionals.status, "published")),
       );
       const totalBundle = allPub.reduce((s, d) => s + (d.priceMinor as number), 0);
-      const isBundleTransfer = allPub.length > 1 && transfer.amountMinor === totalBundle;
+      const expectedBundle = (settings as SiteSettings).bundlePriceMinor && (settings as SiteSettings).bundlePriceMinor > 0
+        ? (settings as SiteSettings).bundlePriceMinor
+        : (settings as SiteSettings).defaultPriceMinor && (settings as SiteSettings).defaultPriceMinor > 0
+          ? (settings as SiteSettings).defaultPriceMinor
+          : totalBundle;
+      const isBundleTransfer = allPub.length > 1 && (transfer.amountMinor === totalBundle || transfer.amountMinor === expectedBundle);
       if (isBundleTransfer) {
         for (const devo of allPub) {
           if (devo.id === devotional.id) continue; // already handled
-          const mode: AccessMode = (devo.accessMode as AccessMode) ?? settings.accessMode ?? "one-time";
-          const exp = computeExpiry(mode);
+          // For bundle bank transfer, use bundleAccessMode
+          const bundleMode: AccessMode = (settings as SiteSettings).bundleAccessMode ?? settings.accessMode ?? "one-time";
+          const bundleDur = (settings as SiteSettings).bundleDurationDays ?? (settings as SiteSettings).durationAccessDays ?? 60;
+          const exp = computeExpiry(bundleMode, bundleDur);
           const exists = await queryWithTimeout((db) =>
             db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devo.id), eq(accessGrants.email, transfer.email))).limit(1),
           ).catch(() => []);

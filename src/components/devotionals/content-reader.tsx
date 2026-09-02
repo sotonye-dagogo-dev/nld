@@ -25,6 +25,7 @@ interface ContentReaderProps {
   maxPreviewChars?: number;
   hasFullAccess?: boolean;
   upgradeHref?: string;
+  coverUrl?: string;
   className?: string;
 }
 
@@ -150,6 +151,7 @@ export function ContentReader({
   maxPreviewChars = DEFAULT_MAX_PREVIEW_CHARS,
   hasFullAccess = false,
   upgradeHref,
+  coverUrl,
   className,
 }: ContentReaderProps) {
   const [isLoading, setIsLoading] = useState(true);
@@ -307,7 +309,7 @@ export function ContentReader({
     <div
       className={cn(
         "flex w-full flex-col rounded-xl border border-border bg-surface overflow-hidden",
-        isFullscreen && "fixed inset-0 z-[60] rounded-none border-0",
+        isFullscreen && "fixed inset-0 z-[65] rounded-none border-0",
         className,
       )}
     >
@@ -469,21 +471,53 @@ export function ContentReader({
                 </div>
               </div>
             ) : (
-              <div className="flex h-full w-full flex-1 flex-col items-center justify-center p-8 text-center bg-surface">
-                <FileText className="h-16 w-16 text-text-muted/40 mb-4" aria-hidden="true" />
-                <p className="text-lg font-medium text-text-primary mb-2">Protected PDF Content</p>
-                <p className="text-sm text-text-muted mb-6 max-w-md">
-                  This PDF is protected and only accessible after purchasing full access to this devotional.
-                </p>
-                {upgradeHref && (
-                  <a
-                    href={upgradeHref}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-background hover:bg-primary-hover transition-colors"
-                  >
-                    <Lock className="h-4 w-4" aria-hidden="true" />
-                    Purchase to Unlock
-                  </a>
+              <div className="relative flex h-full w-full flex-1 flex-col items-center justify-center overflow-hidden p-8 text-center">
+                {coverUrl ? (
+                  <>
+                    {/* Cover image as watermarked background */}
+                    <div className="absolute inset-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={coverUrl}
+                        alt=""
+                        className="h-full w-full object-cover opacity-50 blur-[1px]"
+                        aria-hidden
+                      />
+                      <div className="absolute inset-0 bg-surface/70 backdrop-blur-[2px]" aria-hidden />
+                      <div className="absolute inset-0 bg-gradient-to-t from-surface/80 via-transparent to-surface/40" aria-hidden />
+                    </div>
+                    {/* Diagonal watermark text */}
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden" aria-hidden>
+                      <span className="rotate-[-18deg] select-none whitespace-nowrap text-4xl font-black tracking-widest text-text-primary/[0.12] sm:text-5xl">
+                        UNLOCK TO ACCESS
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="absolute inset-0 bg-surface" aria-hidden />
                 )}
+                <div className="relative z-10 flex flex-col items-center">
+                  {coverUrl ? (
+                    <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-background/90 shadow-lg ring-1 ring-border backdrop-blur">
+                      <Lock className="h-9 w-9 text-primary" aria-hidden="true" />
+                    </div>
+                  ) : (
+                    <FileText className="h-16 w-16 text-text-muted/40 mb-4" aria-hidden="true" />
+                  )}
+                  <p className="text-lg font-semibold text-text-primary drop-shadow-sm">Unlock to Access</p>
+                  <p className="mt-1 max-w-md text-sm text-text-muted">
+                    This content is locked. Purchase full access to read this devotional.
+                  </p>
+                  {upgradeHref && (
+                    <a
+                      href={upgradeHref}
+                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-background shadow-md hover:bg-primary-hover transition-colors"
+                    >
+                      <Lock className="h-4 w-4" aria-hidden="true" />
+                      Purchase to Unlock
+                    </a>
+                  )}
+                </div>
               </div>
             )}
             {/* Invisible shield to block right-click on iframe area (pointer events disabled for overlay, but block selection) */}
@@ -511,21 +545,49 @@ export function ContentReader({
                 )}
               </div>
             ) : (
-              <div className="flex h-full w-full flex-1 flex-col items-center justify-center text-center">
-                <FileText className="h-16 w-16 text-text-muted/40 mb-4" aria-hidden="true" />
-                <p className="text-lg font-medium text-text-primary mb-2">Protected Document</p>
-                <p className="text-sm text-text-muted mb-6 max-w-md">
-                  This document is protected and only accessible after purchasing full access.
-                </p>
-                {upgradeHref && (
-                  <a
-                    href={upgradeHref}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-background hover:bg-primary-hover transition-colors"
-                  >
-                    <Lock className="h-4 w-4" aria-hidden="true" />
-                    Purchase to Unlock
-                  </a>
-                )}
+              <div className="relative flex h-full min-h-[380px] w-full flex-1 flex-col items-center justify-center overflow-hidden rounded-xl text-center p-8">
+                {coverUrl ? (
+                  <>
+                    <div className="absolute inset-0 rounded-xl overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={coverUrl}
+                        alt=""
+                        className="h-full w-full object-cover opacity-50 blur-[1px]"
+                        aria-hidden
+                      />
+                      <div className="absolute inset-0 bg-surface/70 backdrop-blur-[2px]" aria-hidden />
+                      <div className="absolute inset-0 bg-gradient-to-t from-surface/80 via-transparent to-surface/40" aria-hidden />
+                    </div>
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden" aria-hidden>
+                      <span className="rotate-[-18deg] select-none whitespace-nowrap text-4xl font-black tracking-widest text-text-primary/[0.12] sm:text-5xl">
+                        UNLOCK TO ACCESS
+                      </span>
+                    </div>
+                  </>
+                ) : null}
+                <div className="relative z-10 flex flex-col items-center">
+                  {coverUrl ? (
+                    <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-background/90 shadow-lg ring-1 ring-border backdrop-blur">
+                      <Lock className="h-9 w-9 text-primary" aria-hidden="true" />
+                    </div>
+                  ) : (
+                    <FileText className="h-16 w-16 text-text-muted/40 mb-4" aria-hidden="true" />
+                  )}
+                  <p className="text-lg font-semibold text-text-primary">Unlock to Access</p>
+                  <p className="mt-1 max-w-md text-sm text-text-muted">
+                    This document is locked. Purchase full access to unlock the full reader.
+                  </p>
+                  {upgradeHref && (
+                    <a
+                      href={upgradeHref}
+                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-background shadow-md hover:bg-primary-hover transition-colors"
+                    >
+                      <Lock className="h-4 w-4" aria-hidden="true" />
+                      Purchase to Unlock
+                    </a>
+                  )}
+                </div>
               </div>
             )}
           </div>

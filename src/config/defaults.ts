@@ -21,6 +21,13 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   footerDevCreditName: "S.D.",
   footerDevCreditUrl: "https://sotonye-dagogo.is-a.dev",
   footerDevCreditEnabled: true,
+  // Dynamic bundle / per-set pricing (config-driven, non-breaking fallbacks)
+  bundleEnabled: true,
+  bundlePriceMinor: 0, // 0 means fallback to defaultPriceMinor or sum of individual prices
+  bundleAccessMode: "one-time",
+  bundleDurationDays: 60,
+  allowIndividualPurchase: true,
+  durationAccessDays: 60,
 };
 
 /** Currency display helpers, config-driven with fallbacks. */

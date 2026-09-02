@@ -30,6 +30,12 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
     footerDevCreditName: initial.footerDevCreditName,
     footerDevCreditUrl: initial.footerDevCreditUrl,
     footerDevCreditEnabled: initial.footerDevCreditEnabled,
+    bundleEnabled: (initial.bundleEnabled ?? true) as boolean,
+    bundlePriceMinor: String(initial.bundlePriceMinor ?? 0),
+    bundleAccessMode: (initial.bundleAccessMode ?? initial.accessMode ?? "one-time") as AccessMode,
+    bundleDurationDays: String(initial.bundleDurationDays ?? 60),
+    allowIndividualPurchase: (initial.allowIndividualPurchase ?? true) as boolean,
+    durationAccessDays: String(initial.durationAccessDays ?? 60),
   });
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(initial.bankAccounts ?? []);
   const [saving, setSaving] = useState(false);
@@ -70,6 +76,9 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             ...form,
             defaultPriceMinor: Number(form.defaultPriceMinor) || 0,
             freePreviewDays: Number(form.freePreviewDays) || 0,
+            bundlePriceMinor: Number(form.bundlePriceMinor) || 0,
+            bundleDurationDays: Number(form.bundleDurationDays) || 60,
+            durationAccessDays: Number(form.durationAccessDays) || 60,
           },
         }),
       });
@@ -230,6 +239,35 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
           </label>
         </div>
 
+        {/* Dynamic access & pricing policy — config-driven, enables flexible client requirements */}
+        <div className="space-y-4 border-t border-border pt-4">
+          <h3 className="text-lg font-semibold text-text-primary">Access & Pricing Policy</h3>
+          <p className="text-sm text-text-muted">
+            Configure how users purchase access. Supports per-devotional, bundle (all devotionals), and time-bound variations without code changes.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-surface px-3 py-3 text-sm text-text-primary">
+              <span>Allow individual purchase<span className="block text-xs text-text-muted">Users can buy a single devotional</span></span>
+              <input type="checkbox" checked={form.allowIndividualPurchase} onChange={(e) => setForm({ ...form, allowIndividualPurchase: e.target.checked })} className="h-4 w-4 accent-primary" />
+            </label>
+            <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-surface px-3 py-3 text-sm text-text-primary">
+              <span>Enable bundle<span className="block text-xs text-text-muted">One fee for all devotionals / set</span></span>
+              <input type="checkbox" checked={form.bundleEnabled} onChange={(e) => setForm({ ...form, bundleEnabled: e.target.checked })} className="h-4 w-4 accent-primary" />
+            </label>
+            <Input name="bundlePriceMinor" type="number" min={0} step={100} label="Bundle price (minor units)" hint="Fee for all devotionals when bundle enabled (0 = use Default price or sum)" value={form.bundlePriceMinor} onChange={(e) => setForm({ ...form, bundlePriceMinor: e.target.value })} autoComplete="off" />
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-text-primary">
+              Bundle access mode
+              <select name="bundleAccessMode" value={form.bundleAccessMode} onChange={(e) => setForm({ ...form, bundleAccessMode: e.target.value as AccessMode })} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+                <option value="one-time">One-time (forever)</option>
+                <option value="monthly">Monthly (30 days)</option>
+                <option value="duration">Duration (custom days)</option>
+              </select>
+            </label>
+            <Input name="bundleDurationDays" type="number" min={1} label="Bundle duration (days)" hint="Used when bundle mode is Duration" value={form.bundleDurationDays} onChange={(e) => setForm({ ...form, bundleDurationDays: e.target.value })} autoComplete="off" />
+            <Input name="durationAccessDays" type="number" min={1} label="Duration days (individual)" hint="Days for Duration mode on individual devotionals" value={form.durationAccessDays} onChange={(e) => setForm({ ...form, durationAccessDays: e.target.value })} autoComplete="off" />
+          </div>
+        </div>
+
         <div className="space-y-3 border-t border-border pt-4">
           <h3 className="text-lg font-semibold text-text-primary">Payment Methods</h3>
           <p className="text-sm text-text-muted">At least one payment method must be enabled.</p>
@@ -352,7 +390,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             <Plus className="h-4 w-4 mr-2" /> Add Bank Account
           </Button>
           <div className="flex justify-end border-t border-border pt-4">
-            <Button type="submit" loading={savingAccounts}>
+            <Button type="button" onClick={saveBankAccounts} loading={savingAccounts}>
               Save Bank Accounts
             </Button>
           </div>
