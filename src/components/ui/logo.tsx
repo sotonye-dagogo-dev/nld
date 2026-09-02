@@ -22,7 +22,7 @@ export function Logo({ name, logoUrl, className }: LogoProps) {
     .join("");
   return (
     <span className={cn("flex items-center gap-2", className)}>
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-background">
         {initials || "NL"}
       </span>
       <span className="font-semibold text-text-primary">{name}</span>

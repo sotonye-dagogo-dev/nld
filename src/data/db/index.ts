@@ -30,10 +30,26 @@ function withTimeout<T>(promise: Promise<T>, ms: number = QUERY_TIMEOUT_MS): Pro
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`Database query timeout after ${ms}ms`)), ms);
   });
-  // Prevent unhandled rejection from the losing branch
-  promise.catch(() => {});
+  // Prevent unhandled rejection from the losing branch — also handle
+  // the postgres query promise which may reject after race with STATEMENT_TIMEOUT
+  // Use a chained catch that swallows but preserves the rejection for the winner
+  const safePromise = promise.catch((e) => {
+    // Keep for Promise.race rejection path; re-throw via a wrapped promise
+    // that will be caught by race winner if needed
+    throw e;
+  });
+  // Ensure both branches never cause unhandled
+  safePromise.catch(() => {});
   timeoutPromise.catch(() => {});
-  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer!));
+  return Promise.race([safePromise, timeoutPromise]).finally(() => clearTimeout(timer!));
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  const e = err as Record<string, unknown> | null;
+  if (!e) return false;
+  const code = typeof e.code === "string" ? e.code : "";
+  const msg = typeof e.message === "string" ? e.message.toLowerCase() : "";
+  return code === "23505" || msg.includes("duplicate key") || msg.includes("unique constraint");
 }
 
 function sleep(ms: number): Promise<void> {
@@ -63,12 +79,13 @@ function createPgClient() {
     throw new Error("DATABASE_URL is not set — cannot create DB client");
   }
   const pgClient = postgres(databaseUrl, {
-    max: 2,
+    max: 3,
     prepare: false,
     connect_timeout: CONNECT_TIMEOUT_MS / 1000,
-    idle_timeout: 20,
-    max_lifetime: 60 * 10,
+    idle_timeout: 15,
+    max_lifetime: 60 * 8,
     onnotice: () => {},
+    fetch_types: false,
     transform: {
       undefined: (val: unknown) => val,
     },
@@ -101,21 +118,28 @@ export async function queryWithTimeout<T>(
   retries = MAX_RETRIES,
   timeoutMs = QUERY_TIMEOUT_MS,
 ): Promise<T> {
-  const db = getDb();
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+    const db = getDb();
     try {
       return await withTimeout(fn(db), timeoutMs);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
 
+      // Never retry unique-constraint violations — caller must handle
+      if (isUniqueViolation(lastError)) {
+        throw lastError;
+      }
+
       const message = lastError.message.toLowerCase();
+      const code = (lastError as unknown as Record<string, unknown>).code;
       const isTimeoutish =
         message.includes("timeout") ||
         message.includes("abort") ||
         message.includes("cancel") ||
-        message.includes("57014");
+        message.includes("57014") ||
+        code === "57014";
       // Timeouts are retriable once after a pool reset (transient pooler
       // contention), but not infinitely — one retry max for timeouts.
       if (isTimeoutish) {
@@ -132,14 +156,19 @@ export async function queryWithTimeout<T>(
         message.includes("econnrefused") ||
         message.includes("enotfound") ||
         message.includes("etimedout") ||
+        message.includes("connection_ended") ||
         message.includes("connection") ||
         message.includes("socket") ||
-        message.includes("eof")
+        message.includes("eof") ||
+        message.includes("pool") ||
+        code === "CONNECTION_ENDED"
       ) {
         resetPool();
-      }
-
-      if (attempt < retries) {
+        if (attempt < retries) {
+          await sleep(RETRY_DELAY_MS * (attempt + 1));
+          continue;
+        }
+      } else if (attempt < retries) {
         await sleep(RETRY_DELAY_MS * (attempt + 1));
         continue;
       }

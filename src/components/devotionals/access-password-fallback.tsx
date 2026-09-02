@@ -112,7 +112,7 @@ export function AccessPasswordFallback({ reference, devotionalSlug }: AccessPass
             </div>
             <a
               href={`/access?slug=${encodeURIComponent(devotionalSlug)}&email=&password=${encodeURIComponent(password!)}`}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white text-center hover:bg-primary-hover"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-background text-center hover:bg-primary-hover"
             >
               Unlock now
             </a>

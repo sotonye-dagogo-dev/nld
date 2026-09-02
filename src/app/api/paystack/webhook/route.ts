@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 import { queryWithTimeout } from "@/data/db";
-import { purchases, accessGrants } from "@/data/db/schema";
+import { purchases, accessGrants, devotionals } from "@/data/db/schema";
 import { verifyWebhookSignature } from "@/integrations/paystack/client";
-import { deriveAccessPassword } from "@/lib/access";
+import { deriveAccessPassword, computeExpiry } from "@/lib/access";
 import { sendAccessEmail } from "@/integrations/resend/client";
 import { getSiteSettings } from "@/config/site";
 import { recordAudit, recordEvent } from "@/lib/audit";
@@ -14,13 +14,14 @@ export const runtime = "nodejs";
 /**
  * Paystack webhook for `charge.success`.
  *
- * Flow: verify signature over the RAW body → verify the transaction
- * server-side → flip the pending purchase to success → derive the access
- * password → create the access grant (idempotent) → email the password.
+ * Flow: verify signature over the RAW body → flip purchase to success →
+ * derive password → create grant(s) with config-driven expiry → email.
  *
- * Idempotency: keyed on paystack_reference (unique) and on
- * (devotionalId, email) for grants; email is sent only when the grant is
- * first created.
+ * Platform config drives access handling:
+ * - `accessMode` per devotional or site fallback determines expiry (forever vs time-bound)
+ * - `isBundle` purchases grant access to all devotionals
+ *
+ * Idempotency: keyed on paystack_reference (unique) and on (devotionalId, email)
  */
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   if (event.event !== "charge.success") {
-    return NextResponse.json({ ok: true }); // accept + ignore other events
+    return NextResponse.json({ ok: true });
   }
 
   const { reference, status, amount, currency, customer } = event.data;
@@ -46,18 +47,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  // Flip the pending purchase to success (idempotent upsert by reference).
   const existing = await queryWithTimeout((db) => db.select().from(purchases).where(eq(purchases.paystackReference, reference)).limit(1)).catch(() => []);
   const purchase = existing[0];
   if (!purchase) {
-    // Webhook for a purchase we never initialized — reject.
     return NextResponse.json({ ok: false }, { status: 404 });
   }
 
   if (purchase.status !== "success") {
     await queryWithTimeout((db) =>
-      db.update(purchases).set({ status: "success", updatedAt: new Date() }).where(eq(purchases.paystackReference, reference))
-    );
+      db.update(purchases).set({ status: "success", updatedAt: new Date() }).where(eq(purchases.paystackReference, reference)),
+    ).catch(() => {});
     await recordAudit({
       actor: purchase.email,
       action: "purchase.verify",
@@ -71,42 +70,122 @@ export async function POST(request: Request) {
 
   const accessPassword = deriveAccessPassword(reference);
   const email = customer.email || purchase.email;
-  const existingGrant = await queryWithTimeout((db) =>
-    db.select().from(accessGrants).where(eq(accessGrants.paystackReference, reference)).limit(1)
-  ).catch(() => []);
-  const grant = existingGrant[0];
 
-  if (grant) {
-    // Already granted (duplicate webhook / retry) — nothing more to do.
+  // Check existing grant(s) for idempotency
+  const existingGrant = await queryWithTimeout((db) =>
+    db.select().from(accessGrants).where(eq(accessGrants.paystackReference, reference)).limit(1),
+  ).catch(() => []);
+  if (existingGrant[0]) {
     return NextResponse.json({ ok: true });
   }
 
-  await queryWithTimeout((db) =>
-    db.insert(accessGrants).values({
-      devotionalId: purchase.devotionalId,
-      email,
-      paystackReference: reference,
-      accessPassword,
-      status: "active",
-    })
-  );
-  await recordAudit({
-    actor: email,
-    action: "access.grant",
-    entity: "access_grant",
-    entityId: reference,
-    after: { devotionalId: purchase.devotionalId, email },
-  });
-  await recordEvent({ eventType: "purchase.completed", slug: purchase.metadata?.slug as string | undefined, email });
-
-  // Deliver the password. If Resend fails, audit the failure so an operator
-  // can re-send; the grant itself is already recorded.
+  // Resolve settings for expiry computation
+  let siteSettings: SiteSettings | null = null;
   try {
-    const { value: settings } = await getSiteSettings();
+    const s = await getSiteSettings();
+    siteSettings = s.value;
+  } catch {
+    siteSettings = null;
+  }
+
+  const meta = (purchase.metadata ?? {}) as Record<string, unknown>;
+  const isBundle = meta.isBundle === true || meta.isBundle === "true";
+
+  if (isBundle) {
+    // Bundle: grant access to every published devotional
+    let devotionalsToGrant: { id: string; accessMode: AccessMode; title: string }[] = [];
+    try {
+      const rows = await queryWithTimeout((db) =>
+        db.select({ id: devotionals.id, accessMode: devotionals.accessMode, title: devotionals.title }).from(devotionals).where(eq(devotionals.status, "published")),
+      );
+      devotionalsToGrant = rows as typeof devotionalsToGrant;
+    } catch {
+      devotionalsToGrant = [];
+    }
+
+    for (const devo of devotionalsToGrant) {
+      const mode: AccessMode = (devo.accessMode as AccessMode) ?? siteSettings?.accessMode ?? "one-time";
+      const expiresAt = computeExpiry(mode);
+      // Check if grant already exists for this email+devotional (admin manual etc)
+      const already = await queryWithTimeout((db) =>
+        db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devo.id), eq(accessGrants.email, email))).limit(1),
+      ).catch(() => []);
+      if (already.length > 0) continue;
+      await queryWithTimeout((db) =>
+        db.insert(accessGrants).values({
+          devotionalId: devo.id,
+          email,
+          paystackReference: `${reference}__${devo.id}`,
+          accessPassword,
+          status: "active",
+          expiresAt,
+        }),
+      ).catch(() => {});
+      await recordAudit({
+        actor: email,
+        action: "access.grant",
+        entity: "access_grant",
+        entityId: `${reference}__${devo.id}`,
+        after: { devotionalId: devo.id, email, mode, expiresAt: expiresAt?.toISOString() ?? null },
+      });
+    }
+    // Also keep bundle anchor grant for backward compatibility
+    const bundleMode: AccessMode = siteSettings?.accessMode ?? "one-time";
+    const bundleExpiry = computeExpiry(bundleMode);
+    await queryWithTimeout((db) =>
+      db.insert(accessGrants).values({
+        devotionalId: purchase.devotionalId,
+        email,
+        paystackReference: reference,
+        accessPassword,
+        status: "active",
+        expiresAt: bundleExpiry,
+      }),
+    ).catch(() => {});
+
+    await recordEvent({ eventType: "purchase.completed", slug: "all", email });
+  } else {
+    // Single devotional: compute expiry from devotional's accessMode or site fallback
+    let devotionalMode: AccessMode | null = null;
+    try {
+      const rows = await queryWithTimeout((db) =>
+        db.select({ accessMode: devotionals.accessMode }).from(devotionals).where(eq(devotionals.id, purchase.devotionalId)).limit(1),
+      );
+      devotionalMode = (rows[0]?.accessMode as AccessMode) ?? null;
+    } catch {
+      devotionalMode = null;
+    }
+    const effectiveMode: AccessMode = devotionalMode ?? siteSettings?.accessMode ?? "one-time";
+    const expiresAt = computeExpiry(effectiveMode);
+
+    await queryWithTimeout((db) =>
+      db.insert(accessGrants).values({
+        devotionalId: purchase.devotionalId,
+        email,
+        paystackReference: reference,
+        accessPassword,
+        status: "active",
+        expiresAt,
+      }),
+    ).catch(() => {});
+    await recordAudit({
+      actor: email,
+      action: "access.grant",
+      entity: "access_grant",
+      entityId: reference,
+      after: { devotionalId: purchase.devotionalId, email, mode: effectiveMode, expiresAt: expiresAt?.toISOString() ?? null },
+    });
+    await recordEvent({ eventType: "purchase.completed", slug: purchase.metadata?.slug as string | undefined, email });
+  }
+
+  // Deliver the password (best-effort)
+  try {
+    const settings = siteSettings ?? (await getSiteSettings()).value;
+    const devotionalTitle = (purchase.metadata?.title as string | undefined) ?? (isBundle ? "all devotionals" : "your devotional");
     await sendAccessEmail({
       to: email,
       platformName: settings.platformName,
-      devotionalTitle: purchase.metadata?.title as string | undefined ?? "your devotional",
+      devotionalTitle,
       accessPassword,
       accessUrl: `${new URL(request.url).origin}/access`,
       supportEmail: settings.supportEmail,

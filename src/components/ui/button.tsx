@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 // call sites pass a variant, never bespoke styling.
 
 const VARIANTS = {
-  primary: "bg-primary text-white hover:bg-primary-hover",
+  primary: "bg-primary text-background hover:bg-primary-hover",
   secondary: "border border-border bg-surface text-text-primary hover:bg-background",
   destructive: "bg-danger text-white hover:opacity-90",
   ghost: "text-text-muted hover:bg-background",

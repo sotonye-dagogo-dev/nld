@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 
 import { queryWithTimeout } from "@/data/db";
 import { bankTransfers, accessGrants, devotionals, bankAccounts } from "@/data/db/schema";
-import { deriveAccessPassword } from "@/lib/access";
+import { deriveAccessPassword, computeExpiry } from "@/lib/access";
 import { requireAdmin } from "@/lib/admin-auth";
 import { recordAudit, recordEvent } from "@/lib/audit";
 import { getSiteSettings } from "@/config/site";
@@ -89,6 +89,10 @@ export async function POST(request: Request) {
     // Derive access password from transfer reference (consistent with Paystack approach)
     const accessPassword = deriveAccessPassword(`BT-${transfer.reference}-${transfer.id}`);
 
+    // Platform-config-driven expiry (devotional mode → site fallback)
+    const effectiveMode: AccessMode = (devotional.accessMode as AccessMode) ?? settings.accessMode ?? "one-time";
+    const expiresAt = computeExpiry(effectiveMode);
+
     // Create access grant (idempotent)
     const existingGrant = await queryWithTimeout((db) =>
       db
@@ -106,8 +110,46 @@ export async function POST(request: Request) {
           paystackReference: `BT-${transfer.reference}-${transfer.id}`,
           accessPassword,
           status: "active",
+          expiresAt,
         })
       );
+    } else if (existingGrant[0].expiresAt == null && expiresAt != null) {
+      // Update expiry if grant was forever but now mode is time-bound
+      await queryWithTimeout((db) =>
+        db.update(accessGrants).set({ expiresAt }).where(eq(accessGrants.id, existingGrant[0].id))
+      ).catch(() => {});
+    }
+
+    // Bundle detection: if amount equals sum of all purchasables, grant all
+    try {
+      const allPub = await queryWithTimeout((db) =>
+        db.select({ id: devotionals.id, slug: devotionals.slug, accessMode: devotionals.accessMode, priceMinor: devotionals.priceMinor }).from(devotionals).where(eq(devotionals.status, "published")),
+      );
+      const totalBundle = allPub.reduce((s, d) => s + (d.priceMinor as number), 0);
+      const isBundleTransfer = allPub.length > 1 && transfer.amountMinor === totalBundle;
+      if (isBundleTransfer) {
+        for (const devo of allPub) {
+          if (devo.id === devotional.id) continue; // already handled
+          const mode: AccessMode = (devo.accessMode as AccessMode) ?? settings.accessMode ?? "one-time";
+          const exp = computeExpiry(mode);
+          const exists = await queryWithTimeout((db) =>
+            db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devo.id), eq(accessGrants.email, transfer.email))).limit(1),
+          ).catch(() => []);
+          if (exists.length > 0) continue;
+          await queryWithTimeout((db) =>
+            db.insert(accessGrants).values({
+              devotionalId: devo.id,
+              email: transfer.email,
+              paystackReference: `BT-${transfer.reference}-${transfer.id}__${devo.id}`,
+              accessPassword,
+              status: "active",
+              expiresAt: exp,
+            }),
+          ).catch(() => {});
+        }
+      }
+    } catch {
+      // best-effort bundle grant
     }
 
     // Update transfer status
@@ -223,4 +265,5 @@ interface Devotional {
   id: string;
   slug: string;
   title: string;
+  accessMode?: AccessMode;
 }

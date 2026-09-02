@@ -92,7 +92,7 @@ export default async function DevotionalPage({
                 <Link
                   href={`/purchase/${devotional.slug}`}
                   aria-label={`Purchase access to ${devotional.title}`}
-                  className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
+                  className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-background hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
                 >
                   Purchase access
                 </Link>

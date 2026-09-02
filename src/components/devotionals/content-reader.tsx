@@ -162,7 +162,7 @@ export function ContentReader({
           {isTruncated && !hasFullAccess && upgradeHref && (
             <a
               href={upgradeHref}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-background hover:bg-primary-hover transition-colors"
             >
               <Lock className="h-4 w-4" aria-hidden="true" />
               Unlock Full Content
@@ -216,7 +216,7 @@ export function ContentReader({
                 {upgradeHref && (
                   <a
                     href={upgradeHref}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-background hover:bg-primary-hover transition-colors"
                   >
                     <Lock className="h-4 w-4" aria-hidden="true" />
                     Purchase to Unlock Full Content
@@ -244,7 +244,7 @@ export function ContentReader({
                 {upgradeHref && (
                   <a
                     href={upgradeHref}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-background hover:bg-primary-hover transition-colors"
                   >
                     <Lock className="h-4 w-4" aria-hidden="true" />
                     Purchase to Unlock Full Content
