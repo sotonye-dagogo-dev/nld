@@ -55,17 +55,8 @@ export async function GET(request: Request) {
   }
 
   if (transfer.status === "verified") {
-    // Check if access grant exists
-    let accessPassword: string | null = null;
-    const existingGrant = await queryWithTimeout((db) =>
-      db.select({ password: accessGrants.accessPassword }).from(accessGrants).where(eq(accessGrants.paystackReference, `BT-${transfer.reference}-${transfer.id}`)).limit(1)
-    );
-    if (existingGrant.length > 0) {
-      accessPassword = existingGrant[0].password;
-    } else {
-      // Derive it (should not happen if verified correctly)
-      accessPassword = deriveAccessPassword(`BT-${transfer.reference}-${transfer.id}`);
-    }
+    // Derive deterministically from reference — no DB column needed
+    const accessPassword = deriveAccessPassword(`BT-${transfer.reference}-${transfer.id}`);
 
     return NextResponse.json({
       ok: true,

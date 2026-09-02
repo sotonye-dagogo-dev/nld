@@ -147,12 +147,17 @@ interface PurchaseRecord {
   updatedAt: Date;
 }
 
-/** Access grant delivered by email after a verified payment. */
+/** Access grant delivered by email after a verified payment.
+ *  `accessPassword` is NOT stored — it is derived deterministically from
+ *  `paystackReference` via HMAC (see src/lib/access.ts derivePasswordForGrant).
+ *  The grant row holds only the reference; UI derives the password on demand
+ *  to maintain viewing/copying flow without a DB column.
+ */
 interface AccessGrant {
   id: string;
   devotionalId: string;
   email: string;
-  accessPassword: string; // derived from paystack reference (HMAC), not stored as plaintext secret source
+  paystackReference: string;
   status: AccessStatus;
   expiresAt: Date | null;
   grantedAt: Date;

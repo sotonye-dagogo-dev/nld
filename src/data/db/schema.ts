@@ -109,6 +109,9 @@ export const purchases = pgTable(
 
 // ---------------------------------------------------------------------------
 // access_grants — access delivered by email after verified payment
+// No `access_password` column — password is derived deterministically from
+// `paystack_reference` via HMAC (see src/lib/access.ts). This keeps the
+// viewing/copying flow without persisting a separate secret per grant.
 // ---------------------------------------------------------------------------
 export const accessGrants = pgTable(
   "access_grants",
@@ -119,7 +122,6 @@ export const accessGrants = pgTable(
       .references(() => devotionals.id, { onDelete: "restrict" }),
     email: text("email").notNull(),
     paystackReference: text("paystack_reference").notNull(),
-    accessPassword: text("access_password").notNull(),
     status: accessStatusEnum("status").notNull().default("active"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),

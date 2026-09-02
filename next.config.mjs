@@ -53,10 +53,11 @@ const nextConfig = {
     const csp = [
       "default-src 'self'",
       "img-src 'self' data: blob: https: https://*.supabase.co https://*.supabase.in https://*.gstatic.com https://*.googleusercontent.com",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in https:",
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in https: https://cdn.jsdelivr.net blob:",
       "frame-src 'self' https://*.supabase.co https://*.supabase.in https:",
-      "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net blob:",
+      "worker-src 'self' blob: https://cdn.jsdelivr.net",
       "font-src 'self' data:",
     ].join("; ");
 

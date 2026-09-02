@@ -29,6 +29,17 @@ export function deriveAccessPassword(paystackReference: string): string {
   return out;
 }
 
+/** Base reference stripping bundle/lazy suffixes (e.g. NL-xxx__devId -> NL-xxx). */
+export function baseReference(ref: string): string {
+  const idx = ref.indexOf("__");
+  return idx === -1 ? ref : ref.slice(0, idx);
+}
+
+/** Derive password for a stored grant's paystack_reference (handles suffix variants). */
+export function derivePasswordForGrant(paystackReference: string): string {
+  return deriveAccessPassword(baseReference(paystackReference));
+}
+
 /**
  * Compute expiry for an access grant based on the platform/devotional
  * accessMode configuration. Returns null for forever (one-time), or a Date
