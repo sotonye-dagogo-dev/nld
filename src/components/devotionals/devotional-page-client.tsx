@@ -7,6 +7,7 @@ import { AccessGate } from "@/components/devotionals/access-gate";
 import { AccessPasswordFallback } from "@/components/devotionals/access-password-fallback";
 import { ContentReader, MAX_PREVIEW_CHARS } from "@/components/devotionals/content-reader";
 import { DevotionalPurchaseModal } from "@/components/devotionals/devotional-purchase-modal";
+import { LockedCoverOverlay } from "@/components/devotionals/locked-cover-overlay";
 import { formatPrice } from "@/config/defaults";
 
 interface Props {
@@ -21,6 +22,7 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
   const [unlockedDays, setUnlockedDays] = useState<DevotionalDay[] | null>(null);
 
   const visibleDays = days.slice(0, previewDays);
+  const lockedDays = days.slice(previewDays);
   const hasAccessControl = devotional.priceMinor > 0 && days.length > previewDays;
   const isUnlocked = !!unlockedDays;
 
@@ -75,6 +77,44 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
               </article>
             ))}
           </section>
+
+          {/* Locked days — blurred preview with cover + watermark unlock (shown until unlocked) */}
+          {hasAccessControl && !isUnlocked && lockedDays.length > 0 && (
+            <section className="space-y-6" aria-label="Locked devotional days">
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <p className="text-xs font-semibold tracking-widest text-text-muted uppercase">
+                  {lockedDays.length} more day{lockedDays.length === 1 ? "" : "s"} — unlock to read
+                </p>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              {lockedDays.map((day) => (
+                <LockedCoverOverlay
+                  key={day.id}
+                  coverUrl={devotional.coverUrl}
+                  title={`Day ${day.dayNumber} — ${day.title}`}
+                  subtitle={`${lockedDays.length} day${lockedDays.length === 1 ? "" : "s"} remaining • Purchase access or enter your access code`}
+                  unlockHref={settings.paymentsEnabled ? `/purchase/${devotional.slug}` : "#access-gate"}
+                  unlockLabel={settings.paymentsEnabled ? "Purchase to Unlock" : "Enter Access Code"}
+                >
+                  <article className="rounded-xl border border-border bg-surface p-6">
+                    <h2 className="mb-2 text-xl font-semibold text-text-primary">
+                      Day {day.dayNumber} — {day.title}
+                    </h2>
+                    <div className="prose-devotional">
+                      {day.content.slice(0, 400)}
+                      {day.content.length > 400 ? "…" : ""}
+                    </div>
+                    {day.contentFileUrl && (
+                      <div className="mt-4 rounded-lg border border-border bg-background p-4 text-sm text-text-muted">
+                        {day.contentFileUrl.split("/").pop()} — file content
+                      </div>
+                    )}
+                  </article>
+                </LockedCoverOverlay>
+              ))}
+            </section>
+          )}
 
           {/* Render unlocked locked-days directly with full access */}
           {isUnlocked && unlockedDays!.length > 0 && (

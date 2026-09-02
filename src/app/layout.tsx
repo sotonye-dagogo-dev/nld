@@ -52,6 +52,23 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Early non-blocking asset protection — runs before hydration only if admin-enabled; <1ms */}
+        {settings.antiScreenshotEnabled && (
+          <>
+            <style
+              dangerouslySetInnerHTML={{
+                __html: `html[data-protected="true"]{ -webkit-user-select:none;user-select:none;-webkit-touch-callout:none }html.screenshot-blur body{filter:blur(18px);transition:filter 80ms ease-out}@media print{html[data-protected="true"] body{display:none}html[data-protected="true"]::after{content:"Printing disabled for protected content";display:block;text-align:center;padding:4rem 2rem;color:#64748b}}`,
+              }}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `(function(){try{var d=document;var h=document.documentElement;var block=function(e){var t=e.target;if(t&&t.closest&&t.closest("[data-allow-select]"))return;e.preventDefault()};d.addEventListener("contextmenu",block,{capture:true});d.addEventListener("copy",block,{capture:true});d.addEventListener("cut",block,{capture:true});d.addEventListener("dragstart",block,{capture:true});d.addEventListener("selectstart",block,{capture:true});d.addEventListener("keydown",function(e){var k=(e.key||"").toLowerCase();var m=e.ctrlKey||e.metaKey;if(k==="f12"||(m&&["s","p","c","u","a"].indexOf(k)>-1))e.preventDefault();if(k==="printscreen"){h.classList.add("screenshot-blur");setTimeout(function(){h.classList.remove("screenshot-blur")},800)}} ,{capture:true});d.addEventListener("visibilitychange",function(){if(d.visibilityState==="hidden")h.classList.add("screenshot-blur");else setTimeout(function(){h.classList.remove("screenshot-blur")},400)});h.setAttribute("data-protected","true")}catch(e){}})();`,
+              }}
+            />
+          </>
+        )}
+      </head>
       <body>
         <ToastProvider>
           <ErrorBoundaryProvider>

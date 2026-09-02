@@ -247,3 +247,24 @@ Fixed the laggy SPA routing and analytics navigation, rebuilt the secure viewer 
 **Next Sprint Focus:**
 Live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e for Paystack + bank transfer) + browser pass over viewer fullscreen/overlay and Purchase/Unlock modals.
 
+---
+
+## 2026-09-02 — Merge: reader lock overlay (cover + watermark + blur) on top of upstream
+
+**Summary:**
+Merged local reader-lock work (stashed before pull) on top of 12 upstream commits that already delivered the secure viewer overhaul and routing fixes. Resolved by keeping upstream's superior ContentReader/AntiScreenshot and adding the missing LockedCoverOverlay feature for prose locked days, plus merging the early pre-hydration deterrent script into the new layout.
+
+**Completed:**
+- Stash → pull --ff-only (12 commits) → stash apply merge; resolved per-file via checkout --theirs/--ours
+- Kept upstream ContentReader (pdfjs-dist, zoom/page/expand, useProtectionBlur) and AntiScreenshot (blank overlay, getDisplayMedia hijack) — supersede stashed simpler versions
+- Added `LockedCoverOverlay` (src/components/devotionals/locked-cover-overlay.tsx) and integrated into `DevotionalPageClient` — lockedDays now show as blurred cards with cover + tiled watermark + unlock CTA when not unlocked (previously hidden)
+- Merged `src/app/layout.tsx` early inline style/script (gated by antiScreenshotEnabled) with upstream ClientNav + withLayoutTimeout
+- Globals: merged `.protected-content` / `.screenshot-blur` rules
+
+**Key Changes:**
+- Locked prose content now has visual deterrent (blur + cover) consistent with locked PDF/DOCX viewer; true protection remains server-side via `/api/devotionals/[slug]/unlock`
+- Layout now has both resilient nav loading and pre-hydration protection
+
+**Next Sprint Focus:**
+Verify in production cover overlay and lockedDays blur, browser pass over deterrent timing, then live-key verification.
+

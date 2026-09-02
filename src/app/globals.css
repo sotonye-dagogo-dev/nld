@@ -162,6 +162,43 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Asset-protection — applied synchronously via AntiScreenshot[data-protected] + .protected-content */
+.protected-content {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.protected-content img,
+.protected-content iframe,
+.protected-content video {
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+.protected-content p,
+.protected-content div,
+.protected-content article {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Screenshot deterrent — activated on PrintScreen / visibilitychange, non-blocking blur */
+.screenshot-blur .protected-content {
+  filter: blur(18px);
+  transition: filter 80ms ease-out;
+}
+@media print {
+  .protected-content {
+    display: none !important;
+  }
+  body::after {
+    content: "Printing is disabled for protected content.";
+    display: block;
+    text-align: center;
+    padding: 4rem 2rem;
+    font-size: 1rem;
+    color: #64748b;
+  }
+}
+
 /* Focus visible for accessibility */
 .focus-visible-ring {
   @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background;
