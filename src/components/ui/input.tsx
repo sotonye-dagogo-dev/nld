@@ -36,9 +36,9 @@ export function Input({ label, hint, error, className, id, showPasswordToggle, t
           autoComplete={autoComplete}
           aria-invalid={Boolean(error)}
           className={cn(
-            "rounded-lg border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+            "w-full rounded-lg border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
             isPasswordField ? "pr-12" : "pr-3",
-            error ? "border-danger" : "border-border",
+            error ? "border-danger focus-visible:ring-danger" : "border-border",
             className,
           )}
           {...rest}

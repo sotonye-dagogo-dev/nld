@@ -12,7 +12,7 @@ import { isEmail } from "@/lib/utils";
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
-  slug: z.string().min(1).max(200),
+  slug: z.string().max(200),
   email: z.string().email(),
   password: z.string().min(1).max(64),
 });
@@ -28,9 +28,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "A valid email address is required." }, { status: 400 });
   }
 
+  // Auto-detect mode: slug empty → scan all grants for email and match password
+  const trimmedSlug = payload.slug.trim();
+  if (!trimmedSlug) {
+    const allGrants = await queryWithTimeout((db) =>
+      db.select().from(accessGrants).where(eq(accessGrants.email, payload.email))
+    ).catch(() => []);
+    const activeGrants = allGrants.filter((g) => g.status === "active" && (!g.expiresAt || g.expiresAt > new Date()));
+    for (const g of activeGrants) {
+      if (verifyAccessPassword(payload.password, g.accessPassword)) {
+        const devotionalRows = await queryWithTimeout((db) => db.select().from(devotionals).where(eq(devotionals.id, g.devotionalId)).limit(1)).catch(() => []);
+        const devotional = devotionalRows[0] as unknown as Devotional | undefined;
+        const days = devotional ? await queryWithTimeout((db) => db.select({ n: devotionalDays.dayNumber }).from(devotionalDays).where(and(eq(devotionalDays.devotionalId, devotional.id), eq(devotionalDays.published, true)))).then((r) => r.length).catch(() => 0) : 0;
+        if (devotional) {
+          await recordAudit({ actor: payload.email, action: "access.verify", entity: "access_grant", entityId: g.id, metadata: { result: "ok", autoDetect: true } });
+          await recordEvent({ eventType: "access.used", slug: devotional.slug, email: payload.email });
+          return NextResponse.json({ ok: true, devotional: devotional.title, days, matchedSlug: devotional.slug });
+        }
+      }
+    }
+    return NextResponse.json({ ok: false, error: "No matching devotional found for that email and password. Please select a devotional." }, { status: 403 });
+  }
+
   let devotional: Devotional | null = null;
   try {
-    devotional = await getDevotionalBySlug(payload.slug);
+    devotional = await getDevotionalBySlug(trimmedSlug);
   } catch {
     return NextResponse.json(
       { ok: false, error: "Service temporarily unavailable. Please try again shortly." },

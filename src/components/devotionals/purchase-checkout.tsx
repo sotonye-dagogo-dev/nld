@@ -38,7 +38,8 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [generalError, setGeneralError] = useState<string | null>(null);
   const [method, setMethod] = useState<"paystack" | "bank_transfer">(
     settings.paystackEnabled ? "paystack" : "bank_transfer"
   );
@@ -54,7 +55,12 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
 
   async function startPaystackPayment(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setFieldErrors({});
+    setGeneralError(null);
+    if (!email.trim()) {
+      setFieldErrors({ email: "Email is required." });
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/paystack/init", {
@@ -64,12 +70,14 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
       });
       const data = (await res.json()) as { ok: boolean; authorizationUrl?: string; error?: string };
       if (!res.ok || !data.ok || !data.authorizationUrl) {
-        setError(data.error ?? "Could not start payment. Please try again.");
+        const msg = data.error ?? "Could not start payment. Please try again.";
+        if (msg.toLowerCase().includes("email")) setFieldErrors({ email: msg });
+        else setGeneralError(msg);
         return;
       }
       router.push(data.authorizationUrl);
     } catch {
-      setError("Network error while starting payment. Please try again.");
+      setGeneralError("Network error while starting payment. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -79,36 +87,31 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      setError("File size must be less than 10MB.");
+      setFieldErrors({ proofFile: "File size must be less than 10MB." });
       return;
     }
     const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     if (!allowedTypes.includes(file.type)) {
-      setError("Please upload an image (JPG, PNG, WebP) or PDF.");
+      setFieldErrors({ proofFile: "Please upload an image (JPG, PNG, WebP) or PDF." });
       return;
     }
     setProofFile(file);
-    setError(null);
+    setFieldErrors({});
+    setGeneralError(null);
   }
 
   async function submitBankTransfer(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setFieldErrors({});
+    setGeneralError(null);
 
-    if (!email.trim()) {
-      setError("Email address is required.");
-      return;
-    }
-    if (!bankAccountId) {
-      setError("Please select a bank account.");
-      return;
-    }
-    if (!transferReference.trim()) {
-      setError("Transfer reference is required.");
-      return;
-    }
-    if (!proofFile) {
-      setError("Proof of payment is required.");
+    const errs: Record<string, string> = {};
+    if (!email.trim()) errs.email = "Email address is required.";
+    if (!bankAccountId) errs.bankAccountId = "Please select a bank account.";
+    if (!transferReference.trim()) errs.transferReference = "Transfer reference is required.";
+    if (!proofFile) errs.proofFile = "Proof of payment is required.";
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
 
@@ -118,15 +121,17 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
     try {
 // Upload proof file to storage
       const formData = new FormData();
-      formData.append("file", proofFile);
+      formData.append("file", proofFile as File);
 
       const uploadRes = await fetch("/api/bank-transfer/upload-proof", {
         method: "POST",
         body: formData,
       });
-const uploadData = await uploadRes.json();
+ const uploadData = await uploadRes.json();
       if (!uploadRes.ok || !uploadData.ok) {
-        setError(uploadData.error ?? "Failed to upload proof of payment.");
+        const msg = uploadData.error ?? "Failed to upload proof of payment.";
+        if (msg.toLowerCase().includes("proof") || msg.toLowerCase().includes("file")) setFieldErrors({ proofFile: msg });
+        else setGeneralError(msg);
         return;
       }
 
@@ -149,7 +154,12 @@ const uploadData = await uploadRes.json();
       });
       const data = (await res.json()) as { ok: boolean; transferId?: string; error?: string };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Could not submit transfer. Please try again.");
+        const msg = data.error ?? "Could not submit transfer. Please try again.";
+        const low = msg.toLowerCase();
+        if (low.includes("email")) setFieldErrors({ email: msg });
+        else if (low.includes("bank account")) setFieldErrors({ bankAccountId: msg });
+        else if (low.includes("reference")) setFieldErrors({ transferReference: msg });
+        else setGeneralError(msg);
         return;
       }
 
@@ -157,7 +167,7 @@ const uploadData = await uploadRes.json();
       setSubmitted(true);
       toast("Proof of payment submitted! We'll verify and email your access password.", "success");
     } catch {
-      setError("Network error while submitting. Please try again.");
+      setGeneralError("Network error while submitting. Please try again.");
     } finally {
       setLoading(false);
       setUploadProgress(0);
@@ -251,8 +261,15 @@ const uploadData = await uploadRes.json();
         </div>
       )}
 
+      {generalError && (
+        <div className="flex items-center gap-2 text-sm text-danger bg-danger/5 p-3 rounded-lg mb-4" role="alert">
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+          <span>{generalError}</span>
+        </div>
+      )}
+
       {method === "paystack" && (
-        <form onSubmit={startPaystackPayment} className="space-y-4">
+        <form onSubmit={startPaystackPayment} className="space-y-4" noValidate>
           <Input
             name="email"
             type="email"
@@ -262,7 +279,7 @@ const uploadData = await uploadRes.json();
             hint="We send your access password to this address."
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            error={error ?? undefined}
+            error={fieldErrors.email}
           />
           <Button type="submit" loading={loading} className="w-full">
             Pay with Paystack
@@ -271,7 +288,7 @@ const uploadData = await uploadRes.json();
       )}
 
       {method === "bank_transfer" && !submitted && (
-        <form onSubmit={submitBankTransfer} className="space-y-4">
+        <form onSubmit={submitBankTransfer} className="space-y-4" noValidate>
           <Input
             name="email"
             type="email"
@@ -281,7 +298,7 @@ const uploadData = await uploadRes.json();
             hint="We send your access password to this address after verification."
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            error={error ?? undefined}
+            error={fieldErrors.email}
           />
           <div className="space-y-3">
             <label className="block text-sm font-medium text-text-primary">
@@ -290,7 +307,7 @@ const uploadData = await uploadRes.json();
                 required
                 value={bankAccountId}
                 onChange={(e) => setBankAccountId(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className={cn("mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary", fieldErrors.bankAccountId ? "border-danger" : "border-border")}
               >
                 <option value="">Choose a bank account</option>
                 {activeBankAccounts.map((acc) => (
@@ -299,6 +316,7 @@ const uploadData = await uploadRes.json();
                   </option>
                 ))}
               </select>
+              {fieldErrors.bankAccountId && <p className="text-xs text-danger" role="alert">{fieldErrors.bankAccountId}</p>}
             </label>
 
             {bankAccountId && (
@@ -361,7 +379,7 @@ const uploadData = await uploadRes.json();
             hint="The reference from your bank transfer receipt"
             value={transferReference}
             onChange={(e) => setTransferReference(e.target.value)}
-            error={error ?? undefined}
+            error={fieldErrors.transferReference}
           />
 
           <div className="space-y-2">
@@ -371,9 +389,10 @@ const uploadData = await uploadRes.json();
                 type="file"
                 accept="image/jpeg,image/png,image/webp,application/pdf"
                 onChange={handleProofUpload}
-                className="mt-1 w-full text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-background hover:file:bg-primary-hover"
+                className={cn("mt-1 w-full text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-background hover:file:bg-primary-hover", fieldErrors.proofFile && "ring-1 ring-danger rounded-lg")}
               />
             </label>
+            {fieldErrors.proofFile && <p className="text-xs text-danger" role="alert">{fieldErrors.proofFile}</p>}
             {proofFile && (
               <div className="flex items-center gap-2 text-sm text-text-muted">
                 <CheckCircle className="h-4 w-4 text-success" />
