@@ -155,7 +155,7 @@ export function EmailTemplateEditor({ templates }: { templates: EmailTemplate[] 
             onClick={() => selectTemplate(t.key)}
             className={
               t.key === selectedKey
-                ? "rounded-lg bg-primary px-3 py-1.5 text-sm text-white"
+                ? "rounded-lg bg-primary px-3 py-1.5 text-sm text-background"
                 : "rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text-muted hover:bg-background"
             }
           >
@@ -194,7 +194,7 @@ export function EmailTemplateEditor({ templates }: { templates: EmailTemplate[] 
                     onClick={() => setMode(m)}
                     className={
                       mode === m
-                        ? "rounded-md bg-primary px-3 py-1 text-xs text-white"
+                        ? "rounded-md bg-primary px-3 py-1 text-xs text-background"
                         : "rounded-md px-3 py-1 text-xs text-text-muted hover:bg-background"
                     }
                   >

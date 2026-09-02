@@ -39,7 +39,7 @@ export function Pagination({
     cn(
       "inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm",
       active
-        ? "bg-primary text-white"
+        ? "bg-primary text-background"
         : "border border-border bg-surface text-text-muted hover:bg-background hover:text-text-primary",
     );
 
