@@ -2,8 +2,8 @@
 
 > **Metadata**
 >
-> - last-updated-by: fix-build
-> - last-verified-against-code: 2026-09-01
+> - last-updated-by: execute-feature
+> - last-verified-against-code: 2026-09-02
 > - staleness-policy: this file is overwritten every session — always current
 
 > **Overview:** Tracks work that is currently in progress but not yet complete. Written _before_ starting risky multi-step work, cleared on clean completion. This is the first file `resume-session.md` reads on interruption — it is the single source of truth for "what was half-done."
@@ -14,29 +14,25 @@
 
 **Status:** Complete — cleared on clean completion.
 
-**What was completed (this session — fix-build 2026-09-01 Session 11):**
-- Diagnosed CSP `img-src` block for `https://encrypted-tbn0.gstatic.com` + RSC `digest: '3220325878'` Server Components render error
-- Fixed `next.config.mjs` (images.remotePatterns wide + CSP `img-src https:` + google/gstatic allow)
-- Fixed `src/components/devotionals/devotional-card.tsx` (unoptimized for non-supabase hosts)
-- Fixed `src/app/devotionals/[slug]/page.tsx` generateMetadata try/catch
-- Verified: tsc clean, build 23/23, lint clean, vitest 54/55 (1 pre-existing locale)
-- Logged repair-system.md and session-log.md Session 11; sync-context drift check passed (no repo-map rewrite needed)
+**What was completed (this session — execute-feature 2026-09-02 Session 12: routing lag + secure viewer overhaul + protection):**
+- Routing lag & analytics navigation: fixed root layout DB blocking with withLayoutTimeout(2500ms), resilient analytics partial-data (only hard-fail when all 7 queries null), added src/app/loading.tsx + src/app/admin/(panel)/loading.tsx skeletons, fixed admin panel double-section wrapper, verified middleware cheap redirect + SW bypass for /admin
+- Secure viewer: rewrote src/components/devotionals/content-reader.tsx — full width/height flex-1 (viewerHeight 480/600 ↔ 85vh + fixed fullscreen), expand/collapse button now toggles height (was toggling text truncation only), zoom 0.5–3x with out/in/reset (transform scale), page counter input with prev/next + setCurrentPage clamping (DOCX paginated by 1800 chars, PDF hash page/zoom), toolbar responsive, height transition
+- Content protection: new useProtectionBlur hook in ContentReader + enhanced AntiScreenshot — blank overlay on visibilitychange/blur/focus/pagehide/beforeprint/PrintScreen/Ctrl+P/Cmd+Shift+4/F12 and getDisplayMedia hijack (throws + 2.5–4s overlay), covers normal view and fullscreen, invisible wrapper when hidden; select-none + contextmenu/copy/cut/drag blocked
+- Build green, tests 55/55
 
 **Files affected:**
-- Modified: `next.config.mjs`, `src/components/devotionals/devotional-card.tsx`, `src/app/devotionals/[slug]/page.tsx`
-- Docs: `ai-system/repair-system.md`, `ai-system/checkpoints/session-log.md`
+- Modified: `src/app/layout.tsx`, `src/app/admin/(panel)/layout.tsx`, `src/app/admin/(panel)/analytics/page.tsx`, `src/components/devotionals/content-reader.tsx`, `src/components/devotionals/anti-screenshot.tsx`, `next.config.mjs` (no change, verified), `ai-system/*` docs
+- New: `src/app/loading.tsx`, `src/app/admin/(panel)/loading.tsx`
 
 **QA Gate Results:**
-- Build: PASS
+- Build: PASS (23/23 routes, no RSC digest)
 - TypeCheck: PASS
-- Lint: PASS
-- Tests: 54/55 PASS (1 pre-existing analytics locale failure)
-- CSP: external gstatic images now allowed; RSC digest resolved
+- Tests: 55/55 PASS
+- Manual: viewer height fills container, expand/collapse toggles 85vh, zoom 50–300%, page input works, overlay appears on blur/PrintScreen/getDisplayMedia
 
 ---
 
 ## Next up (queued in `planning/task-queue.md`):
-1. Verify in production that gstatic cover loads and digest gone; monitor for further external CDNs
-2. Prior fix-build retention: DB pool timeouts (Session 10) + purchase CTA header (Session 10) remain active
-3. Live-key verification pass with real Paystack/Cloudflare/Supabase keys
-4. Deploy Cloudflare Worker + Vercel env sync as needed
+1. Live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e for Paystack + bank transfer)
+2. Browser pass over viewer (fullscreen + overlay), analytics nav, and Purchase/Unlock modals (ClientNav)
+3. Consider DOCX server-side conversion (mammoth) if full rendering required

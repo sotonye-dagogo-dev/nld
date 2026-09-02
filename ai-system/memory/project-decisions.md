@@ -1,8 +1,8 @@
 # Project Decisions
 
 > **Metadata**
-> - last-updated-by: update-ai-system (post-session 7)
-> - last-verified-against-code: 2026-08-24
+> - last-updated-by: update-ai-system (post-session 12)
+> - last-verified-against-code: 2026-09-02
 > - staleness-policy: each entry has its own staleness — check supersedes links
 
 > **Overview:** Log of significant architectural, technical, and product decisions. Agents consult this before proposing changes to avoid contradicting prior reasoning. Uses supersedes/superseded-by links so contradictory entries are explicitly resolved rather than both appearing equally valid.
@@ -322,3 +322,65 @@ Cloudflare + MailChannels is the only option that is completely free, unlimited,
 - Worker URL (`CLOUDFLARE_EMAIL_WORKER_URL`) and secret (`CLOUDFLARE_EMAIL_WORKER_SECRET`) in Vercel env vars
 - Templates, variables, admin editor, preview — all unchanged
 - Resend SMTP/API remains as a tested fallback
+---
+
+### Analytics resilience + layout timeout for perceived performance
+
+**Decision:** Analytics page renders partial data (only hard-fails when all 7 queries miss) and the root layout races nav DB calls with a 2500ms fallback; `loading.tsx` skeletons exist for root and `admin/(panel)` so route transitions feel instant.
+**Date:** 2026-09-02
+**Made by:** execute-feature (post-session 12)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+One flaky pooler query was blanking the whole analytics page with "Check DATABASE_URL" even when 6/7 queries succeeded; the root layout awaiting devotionals on every request made every navigation feel laggy.
+
+**Alternatives Considered:**
+- Keep full ErrorState on any null — rejected: over-fragile.
+- Await layout DB without timeout — rejected: blocked TTFB.
+
+**Implications:**
+- New aggregation pages must follow partial-data pattern.
+- Any new layout nav data must go through withLayoutTimeout or equivalent.
+
+---
+
+### Blank-overlay content protection for screenshots/capture/window loss
+
+**Decision:** Best-effort deterrence with blank overlay on `visibilitychange`/`blur`/`pagehide`/`beforeprint`/`PrintScreen`/`Ctrl+P`/`Cmd+Shift+3|4|5`/`F12` and a `navigator.mediaDevices.getDisplayMedia` monkey-patch that throws; overlay appears in both the viewer (ContentReader `useProtectionBlur`) and page wrapper (AntiScreenshot) and covers normal and fullscreen via `fixed inset-0 z-[60..70]`.
+**Date:** 2026-09-02
+**Made by:** execute-feature (post-session 12)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Cannot truly block OS screenshots; blanking the reader when the window loses focus or capture keys are pressed is the strongest practical deterrent.
+
+**Alternatives Considered:**
+- npm packages for screenshot detection — rejected: no reliable cross-OS library; pure DOM events cover majority cases with zero deps.
+- Only viewer-scoped overlay — rejected: user could still screenshot surrounding page; page-level overlay adds second layer.
+
+**Implications:**
+- getDisplayMedia override throws — if legitimate capture is ever needed, guard behind `hasFullAccess`.
+- Document as deterrence, not DRM.
+
+---
+
+### Viewer UX: expand/zoom/pagination are first-class controls
+
+**Decision:** ContentReader controls are: `isExpanded` ↔ height `h-[520/600]`/`h-[85vh]` plus `requestFullscreen`, zoom 0.5–3× via scale transform, page input (number + prev/next, clamped) with DOCX `ceil(len/1800)` and PDF hash params. Expand no longer means "show more text chars" — that stays `showFullContent` for truncated previews.
+**Date:** 2026-09-02
+**Made by:** execute-feature (post-session 12)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Expand button did nothing because it toggled truncation truthiness that was falsy for PDFs; height fix plus discrete controls makes viewer usable.
+
+**Alternatives Considered:**
+- CSS `zoom` property — rejected: non-standard, breaks Firefox.
+- PDF.js integration for true page count — deferred: hash params + placeholder 10 pages give usable UX with zero bundle cost.
+
+**Implications:**
+- Future viewer work should keep toolbar controls (paging + zoom + expand + fullscreen) as a unit.
+

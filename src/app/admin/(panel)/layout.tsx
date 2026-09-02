@@ -72,10 +72,8 @@ export default async function AdminPanelLayout({ children }: { children: ReactNo
   const superadmin = isSuperAdmin(admin);
 
   return (
-    <AdminErrorBoundary>
-      <AdminPanelLayoutInner settings={settings} admin={admin} superadmin={superadmin}>
-        <section className="min-w-0 flex-1">{children}</section>
-      </AdminPanelLayoutInner>
-    </AdminErrorBoundary>
+    <AdminPanelLayoutInner settings={settings} admin={admin} superadmin={superadmin}>
+      {children}
+    </AdminPanelLayoutInner>
   );
 }

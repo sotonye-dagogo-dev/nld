@@ -1,8 +1,8 @@
 # System Architecture
 
 > **Metadata**
-> - last-updated-by: update-ai-system (post-session 9)
-> - last-verified-against-code: 2026-08-26
+> - last-updated-by: update-ai-system (post-session 12)
+> - last-verified-against-code: 2026-09-02
 > - staleness-policy: re-verify before trusting if any architecture-affecting commits have been made since last-verified-against-code
 
 > **Overview:** How the system is structured — layers, modules, data flow, and configuration. Agents designing or changing structure must read this first.
@@ -83,10 +83,11 @@ Admin/devotionals (create/edit) → FileUpload component
 
 ### On-Platform Content Reader Flow (Asset Protection)
 ```
-Devotional reader page / access gate → ContentReader component
-  → Secure iframe/pdf.js for PDF / text truncation for DOCX
-  → Preview limited to 2000 chars (configurable) for non-authorized users
-  → Full access users see complete content
+Devotional reader page / access gate → ContentReader component (full width/height, flex-1, zoom + pagination)
+  → PDF: secure iframe toolbar=0 with hash page/zoom params; DOCX: paginated text (1800 chars/page)
+  → Toolbar: page input + prev/next, zoom out/in/reset (0.5x–3x), Expand/Collapse height toggle (480→85vh), Fullscreen via requestFullscreen
+  → Preview limited to 2000 chars for non-authorized users; hasFullAccess uses blank overlay protection (see below)
+  → Protection overlay inside ContentReader + page-level AntiScreenshot: visibilitychange/blur/pagehide/beforeprint/PrintScreen/getDisplayMedia hijack → blank blurred overlay (normal + fullscreen); pointer-events shield; select-none; contextmenu/copy/cut/drag blocked
   → Watermark overlay for protected content
   → No download/export capability — content stays in-platform
   → Upgrade prompt when preview truncated
@@ -177,12 +178,14 @@ No project CLI exists yet. Verification is via `npm run typecheck`, `npm run lin
 - No runtime secrets in client bundles — Paystack/Resend/Supabase service-role keys are server-only; server-only code must not leak into client bundles (`server-only` package discipline).
 - Supabase `anon` key is public by design; RLS/policies must be enforced at the DB level for anything a client could touch directly.
 - Access password derivation depends on `ACCESS_PASSWORD_SECRET`; changing it invalidates existing grants (documented migration path in `memory/project-decisions.md`).
-- Anti-screenshot protection is a best-effort client behavior (DRM-level protection is a future consideration; the parent project may own this).
+- Anti-screenshot protection is a best-effort client behavior (DRM-level protection is a future consideration; the parent project may own this). Now includes blank overlay on visibilitychange/blur/PrintScreen/getDisplayMedia hijack (normal + fullscreen).
+- Analytics dashboard degrades to partial data on single-query timeout (not full-page ErrorState); requires DB but falls back gracefully.
+- Root layout nav uses withLayoutTimeout (2500ms) so slow DB does not block route transitions; admin panel has loading.tsx skeleton for perceived performance; middleware cheap redirect stays boundary-free.
 - Supabase Storage bucket `devotional-assets` must exist and be public (or use signed URLs for private assets).
 - Destructive action undo is UI-level only; actual data rollback must be implemented by the consumer (e.g., soft-delete, re-create from audit log).
 - Cloudflare email worker secret must be set in Cloudflare Worker environment (not in Vercel) — separate secret management.
-- On-platform content reader: preview truncation is enforced client-side for non-authorized users; server-side enforcement via `/api/devotionals/[slug]/unlock` is the true boundary.
-- Content reader does not support full DOCX rendering client-side (requires server-side conversion or mammoth.js); currently shows placeholder with upgrade prompt.
+- On-platform content reader: preview truncation is enforced client-side for non-authorized users; server-side enforcement via `/api/devotionals/[slug]/unlock` is the true boundary. Zoom (0.5–3x) and expand/collapse control viewer height (480px ↔ 85vh + fullscreen).
+- Content reader does not support full DOCX rendering client-side (requires server-side conversion or mammoth.js); currently shows paginated placeholder with upgrade prompt.
 
 ---
 

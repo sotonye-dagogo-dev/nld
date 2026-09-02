@@ -1,8 +1,8 @@
 # Lessons Learned
 
 > **Metadata**
-> - last-updated-by: update-ai-system (post-session 7)
-> - last-verified-against-code: 2026-08-24
+> - last-updated-by: update-ai-system (post-session 12)
+> - last-verified-against-code: 2026-09-02
 > - staleness-policy: each entry has its own staleness — check supersedes links
 
 > **Overview:** Practical knowledge accumulated during development — things that worked well, things that didn't, and patterns worth repeating. Different from `repair-system.md` (tracks errors); this file tracks development process insights and architectural wisdom. Uses supersedes/superseded-by links for evolving practices.
@@ -233,3 +233,40 @@ The platform needs to scale to 100k+ users with proper health checks, rate limit
 
 **Supersedes:** None
 **Superseded by:** None
+---
+
+### Root layout DB reads must not block TTFB — race with timeout + skeleton
+
+**Context:**
+The root `layout.tsx` fetched `getPublishedDevotionals(1,100)` + `getPurchasableDevotionals()` for the ClientNav Purchase/Unlock modals on every request. Both hit Postgres with 15s timeout/retry, so a slow pooler blanked the whole app for seconds and made every route feel laggy; admin analytics page also showed full-page ErrorState when any one of its 7 aggregation queries timed out.
+
+**What We Learned:**
+- Wrap non-critical nav data in a `withLayoutTimeout(ms, fallback)` race (2500ms) so slow DB never blocks TTFB. Keep the critical `getSiteSettings()` awaited separately.
+- Make dashboards resilient: only hard-fail when ALL queries miss; otherwise render partial zeros. Users can still navigate.
+- Add `loading.tsx` skeletons for root and `admin/(panel)` — Next.js streams them instantly, so navigation feels SPA even when the server is slow.
+
+**Apply When:**
+Any layout that needs DB data for nav/menus. Never `await` unbounded DB calls directly in `layout.tsx`.
+
+**Supersedes:** None
+**Superseded by:** None
+
+---
+
+### Viewer height/expand/zoom/page UX and protection overlays
+
+**Context:**
+ContentReader clipped at `max-h-[70vh]` while its iframe content never filled the container; Expand button toggled `showFullContent` (text truncation) so it did nothing for PDFs; no zoom or usable page input; protection was only contextmenu/copy blocking with no blank overlay on focus loss or capture attempts.
+
+**What We Learned:**
+- Make the viewer `flex flex-col flex-1 min-h-0 w-full`; control height with a discrete `viewerHeightClass` (`h-[520/600]` ↔ `h-[85vh] + fullscreen fixed`) and `isExpanded` state separate from content truncation. Add `transition-[height]` for smoothness.
+- Zoom via `transform: scale(zoom)` on the inner wrapper plus `width: 100/zoom%` compensation so layout does not clip; hash `zoom`/`page` into PDF iframe src (`#page=N&zoom=NN`) for native nav without PDF.js.
+- Pagination: number input + prev/next with clamping; DOCX pages = `ceil(text.length / 1800)`; scroll wrapper to top on page change.
+- Protection: `visibilitychange`/`blur`/`pagehide`/`beforeprint` + PrintScreen/Ctrl+P/Cmd+Shift+3|4/5 + `getDisplayMedia` monkey-patch → show `backdrop-blur` blank overlay (normal + fullscreen) for 0.5–4s. Duplicate the overlay inside ContentReader (viewer-scoped) and inside AntiScreenshot (page-scoped) so it works in both contexts. Document that this is deterrence, not DRM.
+
+**Apply When:**
+Any secure viewer/PDF reader iteration; also check that every Expand/Collapse button actually controls layout, not just logic that can be falsy.
+
+**Supersedes:** None
+**Superseded by:** None
+
