@@ -18,23 +18,37 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+function withLayoutTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer!));
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const { value: settings } = await getSiteSettings();
+  const [{ value: settings }, navData] = await Promise.all([
+    getSiteSettings(),
+    withLayoutTimeout(
+      (async () => {
+        const [pub, purch] = await Promise.all([
+          getPublishedDevotionals(1, 100).catch(() => ({ rows: [] as Devotional[] })),
+          getPurchasableDevotionals().catch(() => [] as Devotional[]),
+        ]);
+        return {
+          devotionals: (pub as { rows: Devotional[] }).rows.map((d) => ({ slug: d.slug, title: d.title })),
+          purchasable: purch as Devotional[],
+        };
+      })(),
+      2500,
+      { devotionals: [] as { slug: string; title: string }[], purchasable: [] as Devotional[] },
+    ),
+  ]);
   const currentYear = new Date().getFullYear();
-  let devotionals: { slug: string; title: string }[] = [];
-  let purchasable: Devotional[] = [];
-  try {
-    const [pub, purch] = await Promise.all([
-      getPublishedDevotionals(1, 100).catch(() => ({ rows: [] as Devotional[] })),
-      getPurchasableDevotionals().catch(() => [] as Devotional[]),
-    ]);
-    devotionals = (pub as { rows: Devotional[] }).rows.map((d) => ({ slug: d.slug, title: d.title }));
-    purchasable = purch as Devotional[];
-  } catch {
-    // degrade gracefully
-  }
+  const devotionals = navData.devotionals;
+  const purchasable = navData.purchasable;
 
   return (
     <html lang="en" suppressHydrationWarning>

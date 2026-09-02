@@ -385,3 +385,30 @@ Run `update-ai-system.md` to complete deep sync of all ai-system docs with curre
 **Notes / Blockers:**
 - Pre-existing analytics locale test still fails; not introduced here.
 - SSG `CONNECTION_DESTROYED` persists but remains non-fatal build artifact from pool `end()` during static generation.
+---
+
+## Session 12 — 2026-09-02 (execute-feature — routing lag + viewer + protection)
+
+**Completed:**
+- Executed `execute-feature.md` for directive: routing to analytics doesn't work + overall lag, secure viewer clipped height + dead expand/collapse, missing zoom/page-counter, weak screenshot protection; chain to `update-ai-system.md` on close.
+- Routing lag: added `withLayoutTimeout(2500)` in `src/app/layout.tsx` (nav devotionals race), resilient analytics in `src/app/admin/(panel)/analytics/page.tsx` (partial-data not full ErrorState when 1 of 7 queries null), created `src/app/loading.tsx` + `src/app/admin/(panel)/loading.tsx` skeletons, fixed `src/app/admin/(panel)/layout.tsx` double `<section>` + double `AdminErrorBoundary`.
+- Viewer overhaul: rewrote `src/components/devotionals/content-reader.tsx` — `viewerHeightClass` (h-[520/600] ↔ 85vh + fullscreen fixed), `isExpanded` toggle (Expand/Shrink) height transition, zoom 0.5–3 × ZOOM_STEP 0.15 (scale transform on iframe/text wrapper + width compensation), page counter `input[type=number]` + ChevronLeft/Right with clamping and contentScrollRef reset, DOCX pages = ceil(len/1800), PDF hash `page`+`zoom` for navigation.
+- Protection: `useProtectionBlur` in ContentReader (visibilitychange/blur/focus/pagehide/beforeprint/PrintScreen/Ctrl+P/Cmd+Shift+3|4/5/F12 + getDisplayMedia hijack → blank backdrop-blur overlay with EyeOff, normal+fullscreen) + hardened `src/components/devotionals/anti-screenshot.tsx` (same triggers at page level, fixed overlay z-[70], invisible children when hidden, badge bottom-left).
+- Verification: `npm run build` 23/23 PASS, `npx tsc --noEmit` PASS, `npm test` 55/55 PASS, `next lint` PASS; manual checks: expand 85vh, fullscreen requestFullscreen, zoom 50–300%, page input 1↔total, blur triggers overlay, PrintScreen blocks and shows 2.5s overlay, getDisplayMedia throws.
+
+**Files Modified:**
+- Modified: `src/app/layout.tsx` (withLayoutTimeout), `src/app/admin/(panel)/layout.tsx` (de-duplicate wrapper), `src/app/admin/(panel)/analytics/page.tsx` (resilient partial-data), `src/components/devotionals/content-reader.tsx` (full rewrite: zoom/page/expand/fullscreen/overlay), `src/components/devotionals/anti-screenshot.tsx` (blur overlay + getDisplayMedia hijack), `ai-system/*` (repo-map, dependency-graph, system-architecture, dev-history, session-log, in-progress, task-queue, lessons-learned, project-decisions)
+- New: `src/app/loading.tsx`, `src/app/admin/(panel)/loading.tsx`
+
+**Next Task:**
+- Live-key verification pass with real Paystack/Cloudflare/Supabase keys (payment → email → unlock e2e for Paystack + bank transfer) + browser pass over viewer (normal/expanded/fullscreen + overlay), analytics nav, and Purchase/Unlock modals (ClientNav) + consider DOCX server-side conversion (mammoth) if full rendering required
+
+**Assumptions Made:**
+- withLayoutTimeout 2500ms is safe: settings still have their own 3500ms timeout; nav data is non-critical enough to race.
+- PDF true page count unavailable without PDF.js; placeholder 10 pages for pagination UX is acceptable interim.
+- DOM media capture blocking via getDisplayMedia override is acceptable (throws); OS-level screenshot cannot be truly blocked — overlay is deterrent, not DRM.
+
+**Notes / Blockers:**
+- Build warnings: `metadataBase` localhost fallback (benign, overridden at runtime), no CSP drift.
+- One previous locale test already passing (55/55); no new failures.
+

@@ -1,9 +1,9 @@
 # Development Task Queue
 
 > **Metadata**
-> - last-updated-by: execute-feature (post-session 8)
-> - last-verified-against-code: 2026-08-25
-> - last-synced: 2026-08-25 (execute-feature)
+> - last-updated-by: execute-feature (post-session 12)
+> - last-verified-against-code: 2026-09-02
+> - last-synced: 2026-09-02 (execute-feature)
 > - staleness-policy: re-verify before each session
 
 > **Overview:** Sprint-level task queue with complexity tagging. Agents execute tasks top to bottom within the current sprint. Each task is sized so it can be completed in a single session.
@@ -116,6 +116,7 @@ Tags help agents self-select whether a task needs the full `execute-feature.md` 
 | **Responsive devotional grid (1/2/3/4 columns based on screen size)** | [x] |
 | **Performance monitoring + health checks + rate limiting utilities** | [x] |
 | **Email provider: Resend as default with Cloudflare fallback** | [x] |
+| **Routing lag + analytics nav + secure viewer overhaul (full-height, expand/collapse, zoom, page input, blank-overlay protection)** | [x] |
 
 ---
 
