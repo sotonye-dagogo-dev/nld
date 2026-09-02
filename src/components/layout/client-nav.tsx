@@ -66,7 +66,14 @@ export function ClientNav({ platformName, logoUrl, settings, devotionals, purcha
 
       {/* Access modal — always accessible unlock, with select + auto-detect */}
       <Modal open={accessOpen} onClose={() => setAccessOpen(false)} title="Unlock your devotional">
-        <AccessEntry devotionals={devotionals} />
+        <AccessEntry
+          devotionals={devotionals}
+          onSuccess={(r) => {
+            setAccessOpen(false);
+            // global toast already triggered inside AccessEntry; navigate to matched devotional if available
+            if (r.matchedSlug) window.location.href = `/devotionals/${r.matchedSlug}`;
+          }}
+        />
       </Modal>
     </>
   );

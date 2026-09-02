@@ -5,7 +5,7 @@ import { z } from "zod";
 import { queryWithTimeout } from "@/data/db";
 import { accessGrants, devotionalDays, devotionals } from "@/data/db/schema";
 import { getDevotionalBySlug } from "@/lib/catalog";
-import { verifyAccessPassword } from "@/lib/access";
+import { verifyAccessPassword, derivePasswordForGrant } from "@/lib/access";
 import { recordAudit, recordEvent } from "@/lib/audit";
 import { isEmail } from "@/lib/utils";
 
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     ).catch(() => []);
     const activeGrants = allGrants.filter((g) => g.status === "active" && (!g.expiresAt || g.expiresAt > new Date()));
     for (const g of activeGrants) {
-      if (verifyAccessPassword(payload.password, g.accessPassword)) {
+      if (verifyAccessPassword(payload.password, derivePasswordForGrant(g.paystackReference))) {
         const devotionalRows = await queryWithTimeout((db) => db.select().from(devotionals).where(eq(devotionals.id, g.devotionalId)).limit(1)).catch(() => []);
         const devotional = devotionalRows[0] as unknown as Devotional | undefined;
         const days = devotional ? await queryWithTimeout((db) => db.select({ n: devotionalDays.dayNumber }).from(devotionalDays).where(and(eq(devotionalDays.devotionalId, devotional.id), eq(devotionalDays.published, true)))).then((r) => r.length).catch(() => 0) : 0;
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     for (const g of all) {
       if (g.status !== "active") continue;
       if (g.expiresAt && g.expiresAt < new Date()) continue;
-      if (verifyAccessPassword(payload.password, g.accessPassword)) return g;
+      if (verifyAccessPassword(payload.password, derivePasswordForGrant(g.paystackReference))) return g;
     }
     return null;
   }
@@ -106,7 +106,6 @@ export async function POST(request: Request) {
           devotionalId: devotional.id,
           email: payload.email,
           paystackReference: `${active!.paystackReference}__lazy-${devotional.id.slice(0, 8)}`,
-          accessPassword: active!.accessPassword,
           status: "active",
           expiresAt: maybeExpiry,
         })
@@ -120,7 +119,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!verifyAccessPassword(payload.password, active.accessPassword)) {
+    if (!verifyAccessPassword(payload.password, derivePasswordForGrant(active.paystackReference))) {
       const fallback = await findMatchingGrant();
       if (fallback) {
         active = fallback;

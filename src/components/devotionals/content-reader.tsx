@@ -68,7 +68,6 @@ function useProtectionBlur(enabled: boolean) {
       if (document.hidden || document.visibilityState !== "visible") {
         triggerBlur("Content hidden — tab inactive");
       } else {
-        // Keep blurred briefly after returning to prevent quick screenshot toggle
         setTimeout(() => clearBlur(), 600);
       }
     };
@@ -86,7 +85,6 @@ function useProtectionBlur(enabled: boolean) {
     };
     const onKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      // PrintScreen, screenshot shortcuts, devtools print
       if (
         key === "printscreen" ||
         key === "print_screen" ||
@@ -105,16 +103,13 @@ function useProtectionBlur(enabled: boolean) {
         triggerBlur("Content hidden", 1500);
       }
     };
-    const onContextLost = () => {};
 
-    // Monkey-patch getDisplayMedia to blur when capture starts
     let originalGetDisplayMedia: typeof navigator.mediaDevices.getDisplayMedia | undefined;
     if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
       originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
       // @ts-ignore override
       navigator.mediaDevices.getDisplayMedia = async (...args: Parameters<typeof navigator.mediaDevices.getDisplayMedia>) => {
         triggerBlur("Screen capture blocked — content protection active", 4000);
-        // Block capture by rejecting; remove if you want to allow but keep blurred
         throw new Error("Screen capture is disabled for protected content.");
       };
     }
@@ -165,34 +160,39 @@ export function ContentReader({
   const [showFullContent, setShowFullContent] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentScrollRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pdfDocRef = useRef<any>(null);
 
   const { isBlurred, reason } = useProtectionBlur(hasFullAccess);
 
+  // PDF.js loading
   useEffect(() => {
     if (!hasFullAccess) {
       setIsLoading(false);
-      // For preview placeholder we keep 1 page
       setTotalPages(1);
       return;
     }
+    let cancelled = false;
     async function loadContent() {
       setIsLoading(true);
       setError(null);
       try {
         if (fileType === "pdf") {
-          // Verify accessibility without downloading full body
+          // Dynamically import pdfjs-dist to avoid SSR bundling issues
+          const pdfjs: any = await import("pdfjs-dist");
+          // Configure worker — use CDN if not already set; fallback to local import
           try {
-            const res = await fetch(fileUrl, { method: "HEAD" });
-            if (!res.ok) throw new Error("PDF not accessible");
-          } catch {
-            // HEAD may be blocked by CORS/Supabase; ignore and allow iframe to try
-          }
-          // We cannot know true page count without PDF.js; assume 1 but allow navigation
-          // If server ever returns X-Page-Count header we could read it; for now default 1
-          // but enable pagination UI regardless so UX exists.
-          setTotalPages(10); // show pagination usable even when unknown
+            if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+              pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
+            }
+          } catch {}
+          const loadingTask = pdfjs.getDocument({ url: fileUrl, withCredentials: false });
+          const pdf = await loadingTask.promise;
+          if (cancelled) return;
+          pdfDocRef.current = pdf;
+          setTotalPages(pdf.numPages);
+          setCurrentPage(1);
         } else if (fileType === "docx") {
-          // Placeholder: real conversion would use mammoth (not bundled to keep payload small)
           const placeholder =
             content ||
             "Document content is protected. This is a preview of the DOCX viewer. When unlocked, the full document renders here with page navigation, zoom, and protection overlay.";
@@ -201,12 +201,20 @@ export function ContentReader({
           setTotalPages(pages);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load content");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load content");
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
     loadContent();
+    return () => {
+      cancelled = true;
+      // cleanup pdf doc
+      if (pdfDocRef.current?.destroy) {
+        try { pdfDocRef.current.destroy(); } catch {}
+        pdfDocRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileUrl, fileType, hasFullAccess]);
 
@@ -222,6 +230,39 @@ export function ContentReader({
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
+
+  // Render PDF page to canvas whenever doc, page, or zoom changes
+  useEffect(() => {
+    if (fileType !== "pdf" || !hasFullAccess || !pdfDocRef.current || !canvasRef.current) return;
+    let renderTask: any = null;
+    let cancelled = false;
+    async function render() {
+      try {
+        const pdf = pdfDocRef.current;
+        if (!pdf) return;
+        const page = await pdf.getPage(currentPage);
+        if (cancelled) return;
+        const viewport = page.getViewport({ scale: 1.35 * zoom });
+        const canvas = canvasRef.current!;
+        const ctx = canvas.getContext("2d", { alpha: false }) as CanvasRenderingContext2D | null;
+        if (!ctx) return;
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+        const renderContext = { canvasContext: ctx, viewport };
+        renderTask = page.render(renderContext);
+        await renderTask.promise;
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to render PDF page");
+      }
+    }
+    render();
+    return () => {
+      cancelled = true;
+      if (renderTask?.cancel) try { renderTask.cancel(); } catch {}
+    };
+  }, [fileType, hasFullAccess, currentPage, zoom, isLoading]);
 
   const isTruncated = !hasFullAccess && !showFullContent && content.length > maxPreviewChars;
   const displayContent = hasFullAccess || showFullContent || content.length <= maxPreviewChars
@@ -294,10 +335,6 @@ export function ContentReader({
       </div>
     );
   }
-
-  const pdfSrc = hasFullAccess
-    ? `${fileUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH&page=${currentPage}&zoom=${Math.round(zoom * 100)}`
-    : "";
 
   const viewerHeightClass = isFullscreen
     ? "h-screen"
@@ -447,34 +484,22 @@ export function ContentReader({
           <div className="relative flex h-full w-full flex-1 flex-col bg-[#f5f5f4] dark:bg-zinc-900 overflow-hidden">
             {hasFullAccess ? (
               <div
-                className="flex h-full w-full flex-1 overflow-auto bg-[#f5f5f4] dark:bg-zinc-900"
+                ref={contentScrollRef}
+                className="flex h-full w-full flex-1 overflow-auto bg-[#f5f5f4] dark:bg-zinc-900 p-4 justify-center"
                 style={{ scrollbarWidth: "thin" }}
+                onContextMenu={(e) => e.preventDefault()}
               >
-                <div
-                  className="mx-auto w-full max-w-full flex-1"
-                  style={{
-                    transform: `scale(${zoom})`,
-                    transformOrigin: "top center",
-                    width: zoom !== 1 ? `${100 / zoom}%` : "100%",
-                  }}
-                >
-                  <iframe
-                    key={`${fileUrl}-${currentPage}-${zoom}`}
-                    src={pdfSrc}
-                    title={`${fileName} — page ${currentPage}`}
-                    className="block h-full min-h-[600px] w-full border-0"
-                    // allow-same-origin needed for PDF hash params; scripts off for hardening
-                    sandbox="allow-same-origin"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
+                <canvas
+                  ref={canvasRef}
+                  className="shadow-lg bg-white select-none max-w-full h-auto"
+                  style={{ display: "block" }}
+                  aria-label={`${fileName} page ${currentPage}`}
+                />
               </div>
             ) : (
               <div className="relative flex h-full w-full flex-1 flex-col items-center justify-center overflow-hidden p-8 text-center">
                 {coverUrl ? (
                   <>
-                    {/* Cover image as watermarked background */}
                     <div className="absolute inset-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -486,7 +511,6 @@ export function ContentReader({
                       <div className="absolute inset-0 bg-surface/70 backdrop-blur-[2px]" aria-hidden />
                       <div className="absolute inset-0 bg-gradient-to-t from-surface/80 via-transparent to-surface/40" aria-hidden />
                     </div>
-                    {/* Diagonal watermark text */}
                     <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden" aria-hidden>
                       <span className="rotate-[-18deg] select-none whitespace-nowrap text-4xl font-black tracking-widest text-text-primary/[0.12] sm:text-5xl">
                         UNLOCK TO ACCESS
@@ -520,13 +544,12 @@ export function ContentReader({
                 </div>
               </div>
             )}
-            {/* Invisible shield to block right-click on iframe area (pointer events disabled for overlay, but block selection) */}
-            {hasFullAccess && <div className="pointer-events-none absolute inset-0" aria-hidden />}
           </div>
         ) : (
           <div
             ref={contentScrollRef}
             className="flex h-full w-full flex-1 flex-col overflow-y-auto overflow-x-hidden bg-surface p-5 sm:p-6"
+            onContextMenu={(e) => hasFullAccess && e.preventDefault()}
           >
             {hasFullAccess ? (
               <div
@@ -660,12 +683,7 @@ export function SecurePDFViewer({ fileUrl, fileName, className }: SecurePDFViewe
         </div>
       </div>
       <div className="w-full h-[70vh] min-h-[420px]">
-        <iframe
-          src={`${fileUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
-          title={fileName}
-          className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin allow-forms"
-        />
+        <ContentReader fileUrl={fileUrl} fileName={fileName} fileType="pdf" hasFullAccess={true} />
       </div>
     </div>
   );

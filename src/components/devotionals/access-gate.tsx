@@ -20,9 +20,11 @@ interface AccessGateProps {
   devotional: Devotional;
   settings: SiteSettings;
   id?: string;
+  onUnlock?: (days: DevotionalDay[]) => void;
+  onCloseModal?: () => void;
 }
 
-export function AccessGate({ devotional, settings, id }: AccessGateProps) {
+export function AccessGate({ devotional, settings, id, onUnlock, onCloseModal }: AccessGateProps) {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,6 +60,13 @@ export function AccessGate({ devotional, settings, id }: AccessGateProps) {
       const data = (await res.json()) as { ok: boolean; days?: DevotionalDay[]; error?: string };
       if (!res.ok || !data.ok || !data.days) {
         setFieldErrors(mapError(data.error ?? "That password did not work."));
+        return;
+      }
+      // If parent manages unlock state (modal flow), delegate to parent so modal can close and page renders reader
+      if (onUnlock) {
+        onUnlock(data.days);
+        toast("Access granted — opening your devotional!", "success");
+        onCloseModal?.();
         return;
       }
       setDays(data.days);

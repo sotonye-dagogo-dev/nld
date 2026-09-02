@@ -5,7 +5,7 @@ import { z } from "zod";
 import { queryWithTimeout } from "@/data/db";
 import { accessGrants, devotionalDays } from "@/data/db/schema";
 import { getDevotionalBySlug } from "@/lib/catalog";
-import { verifyAccessPassword } from "@/lib/access";
+import { verifyAccessPassword, derivePasswordForGrant } from "@/lib/access";
 import { getSiteSettings } from "@/config/site";
 import { recordAudit, recordEvent } from "@/lib/audit";
 import { clampInt, isEmail } from "@/lib/utils";
@@ -71,7 +71,7 @@ export async function POST(
     for (const g of all) {
       if (g.status !== "active") continue;
       if (g.expiresAt && g.expiresAt < new Date()) continue;
-      if (verifyAccessPassword(payload.password, g.accessPassword)) return g;
+      if (verifyAccessPassword(payload.password, derivePasswordForGrant(g.paystackReference))) return g;
     }
     return null;
   }
@@ -100,7 +100,6 @@ export async function POST(
           devotionalId: devotional.id,
           email: payload.email,
           paystackReference: `${active!.paystackReference}__lazy-${devotional.id.slice(0, 8)}`,
-          accessPassword: active!.accessPassword,
           status: "active",
           expiresAt: maybeExpiry,
         })
@@ -117,7 +116,7 @@ export async function POST(
       );
     }
 
-    if (!verifyAccessPassword(payload.password, active.accessPassword)) {
+    if (!verifyAccessPassword(payload.password, derivePasswordForGrant(active.paystackReference))) {
       // Try bundle fallback before failing
       const fallback = await findMatchingBundleGrant();
       if (fallback) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq, like } from "drizzle-orm";
 import { queryWithTimeout } from "@/data/db";
 import { purchases, accessGrants } from "@/data/db/schema";
-import { deriveAccessPassword } from "@/lib/access";
+import { deriveAccessPassword, derivePasswordForGrant } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -35,8 +35,8 @@ export async function GET(request: Request) {
       grant = (prefixed[0] as typeof grant | undefined) ?? undefined;
     }
 
-    // Even if no grant row yet (webhook race / partial failure), the password is derivable
-    const accessPassword = grant?.accessPassword ?? deriveAccessPassword(reference);
+    // Even if no grant row yet (webhook race / partial failure), the password is derivable from base reference
+    const accessPassword = grant ? derivePasswordForGrant(grant.paystackReference) : deriveAccessPassword(reference);
 
     // Ensure a grant exists for future verify flows — lazily create if missing
     if (!grant) {
@@ -62,7 +62,6 @@ export async function GET(request: Request) {
             devotionalId,
             email: purchase.email,
             paystackReference: reference,
-            accessPassword,
             status: "active",
             expiresAt,
           })
