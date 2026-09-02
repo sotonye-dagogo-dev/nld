@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 interface PurchaseCheckoutProps {
   devotional: Devotional;
   settings: SiteSettings;
+  isBundle?: boolean;
 }
 
 interface BankAccount {
@@ -32,7 +33,7 @@ interface BankAccount {
   displayOrder: number;
 }
 
-export function PurchaseCheckout({ devotional, settings }: PurchaseCheckoutProps) {
+export function PurchaseCheckout({ devotional, settings, isBundle = false }: PurchaseCheckoutProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
@@ -189,13 +190,32 @@ const uploadData = await uploadRes.json();
     );
   }
 
+  const accessLabel =
+    settings.accessMode === "one-time"
+      ? "forever"
+      : settings.accessMode === "monthly"
+        ? "for 30 days"
+        : "for 60 days";
+
   return (
     <Card className="max-w-md">
-      <h2 className="mb-1 text-lg font-semibold text-text-primary">Purchase access</h2>
+      <h2 className="mb-1 text-lg font-semibold text-text-primary">
+        {isBundle ? "Purchase Bundle" : "Purchase access"}
+      </h2>
       <p className="mb-4 text-sm text-text-muted">
-        One-time access to <strong>{devotional.title}</strong> —{" "}
-        {formatPrice(devotional.priceMinor, devotional.currency)}. Your access
-        password will be emailed to you after payment.
+        {isBundle ? (
+          <>
+            Unlock <strong>{devotional.title}</strong> —{" "}
+            {formatPrice(devotional.priceMinor, devotional.currency)} ({accessLabel}). Your
+            access password will be emailed after payment.
+          </>
+        ) : (
+          <>
+            {accessLabel === "forever" ? "One-time" : "Time-bound"} access to <strong>{devotional.title}</strong> —{" "}
+            {formatPrice(devotional.priceMinor, devotional.currency)} ({accessLabel}). Your access
+            password will be emailed to you after payment.
+          </>
+        )}
       </p>
 
       {showPaystack && showBankTransfer && (
@@ -207,7 +227,7 @@ const uploadData = await uploadRes.json();
             className={cn(
               "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
               method === "paystack"
-                ? "border-primary bg-primary text-white"
+                ? "border-primary bg-primary text-background"
                 : "border-border bg-surface text-text-primary hover:bg-background"
             )}
           >
@@ -221,7 +241,7 @@ const uploadData = await uploadRes.json();
             className={cn(
               "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
               method === "bank_transfer"
-                ? "border-primary bg-primary text-white"
+                ? "border-primary bg-primary text-background"
                 : "border-border bg-surface text-text-primary hover:bg-background"
             )}
           >
@@ -351,7 +371,7 @@ const uploadData = await uploadRes.json();
                 type="file"
                 accept="image/jpeg,image/png,image/webp,application/pdf"
                 onChange={handleProofUpload}
-                className="mt-1 w-full text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-white hover:file:bg-primary-hover"
+                className="mt-1 w-full text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-background hover:file:bg-primary-hover"
               />
             </label>
             {proofFile && (

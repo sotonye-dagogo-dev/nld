@@ -30,24 +30,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
   }
 
-  // Validate devotional exists and is published
+  const isBundle = payload.devotionalSlug === "all" || payload.devotionalSlug === "__all__";
+
+  // Validate devotional exists and is published (or bundle)
   let devotional: Devotional | null = null;
-  try {
-    const result = await queryWithTimeout((db) =>
-      db.select().from(devotionals).where(eq(devotionals.slug, payload.devotionalSlug)).limit(1)
-    );
-    devotional = result[0] ?? null;
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "Service temporarily unavailable. Please try again shortly." },
-      { status: 503 },
-    );
-  }
-  if (!devotional) {
-    return NextResponse.json({ ok: false, error: "Devotional not found." }, { status: 404 });
-  }
-  if (devotional.status !== "published") {
-    return NextResponse.json({ ok: false, error: "This devotional is not available for purchase." }, { status: 400 });
+  if (isBundle) {
+    try {
+      const result = await queryWithTimeout((db) =>
+        db.select().from(devotionals).where(eq(devotionals.status, "published")).limit(1)
+      );
+      devotional = result[0] ?? null;
+    } catch {
+      return NextResponse.json({ ok: false, error: "Service temporarily unavailable. Please try again shortly." }, { status: 503 });
+    }
+    if (!devotional) {
+      return NextResponse.json({ ok: false, error: "No devotionals available for bundle." }, { status: 404 });
+    }
+  } else {
+    try {
+      const result = await queryWithTimeout((db) =>
+        db.select().from(devotionals).where(eq(devotionals.slug, payload.devotionalSlug)).limit(1)
+      );
+      devotional = result[0] ?? null;
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "Service temporarily unavailable. Please try again shortly." },
+        { status: 503 },
+      );
+    }
+    if (!devotional) {
+      return NextResponse.json({ ok: false, error: "Devotional not found." }, { status: 404 });
+    }
+    if (devotional.status !== "published") {
+      return NextResponse.json({ ok: false, error: "This devotional is not available for purchase." }, { status: 400 });
+    }
   }
 
   // Validate bank account exists and is active

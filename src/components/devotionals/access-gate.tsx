@@ -152,8 +152,8 @@ export function AccessGate({ devotional, settings, id }: AccessGateProps) {
         <Link
           href={`/purchase/${devotional.slug}`}
           className={cn(
-            "rounded-lg px-4 py-2 text-sm font-medium text-white",
-            settings.paymentsEnabled ? "bg-primary hover:bg-primary-hover" : "pointer-events-none bg-text-muted",
+            "rounded-lg px-4 py-2 text-sm font-medium",
+            settings.paymentsEnabled ? "bg-primary text-background hover:bg-primary-hover" : "pointer-events-none bg-text-muted text-white",
           )}
         >
           {settings.paymentsEnabled ? "Purchase access" : "Payments temporarily disabled"}

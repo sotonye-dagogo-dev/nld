@@ -28,7 +28,7 @@ export default async function AdminDevotionalsPage() {
         </div>
         <Link
           href="/admin/devotionals/new"
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-background hover:bg-primary-hover"
         >
           Upload devotional
         </Link>
@@ -43,7 +43,7 @@ export default async function AdminDevotionalsPage() {
           action={
             <Link
               href="/admin/devotionals/new"
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-background hover:bg-primary-hover"
             >
               Upload devotional
             </Link>
