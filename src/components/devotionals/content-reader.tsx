@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Download, FileText, Maximize2, Minimize2, AlertCircle, ExternalLink, Lock, EyeOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, FileText, Maximize2, Minimize2, AlertCircle, ExternalLink, Lock, EyeOff, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // On-platform PDF/DOCX reader — renders uploaded content in a secure viewer
@@ -48,8 +48,16 @@ export function ContentReader({
   const [totalPages, setTotalPages] = useState(1);
   const [isTruncated, setIsTruncated] = useState(false);
   const [showFullContent, setShowFullContent] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
 
   // For PDF files, we use an iframe with PDF.js or native browser viewer
   // For DOCX, we convert to HTML on the client (limited) or show a placeholder
@@ -68,16 +76,9 @@ export function ContentReader({
 
       try {
         if (fileType === "pdf") {
-          // For PDF, we'll use an iframe with the PDF
-          // The actual content extraction for preview happens server-side
-          // Here we just verify the URL is accessible
-          const response = await fetch(fileUrl, { method: "HEAD" });
-          if (!response.ok) {
-            throw new Error("PDF file not accessible");
-          }
-          // For PDF, we don't extract text client-side for security
-          // Preview text would come from server-rendered content
-          setTotalPages(1); // Placeholder
+          // For PDF, iframe handles loading; HEAD check is skipped to avoid CSP
+          // connect-src blocks (supabase host) and false "Unable to load content" errors.
+          setTotalPages(1);
         } else if (fileType === "docx") {
           // For DOCX, we'd need a library like mammoth.js to convert
           // For now, show a placeholder with truncation notice
@@ -133,7 +134,7 @@ export function ContentReader({
   }
 
   return (
-    <div className={cn("rounded-xl border border-border bg-surface overflow-hidden", className)}>
+    <div className={cn("rounded-xl border border-border bg-surface overflow-hidden flex flex-col", className)}>
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 bg-background/50">
         <div className="flex items-center gap-3">
@@ -145,8 +146,8 @@ export function ContentReader({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Page navigation for PDF */}
-          {fileType === "pdf" && totalPages > 1 && (
+          {/* Page navigation for PDF — always show when hasFullAccess so user has counter + nav */}
+          {fileType === "pdf" && hasFullAccess && (
             <div className="flex items-center gap-1 border border-border rounded-lg p-1">
               <button
                 onClick={() => handlePageChange(-1)}
@@ -156,7 +157,7 @@ export function ContentReader({
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="px-2 text-sm font-mono text-text-primary">
+              <span className="px-2 text-sm font-mono text-text-primary min-w-[56px] text-center">
                 {currentPage} / {totalPages}
               </span>
               <button
@@ -166,6 +167,27 @@ export function ContentReader({
                 aria-label="Next page"
               >
                 <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Zoom controls — only when unlocked */}
+          {hasFullAccess && (
+            <div className="flex items-center gap-1 border border-border rounded-lg p-1">
+              <button
+                onClick={() => setZoom((z) => Math.max(0.6, Number((z - 0.15).toFixed(2))))}
+                className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
+                aria-label="Zoom out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <span className="px-1.5 text-xs font-mono text-text-primary min-w-[42px] text-center">{Math.round(zoom * 100)}%</span>
+              <button
+                onClick={() => setZoom((z) => Math.min(2.2, Number((z + 0.15).toFixed(2))))}
+                className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
+                aria-label="Zoom in"
+              >
+                <ZoomIn className="h-4 w-4" />
               </button>
             </div>
           )}
@@ -181,42 +203,41 @@ export function ContentReader({
             </a>
           )}
 
-          {/* Fullscreen toggle */}
+          {/* Fullscreen toggle — now reflects state and actually works */}
           <button
             onClick={() => {
               if (containerRef.current) {
                 if (document.fullscreenElement) {
                   document.exitFullscreen();
                 } else {
-                  containerRef.current.requestFullscreen();
+                  containerRef.current.requestFullscreen().catch(() => undefined);
                 }
               }
             }}
             className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
-            aria-label="Toggle fullscreen"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            title={isFullscreen ? "Collapse" : "Expand"}
           >
-            <Maximize2 className="h-4 w-4" />
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
-      {/* Content viewer */}
-      <div ref={containerRef} className="relative min-h-[400px] max-h-[70vh] overflow-hidden">
+      {/* Content viewer — full width/height, no clipping */}
+      <div ref={containerRef} className={cn("relative w-full bg-background flex-1", hasFullAccess ? "min-h-[560px] h-[68vh] max-h-[85vh] overflow-auto" : "min-h-[400px] overflow-hidden")}>
         {fileType === "pdf" ? (
-          <div className="w-full h-full relative">
+          <div className="w-full h-full relative min-h-[inherit]">
             {hasFullAccess ? (
-              <>
+              <div className="w-full h-full min-h-[560px]" style={{ transform: `scale(${zoom})`, transformOrigin: "top left", width: `${100 / zoom}%`, height: `${100 / zoom}%` }}>
                 <iframe
                   ref={iframeRef}
                   src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
                   title={`${fileName} preview`}
-                  className="w-full h-full border-0"
+                  className="w-full h-full min-h-[560px] border-0"
                   sandbox="allow-scripts allow-same-origin"
                   loading="lazy"
                 />
-                {/* Overlay to prevent right-click/context menu on PDF */}
-                <div className="absolute inset-0 pointer-events-none" />
-              </>
+              </div>
             ) : (
               // Locked mode — blurred PDF backdrop + cover + watermark unlock
               <div className="relative w-full h-full min-h-[400px] overflow-hidden bg-surface">
@@ -279,11 +300,15 @@ export function ContentReader({
             )}
           </div>
         ) : (
-          <div className="w-full h-full relative">
+          <div className="w-full h-full relative min-h-[inherit]">
             {hasFullAccess ? (
-              <div className="p-6 overflow-y-auto prose-devotional max-h-[70vh]">
-                <div className="whitespace-pre-wrap text-text-primary select-none">
-                  {displayContent}
+              <div className="w-full min-h-[560px] p-6 overflow-auto bg-background">
+                <div style={{ transform: `scale(${zoom})`, transformOrigin: "top left", width: `${100 / zoom}%` }}>
+                  <div className="prose-devotional max-w-none">
+                    <div className="whitespace-pre-wrap text-text-primary select-none">
+                      {displayContent || "[Document content — viewer]"}
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (

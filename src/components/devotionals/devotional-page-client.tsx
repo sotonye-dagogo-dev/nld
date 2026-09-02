@@ -68,8 +68,7 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
                       fileName={day.contentFileUrl.split("/").pop()?.split(".").slice(0, -1).join(".") || "Content"}
                       fileType={day.contentFileUrl.toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
                       maxPreviewChars={MAX_PREVIEW_CHARS}
-                      hasFullAccess={!hasAccessControl || !!isUnlocked}
-                      upgradeHref={hasAccessControl && !isUnlocked ? "#access-gate" : undefined}
+                      hasFullAccess={true}
                       coverUrl={devotional.coverUrl}
                     />
                   </div>
