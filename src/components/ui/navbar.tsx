@@ -94,7 +94,7 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
     "rounded-lg px-3 py-2 text-sm text-text-muted hover:bg-background hover:text-text-primary";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
         <Link href="/" aria-label="Home">
           <Logo name={platformName} logoUrl={logoUrl} />

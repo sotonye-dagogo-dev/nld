@@ -103,9 +103,13 @@ export async function POST(request: Request) {
       devotionalsToGrant = [];
     }
 
+    // Determine bundle expiry from config (bundleAccessMode takes precedence)
+    const bundleModeFromConfig: AccessMode = (siteSettings as SiteSettings | null)?.bundleAccessMode ?? siteSettings?.accessMode ?? "one-time";
+    const bundleDuration = (siteSettings as SiteSettings | null)?.bundleDurationDays ?? (siteSettings as SiteSettings | null)?.durationAccessDays ?? 60;
     for (const devo of devotionalsToGrant) {
-      const mode: AccessMode = (devo.accessMode as AccessMode) ?? siteSettings?.accessMode ?? "one-time";
-      const expiresAt = computeExpiry(mode);
+      // Bundle purchase respects bundleAccessMode; fallback to per-devotional if bundle mode is one-time? Use bundle mode for bundle buys.
+      const mode: AccessMode = bundleModeFromConfig;
+      const expiresAt = computeExpiry(mode, bundleDuration);
       // Check if grant already exists for this email+devotional (admin manual etc)
       const already = await queryWithTimeout((db) =>
         db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devo.id), eq(accessGrants.email, email))).limit(1),
@@ -129,9 +133,8 @@ export async function POST(request: Request) {
         after: { devotionalId: devo.id, email, mode, expiresAt: expiresAt?.toISOString() ?? null },
       });
     }
-    // Also keep bundle anchor grant for backward compatibility
-    const bundleMode: AccessMode = siteSettings?.accessMode ?? "one-time";
-    const bundleExpiry = computeExpiry(bundleMode);
+    // Also keep bundle anchor grant for backward compatibility and future-devotional fallback
+    const bundleExpiry = computeExpiry(bundleModeFromConfig, bundleDuration);
     await queryWithTimeout((db) =>
       db.insert(accessGrants).values({
         devotionalId: purchase.devotionalId,
@@ -156,7 +159,8 @@ export async function POST(request: Request) {
       devotionalMode = null;
     }
     const effectiveMode: AccessMode = devotionalMode ?? siteSettings?.accessMode ?? "one-time";
-    const expiresAt = computeExpiry(effectiveMode);
+    const effectiveDuration = (siteSettings as SiteSettings | null)?.durationAccessDays ?? 60;
+    const expiresAt = computeExpiry(effectiveMode, effectiveDuration);
 
     await queryWithTimeout((db) =>
       db.insert(accessGrants).values({

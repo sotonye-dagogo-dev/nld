@@ -20,16 +20,16 @@ export function PurchaseTable({ devotionals, settings }: PurchaseTableProps) {
 
   const allSelected = devotionals.length > 0 && selected.size === devotionals.length;
 
-  // Config-driven bundle price: if platform has a one-time defaultPriceMinor set,
-  // use it as bundle fee instead of naively summing individual prices.
+  // Config-driven bundle price: bundlePriceMinor is the primary source for "access to all".
+  // Falls back to defaultPriceMinor (legacy) then sum. Also respects bundleEnabled.
   const bundlePriceMinor = useMemo(() => {
-    if (settings.accessMode === "one-time" && settings.defaultPriceMinor > 0) {
-      return settings.defaultPriceMinor;
-    }
+    if (settings.bundlePriceMinor && settings.bundlePriceMinor > 0) return settings.bundlePriceMinor;
+    if (settings.defaultPriceMinor > 0) return settings.defaultPriceMinor;
     return devotionals.reduce((s, d) => s + d.priceMinor, 0);
-  }, [devotionals, settings.accessMode, settings.defaultPriceMinor]);
+  }, [devotionals, settings.bundlePriceMinor, settings.defaultPriceMinor]);
 
   const bundleCurrency = devotionals[0]?.currency ?? settings.currency;
+  const bundleAccessMode: AccessMode = settings.bundleAccessMode ?? settings.accessMode ?? "one-time";
 
   function toggleAll() {
     if (allSelected) setSelected(new Set());
@@ -51,13 +51,17 @@ export function PurchaseTable({ devotionals, settings }: PurchaseTableProps) {
     return sum;
   }, [selected, devotionals, bundlePriceMinor]);
 
+  const durationDays = settings.durationAccessDays ?? settings.bundleDurationDays ?? 60;
   const accessModeLabel =
-    settings.accessMode === "one-time" ? "forever" : settings.accessMode === "monthly" ? "30 days" : "60 days";
+    bundleAccessMode === "one-time" ? "forever" : bundleAccessMode === "monthly" ? "30 days" : `${durationDays} days`;
+
+  const showBundle = (settings.bundleEnabled ?? true) && devotionals.length > 1;
+  const showIndividual = settings.allowIndividualPurchase ?? true;
 
   return (
     <div className="space-y-6">
-      {/* Bundle — config-driven */}
-      {devotionals.length > 1 && (
+      {/* Bundle — config-driven, respects bundleEnabled */}
+      {showBundle && (
         <section className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-surface to-background p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-3">
@@ -74,13 +78,13 @@ export function PurchaseTable({ devotionals, settings }: PurchaseTableProps) {
                     {formatPrice(bundlePriceMinor, bundleCurrency)}
                   </span>{" "}
                   total. Access mode: <span className="font-medium">{accessModeLabel}</span>.
-                  {settings.accessMode === "one-time" && settings.defaultPriceMinor > 0 && (
+                  {(settings.bundlePriceMinor > 0 || settings.defaultPriceMinor > 0) && (
                     <span className="block text-xs mt-1">Platform bundle fee (config-driven, not sum of titles).</span>
                   )}
                 </p>
               </div>
             </div>
-            <Button
+              <Button
               onClick={() => {
                 const bundleDevotional: Devotional = {
                   id: devotionals[0].id,
@@ -91,7 +95,7 @@ export function PurchaseTable({ devotionals, settings }: PurchaseTableProps) {
                   coverUrl: devotionals[0].coverUrl,
                   priceMinor: bundlePriceMinor,
                   currency: bundleCurrency,
-                  accessMode: settings.accessMode,
+                  accessMode: bundleAccessMode,
                   previewDays: 0,
                   status: "published",
                   createdAt: new Date(),
@@ -107,6 +111,7 @@ export function PurchaseTable({ devotionals, settings }: PurchaseTableProps) {
         </section>
       )}
 
+      {showIndividual && (
       <div className="rounded-xl border border-border bg-surface overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -205,7 +210,7 @@ export function PurchaseTable({ devotionals, settings }: PurchaseTableProps) {
                       coverUrl: devotionals[0].coverUrl,
                       priceMinor: bundlePriceMinor,
                       currency: bundleCurrency,
-                      accessMode: settings.accessMode,
+                      accessMode: bundleAccessMode,
                       previewDays: 0,
                       status: "published",
                       createdAt: new Date(),
@@ -222,6 +227,7 @@ export function PurchaseTable({ devotionals, settings }: PurchaseTableProps) {
           </div>
         )}
       </div>
+      )}
 
       <Modal
         open={!!modalDevotional}

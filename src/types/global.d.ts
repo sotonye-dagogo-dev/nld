@@ -95,6 +95,13 @@ interface SiteSettings {
   footerDevCreditEnabled: boolean;
   /** Bank accounts for transfer payments (fetched separately) */
   bankAccounts?: BankAccount[];
+  // Dynamic access & pricing policy (config-driven, backward compatible)
+  bundleEnabled: boolean;
+  bundlePriceMinor: number;
+  bundleAccessMode: AccessMode;
+  bundleDurationDays: number;
+  allowIndividualPurchase: boolean;
+  durationAccessDays: number;
 }
 
 /** A single devotional (metadata record; content lives in devotional_days). */
