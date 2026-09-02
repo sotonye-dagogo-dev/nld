@@ -109,7 +109,6 @@ export async function POST(request: Request) {
           devotionalId: devotional.id,
           email: transfer.email,
           paystackReference: `BT-${transfer.reference}-${transfer.id}`,
-          accessPassword,
           status: "active",
           expiresAt,
         })
@@ -149,7 +148,6 @@ export async function POST(request: Request) {
               devotionalId: devo.id,
               email: transfer.email,
               paystackReference: `BT-${transfer.reference}-${transfer.id}__${devo.id}`,
-              accessPassword,
               status: "active",
               expiresAt: exp,
             }),

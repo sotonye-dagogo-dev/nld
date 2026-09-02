@@ -10,9 +10,10 @@ import { ShoppingCart, Lock } from "lucide-react";
 interface Props {
   devotional: Devotional;
   settings: SiteSettings;
+  onUnlock?: (days: DevotionalDay[]) => void;
 }
 
-export function DevotionalPurchaseModal({ devotional, settings }: Props) {
+export function DevotionalPurchaseModal({ devotional, settings, onUnlock }: Props) {
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [unlockOpen, setUnlockOpen] = useState(false);
 
@@ -38,7 +39,12 @@ export function DevotionalPurchaseModal({ devotional, settings }: Props) {
       </Modal>
 
       <Modal open={unlockOpen} onClose={() => setUnlockOpen(false)} title={`Unlock — ${devotional.title}`}>
-        <AccessGate devotional={devotional} settings={settings} />
+        <AccessGate
+          devotional={devotional}
+          settings={settings}
+          onUnlock={onUnlock}
+          onCloseModal={() => setUnlockOpen(false)}
+        />
       </Modal>
     </>
   );

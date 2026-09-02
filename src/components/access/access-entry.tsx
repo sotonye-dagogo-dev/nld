@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +14,14 @@ export function AccessEntry({
   devotionals,
   initialSlug,
   initialPassword,
+  onSuccess,
 }: {
   devotionals?: { slug: string; title: string }[];
   initialSlug?: string;
   initialPassword?: string;
+  onSuccess?: (result: { devotional: string; days: number; matchedSlug?: string }) => void;
 } = {}) {
+  const router = useRouter();
   const { toast } = useToast();
   const [slug, setSlug] = useState(initialSlug ?? "");
   const [email, setEmail] = useState("");
@@ -68,8 +72,14 @@ export function AccessEntry({
           return;
         }
         if (data.matchedSlug) setSlug(data.matchedSlug);
-        setResult({ devotional: data.devotional ?? data.matchedSlug ?? slug, days: data.days ?? 0 });
-        toast("Access verified", "success");
+        const r = { devotional: data.devotional ?? data.matchedSlug ?? slug, days: data.days ?? 0, matchedSlug: data.matchedSlug };
+        setResult(r);
+        toast(`Access verified for ${r.devotional} — opening devotional!`, "success");
+        if (onSuccess) {
+          setTimeout(() => onSuccess(r), 400);
+        } else if (data.matchedSlug) {
+          setTimeout(() => router.push(`/devotionals/${data.matchedSlug}`), 800);
+        }
         return;
       }
 
@@ -88,8 +98,14 @@ export function AccessEntry({
         setFieldErrors(mapErrorToField(data.error ?? "Verification failed."));
         return;
       }
-      setResult({ devotional: data.devotional ?? slug, days: data.days ?? 0 });
-      toast("Access verified", "success");
+      const r = { devotional: data.devotional ?? slug, days: data.days ?? 0 };
+      setResult(r);
+      toast(`Access verified for ${r.devotional}!`, "success");
+      if (onSuccess) {
+        setTimeout(() => onSuccess({ ...r, matchedSlug: slug }), 400);
+      } else {
+        setTimeout(() => router.push(`/devotionals/${slug}`), 800);
+      }
     } catch {
       setFieldErrors({ _general: "Network error. Please try again." });
     } finally {

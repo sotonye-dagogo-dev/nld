@@ -6,6 +6,7 @@ import { getAdminSession } from "@/lib/admin-auth";
 import { clampInt } from "@/lib/utils";
 import { ErrorState } from "@/components/ui/error-state";
 import { GrantsTable } from "@/components/admin/grants-table";
+import { derivePasswordForGrant } from "@/lib/access";
 
 export const metadata: Metadata = { title: "Admin — Access grants" };
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export default async function AccessGrantsPage({
             devotionalTitle: devotionals.title,
             devotionalSlug: devotionals.slug,
             status: accessGrants.status,
-            password: accessGrants.accessPassword,
+            paystackReference: accessGrants.paystackReference,
             granted: accessGrants.grantedAt,
             expires: accessGrants.expiresAt,
           })
@@ -65,7 +66,7 @@ export default async function AccessGrantsPage({
       email: r.email,
       devotional: r.devotionalTitle || r.devotionalSlug || "—",
       status: r.status,
-      password: r.password,
+      password: derivePasswordForGrant(r.paystackReference),
       granted: r.granted.toISOString().slice(0, 16).replace("T", " "),
       expires: r.expires ? r.expires.toISOString().slice(0, 10) : "—",
     }));
