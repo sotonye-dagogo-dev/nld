@@ -32,18 +32,19 @@ export function deriveAccessPassword(paystackReference: string): string {
 /**
  * Compute expiry for an access grant based on the platform/devotional
  * accessMode configuration. Returns null for forever (one-time), or a Date
- * for time-bound modes.
+ * for time-bound modes. Duration days are config-driven when provided.
  */
-export function computeExpiry(accessMode: AccessMode): Date | null {
+export function computeExpiry(accessMode: AccessMode, durationDays?: number): Date | null {
   const now = new Date();
   switch (accessMode) {
     case "one-time":
       return null;
     case "monthly":
       return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    case "duration":
-      // Duration mode: 60 days default (configurable via settings.freePreviewDays * 20 if needed)
-      return new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+    case "duration": {
+      const days = Number.isFinite(durationDays as number) && (durationDays as number) > 0 ? (durationDays as number) : 60;
+      return new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    }
     default:
       return null;
   }

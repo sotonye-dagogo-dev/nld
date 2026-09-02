@@ -72,8 +72,10 @@ export async function POST(request: Request) {
     if (!bundleDevotionals || bundleDevotionals.length === 0) {
       return NextResponse.json({ ok: false, error: "No devotionals available for bundle purchase." }, { status: 404 });
     }
-    // Config-driven bundle fee: platform one-time fee if set, else sum
-    if (settings.accessMode === "one-time" && settings.defaultPriceMinor > 0) {
+    // Config-driven bundle fee: bundlePriceMinor is primary, fallback to defaultPriceMinor (legacy), then sum
+    if (settings.bundlePriceMinor && settings.bundlePriceMinor > 0) {
+      amountMinor = settings.bundlePriceMinor;
+    } else if (settings.defaultPriceMinor > 0) {
       amountMinor = settings.defaultPriceMinor;
     } else {
       amountMinor = bundleDevotionals.reduce((sum, d) => sum + d.priceMinor, 0);

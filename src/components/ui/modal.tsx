@@ -26,13 +26,13 @@ export function Modal({ open, onClose, title, children, wide = false }: ModalPro
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cn("relative z-10 w-full rounded-xl border border-border bg-surface p-6 shadow-xl overflow-y-auto max-h-[90vh]", wide ? "max-w-3xl" : "max-w-md")}
+        className={cn("relative z-10 w-full rounded-xl border border-border bg-surface p-6 shadow-2xl overflow-y-auto max-h-[90vh]", wide ? "max-w-3xl" : "max-w-md")}
       >
         <h2 className="mb-4 text-lg font-semibold text-text-primary">{title}</h2>
         {children}

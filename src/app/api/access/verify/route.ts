@@ -67,33 +67,77 @@ export async function POST(request: Request) {
     db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devotional.id), eq(accessGrants.email, payload.email))).limit(1)
   ).catch(() => []);
 
-  const active = grant.find((g) => g.status === "active");
+  let active = grant.find((g) => g.status === "active") ?? null;
+
+  // Bundle-aware fallback: scan all grants for email and see if password matches any active grant
+  async function findMatchingGrant(): Promise<typeof active> {
+    const all = await queryWithTimeout((db) =>
+      db.select().from(accessGrants).where(eq(accessGrants.email, payload.email))
+    ).catch(() => []);
+    for (const g of all) {
+      if (g.status !== "active") continue;
+      if (g.expiresAt && g.expiresAt < new Date()) continue;
+      if (verifyAccessPassword(payload.password, g.accessPassword)) return g;
+    }
+    return null;
+  }
+
   if (!active) {
-    return NextResponse.json(
-      { ok: false, error: "No active access for that email on this devotional." },
-      { status: 403 },
-    );
-  }
+    active = await findMatchingGrant();
+    if (!active) {
+      return NextResponse.json(
+        { ok: false, error: "No active access for that email on this devotional." },
+        { status: 403 },
+      );
+    }
+    // Lazily ensure per-devotional grant for future direct lookup
+    try {
+      const { computeExpiry } = await import("@/lib/access");
+      const { getSiteSettings: getSettings } = await import("@/config/site");
+      const { value: s } = await getSettings().catch(() => ({ value: null as unknown as SiteSettings }));
+      const dur = (s as unknown as SiteSettings | null)?.durationAccessDays ?? 60;
+      const bd = (s as unknown as SiteSettings | null)?.bundleDurationDays ?? dur;
+      const modeFromBundle: AccessMode = active.paystackReference?.startsWith("BT-") || active.paystackReference?.includes("__")
+        ? s?.bundleAccessMode ?? s?.accessMode ?? "one-time"
+        : s?.accessMode ?? "one-time";
+      const maybeExpiry = active.expiresAt ?? computeExpiry(modeFromBundle, modeFromBundle === "duration" ? bd : dur);
+      await queryWithTimeout((db) =>
+        db.insert(accessGrants).values({
+          devotionalId: devotional.id,
+          email: payload.email,
+          paystackReference: `${active!.paystackReference}__lazy-${devotional.id.slice(0, 8)}`,
+          accessPassword: active!.accessPassword,
+          status: "active",
+          expiresAt: maybeExpiry,
+        })
+      ).catch(() => {});
+    } catch {}
+  } else {
+    if (active.expiresAt && active.expiresAt < new Date()) {
+      return NextResponse.json(
+        { ok: false, error: "This access has expired. Please purchase again." },
+        { status: 403 },
+      );
+    }
 
-  if (active.expiresAt && active.expiresAt < new Date()) {
-    return NextResponse.json(
-      { ok: false, error: "This access has expired. Please purchase again." },
-      { status: 403 },
-    );
-  }
-
-  if (!verifyAccessPassword(payload.password, active.accessPassword)) {
-    await recordAudit({
-      actor: payload.email,
-      action: "access.verify",
-      entity: "access_grant",
-      entityId: active.id,
-      metadata: { result: "failed" },
-    });
-    return NextResponse.json(
-      { ok: false, error: "That access password did not match. Please check your email." },
-      { status: 403 },
-    );
+    if (!verifyAccessPassword(payload.password, active.accessPassword)) {
+      const fallback = await findMatchingGrant();
+      if (fallback) {
+        active = fallback;
+      } else {
+        await recordAudit({
+          actor: payload.email,
+          action: "access.verify",
+          entity: "access_grant",
+          entityId: active.id,
+          metadata: { result: "failed" },
+        });
+        return NextResponse.json(
+          { ok: false, error: "That access password did not match. Please check your email." },
+          { status: 403 },
+        );
+      }
+    }
   }
 
   // Password matches — grant was verified. Count the unlocked days.

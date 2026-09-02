@@ -107,6 +107,7 @@ export function AccessGate({ devotional, settings, id }: AccessGateProps) {
                   fileType={day.contentFileUrl.toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
                   maxPreviewChars={MAX_PREVIEW_CHARS}
                   hasFullAccess={true}
+                  coverUrl={devotional.coverUrl}
                 />
               </div>
             )}
