@@ -180,10 +180,15 @@ export function ContentReader({
         if (fileType === "pdf") {
           // Dynamically import pdfjs-dist to avoid SSR bundling issues
           const pdfjs: any = await import("pdfjs-dist");
-          // Configure worker — use CDN if not already set; fallback to local import
+          // Configure worker — pin to the installed API version to avoid
+          // "API version X does not match worker version Y" errors.
+          // Previously hardcoded to 4.4.168 while package-lock had drifted
+          // to 4.10.38, causing hard failure on the devotional reader.
           try {
-            if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-              pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
+            const apiVersion: string = pdfjs.version ?? "4.10.38";
+            const expectedSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${apiVersion}/build/pdf.worker.min.mjs`;
+            if (pdfjs.GlobalWorkerOptions.workerSrc !== expectedSrc) {
+              pdfjs.GlobalWorkerOptions.workerSrc = expectedSrc;
             }
           } catch {}
           const loadingTask = pdfjs.getDocument({ url: fileUrl, withCredentials: false });

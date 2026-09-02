@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
-import { getDb } from "@/data/db";
+import { queryWithTimeout } from "@/data/db";
 import { purchases, accessGrants, events, devotionals } from "@/data/db/schema";
 import { sql } from "drizzle-orm";
 
@@ -17,25 +17,36 @@ function stat(count: number, label: string) {
   );
 }
 
-export default async function AdminDashboardPage() {
-  let counts: { devotionals: number; purchases: number; grants: number; events: number } | null = null;
+async function safeCount(
+  fn: (db: ReturnType<typeof import("@/data/db").getDb>) => Promise<Array<{ n: number }>>,
+): Promise<number | null> {
   try {
-    const db = getDb();
-    const [d, p, g, e] = await Promise.all([
-      db.select({ n: sql<number>`count(*)::int` }).from(devotionals),
-      db.select({ n: sql<number>`count(*)::int` }).from(purchases),
-      db.select({ n: sql<number>`count(*)::int` }).from(accessGrants),
-      db.select({ n: sql<number>`count(*)::int` }).from(events),
-    ]);
-    counts = {
-      devotionals: d[0]?.n ?? 0,
-      purchases: p[0]?.n ?? 0,
-      grants: g[0]?.n ?? 0,
-      events: e[0]?.n ?? 0,
-    };
+    const rows = await queryWithTimeout(fn);
+    return rows[0]?.n ?? 0;
   } catch {
-    counts = null;
+    return null;
   }
+}
+
+export default async function AdminDashboardPage() {
+  const [d, p, g, e] = await Promise.all([
+    safeCount((db) => db.select({ n: sql<number>`count(*)::int` }).from(devotionals)),
+    safeCount((db) => db.select({ n: sql<number>`count(*)::int` }).from(purchases)),
+    safeCount((db) => db.select({ n: sql<number>`count(*)::int` }).from(accessGrants)),
+    safeCount((db) => db.select({ n: sql<number>`count(*)::int` }).from(events)),
+  ]);
+
+  const allFailed = d === null && p === null && g === null && e === null;
+  const counts =
+    allFailed
+      ? null
+      : {
+          devotionals: d ?? 0,
+          purchases: p ?? 0,
+          grants: g ?? 0,
+          events: e ?? 0,
+        };
+  const hasPartialFailure = !allFailed && (d === null || p === null || g === null || e === null);
 
   return (
     <div className="space-y-6">
@@ -57,7 +68,11 @@ export default async function AdminDashboardPage() {
             {stat(counts.grants, "Access grants")}
             {stat(counts.events, "Events logged")}
           </div>
-          
+          {hasPartialFailure && (
+            <p className="text-xs text-text-muted">
+              Some counts may be stale — a transient database hiccup was retried. Refresh to re-check.
+            </p>
+          )}
         </>
       )}
     </div>
