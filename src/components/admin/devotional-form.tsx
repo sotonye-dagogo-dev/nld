@@ -35,7 +35,8 @@ function initialDays(existing?: DevotionalDay[]): DayDraft[] {
       contentFileUrl: (d as DevotionalDay & { contentFileUrl?: string }).contentFileUrl ?? "",
     }));
   }
-  return [{ dayNumber: 1, title: "", content: "", sermonUrl: "", contentFileUrl: "" }];
+  // Start empty — days are optional when a single devotional asset is used
+  return [];
 }
 
 export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
@@ -48,6 +49,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
     subtitle: devotional?.subtitle ?? "",
     slug: devotional?.slug ?? "",
     coverUrl: devotional?.coverUrl ?? "",
+    assetUrl: (devotional as Devotional & { assetUrl?: string | null })?.assetUrl ?? "",
     priceMinor: devotional ? String(devotional.priceMinor) : "500000",
     currency: devotional?.currency ?? "NGN",
     previewDays: devotional ? String(devotional.previewDays) : "3",
@@ -65,10 +67,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
   }
 
   function removeDay(index: number) {
-    setDayDrafts((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      return next.length > 0 ? next : [{ dayNumber: 1, title: "", content: "", sermonUrl: "" }];
-    });
+    setDayDrafts((prev) => prev.filter((_, i) => i !== index));
   }
 
   function addDay() {
@@ -88,9 +87,13 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
     if (form.slug.trim() && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug.trim())) {
       errs.slug = "Slug must be lowercase letters, numbers and hyphens only (e.g. my-devotional).";
     }
+    // Days are optional when a single-asset devotional is provided
+    if (dayDrafts.length === 0 && !form.assetUrl.trim()) {
+      errs.days = "Provide at least one day or upload a single devotional file (PDF/DOCX) that covers all days.";
+    }
     if (Object.keys(errs).length) {
       setFieldErrors(errs);
-      toast("Please fix the highlighted fields.", "error");
+      toast(errs.days ?? "Please fix the highlighted fields.", "error");
       return;
     }
     setLoading(true);
@@ -100,6 +103,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
         subtitle: form.subtitle,
         slug: form.slug,
         coverUrl: form.coverUrl,
+        assetUrl: form.assetUrl || undefined,
         priceMinor: Number(form.priceMinor) || 0,
         currency: form.currency || "NGN",
         accessMode: form.accessMode,
@@ -208,6 +212,13 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
             onChange={(url) => setForm({ ...form, coverUrl: url ?? "" })}
             type="cover"
           />
+          <FileUpload
+            label="Devotional File (covers all days — optional)"
+            value={form.assetUrl}
+            onChange={(url) => setForm({ ...form, assetUrl: url ?? "" })}
+            type="asset"
+            hint="Upload a single PDF/DOCX that contains the whole devotional (e.g. all 30 days in one file). When provided, the per-day entries below are optional — useful when the client uploads an asset that houses all the days. Otherwise add days one-by-one below."
+          />
           <div className="grid grid-cols-2 gap-4">
             <Input
               name="priceMinor"
@@ -268,12 +279,23 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
 
       <Card className="space-y-4">
         <div className="flex-between">
-          <h2 className="text-lg font-semibold text-text-primary">Days</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-text-primary">Days <span className="text-sm font-normal text-text-muted">(optional)</span></h2>
+            <p className="text-xs text-text-muted mt-0.5">Add day-by-day entries when not using a single file above — or combine both (file + days). Leave empty if the devotional file above houses all days.</p>
+          </div>
           <Button type="button" variant="secondary" size="sm" onClick={addDay}>
             + Add day
           </Button>
         </div>
-        {dayDrafts.map((day, i) => (
+        {fieldErrors.days && (
+          <p className="text-sm text-danger" role="alert">{fieldErrors.days}</p>
+        )}
+        {dayDrafts.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-background p-6 text-center">
+            <p className="text-sm text-text-muted">No per-day entries — this devotional will use the single file uploaded above. Add days if you prefer day-by-day assets/content instead.</p>
+          </div>
+        ) : (
+          dayDrafts.map((day, i) => (
           <div key={i} className="space-y-3 rounded-xl border border-border p-4">
             <div className="flex-between">
               <span className="text-sm font-semibold text-text-primary">Day {day.dayNumber}</span>
@@ -321,7 +343,8 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
               onChange={(e) => updateDay(i, { sermonUrl: e.target.value })}
             />
           </div>
-        ))}
+          ))
+        )}
         <div className="flex justify-end border-t border-border pt-4">
           <Button type="button" onClick={onSubmit} loading={loading}>
             {isEdit ? "Save changes" : "Publish devotional"}
