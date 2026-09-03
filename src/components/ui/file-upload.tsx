@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useId } from "react";
 import { Upload, X, Loader2, FileText, FileImage } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -46,8 +46,18 @@ export function FileUpload({ value, onChange, label, hint, accept, type = "cover
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const uid = useId();
 
   const handleUpload = useCallback(async (file: File) => {
+    const MAX_CLIENT_BYTES = 50 * 1024 * 1024;
+    if (file.size > MAX_CLIENT_BYTES) {
+      toast(`File too large — max 50MB (got ${(file.size / 1024 / 1024).toFixed(1)}MB).`, "error");
+      return;
+    }
+    if (file.size === 0) {
+      toast("Empty file.", "error");
+      return;
+    }
     setUploading(true);
     try {
       const formData = new FormData();
@@ -97,14 +107,14 @@ export function FileUpload({ value, onChange, label, hint, accept, type = "cover
       <div className="relative">
         <input
           type="file"
-          accept={accept}
+          accept={effectiveAccept}
           onChange={handleFileChange}
           disabled={disabled || uploading}
           className="sr-only"
-          id={`file-upload-${type}`}
+          id={`file-upload-${type}-${uid}`}
         />
         <label
-          htmlFor={`file-upload-${type}`}
+          htmlFor={`file-upload-${type}-${uid}`}
           className={cn(
             "flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border bg-surface p-6 cursor-pointer transition-colors",
             disabled && "opacity-50 cursor-not-allowed",
@@ -147,7 +157,7 @@ export function FileUpload({ value, onChange, label, hint, accept, type = "cover
             <>
               <Upload className="h-8 w-8 text-text-muted" />
               <span className="text-sm text-text-muted">
-                Click to upload {type === "cover" ? "cover image" : "asset"} (max 10MB)
+                Click to upload {type === "cover" ? "cover image" : "asset"} (max 50MB)
               </span>
             </>
           )}

@@ -86,13 +86,18 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
   async function handleProofUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setFieldErrors({ proofFile: "File size must be less than 10MB." });
+    if (file.size > 50 * 1024 * 1024) {
+      setFieldErrors({ proofFile: `File size must be less than 50MB (got ${(file.size / 1024 / 1024).toFixed(1)}MB).` });
       return;
     }
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-    if (!allowedTypes.includes(file.type)) {
-      setFieldErrors({ proofFile: "Please upload an image (JPG, PNG, WebP) or PDF." });
+    if (file.size === 0) {
+      setFieldErrors({ proofFile: "Empty file." });
+      return;
+    }
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/octet-stream"];
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!allowedTypes.includes(file.type) && file.type !== "" && !["jpg", "jpeg", "png", "webp", "pdf", "docx"].includes(ext)) {
+      setFieldErrors({ proofFile: "Please upload an image (JPG, PNG, WebP), PDF or DOCX." });
       return;
     }
     setProofFile(file);
@@ -384,10 +389,10 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-text-primary">
-              Proof of payment (image or PDF, max 10MB)
+              Proof of payment (image, PDF or DOCX — max 50MB)
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
+                accept="image/jpeg,image/png,image/webp,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={handleProofUpload}
                 className={cn("mt-1 w-full text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary file:text-background hover:file:bg-primary-hover", fieldErrors.proofFile && "ring-1 ring-danger rounded-lg")}
               />

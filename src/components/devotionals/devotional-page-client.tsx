@@ -61,18 +61,18 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
                     <iframe src={day.sermonUrl} title={`Day ${day.dayNumber} sermon`} className="h-full w-full" loading="lazy" />
                   </div>
                 )}
-                {day.contentFileUrl && (
+                {day.contentFileUrl ? (
                   <div className="mt-4">
                     <ContentReader
                       fileUrl={day.contentFileUrl}
                       fileName={day.contentFileUrl.split("/").pop()?.split(".").slice(0, -1).join(".") || "Content"}
-                      fileType={day.contentFileUrl.toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
+                      fileType={(day.contentFileUrl ?? "").toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
                       maxPreviewChars={MAX_PREVIEW_CHARS}
                       hasFullAccess={true}
                       coverUrl={devotional.coverUrl}
                     />
                   </div>
-                )}
+                ) : null}
               </article>
             ))}
           </section>
@@ -101,8 +101,8 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
                       Day {day.dayNumber} — {day.title}
                     </h2>
                     <div className="prose-devotional">
-                      {day.content.slice(0, 400)}
-                      {day.content.length > 400 ? "…" : ""}
+                      {(day.content ?? "").slice(0, 400)}
+                      {(day.content ?? "").length > 400 ? "…" : ""}
                     </div>
                     {day.contentFileUrl && (
                       <div className="mt-4 rounded-lg border border-border bg-background p-4 text-sm text-text-muted">
@@ -126,24 +126,22 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
                   <h3 className="mb-2 text-xl font-semibold text-text-primary">
                     Day {day.dayNumber} — {day.title}
                   </h3>
-                  <div className="prose-devotional">{day.content}</div>
+                  <div className="prose-devotional">{day.content ?? ""}</div>
                   {day.sermonUrl && (
                     <div className="mt-4 aspect-video overflow-hidden rounded-lg">
                       <iframe src={day.sermonUrl} title={`Day ${day.dayNumber} sermon`} className="h-full w-full" loading="lazy" />
                     </div>
                   )}
-                  {day.contentFileUrl && (
-                    <div className="mt-4">
-                      <ContentReader
-                        fileUrl={day.contentFileUrl}
-                        fileName={day.contentFileUrl.split("/").pop()?.split(".").slice(0, -1).join(".") || "Content"}
-                        fileType={day.contentFileUrl.toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
-                        maxPreviewChars={MAX_PREVIEW_CHARS}
-                        hasFullAccess={true}
-                        coverUrl={devotional.coverUrl}
-                      />
-                    </div>
-                  )}
+                  <div className="mt-4">
+                    <ContentReader
+                      fileUrl={day.contentFileUrl ?? ""}
+                      fileName={day.contentFileUrl?.split("/").pop()?.split(".").slice(0, -1).join(".") || `${day.title || "Content"} — Day ${day.dayNumber}`}
+                      fileType={(day.contentFileUrl ?? "").toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
+                      maxPreviewChars={MAX_PREVIEW_CHARS}
+                      hasFullAccess={true}
+                      coverUrl={devotional.coverUrl}
+                    />
+                  </div>
                 </article>
               ))}
             </div>

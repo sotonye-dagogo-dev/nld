@@ -13,8 +13,12 @@ const ALLOWED_TYPES = [
   "image/gif",
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  // Some browsers send octet-stream for docx/pdf — allow and validate by extension
+  "application/octet-stream",
+  "application/msword",
 ];
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif", "pdf", "docx", "doc"];
+const MAX_SIZE = 50 * 1024 * 1024; // 50MB generous
 
 export async function POST(request: Request) {
   const admin = await requireAdmin();
@@ -30,12 +34,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "No file provided." }, { status: 400 });
   }
 
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ ok: false, error: "File type not allowed." }, { status: 400 });
+  const extLower = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const mimeAllowed = ALLOWED_TYPES.includes(file.type) || file.type === "" || file.type === "application/octet-stream";
+  const extAllowed = ALLOWED_EXTENSIONS.includes(extLower);
+  if (!mimeAllowed && !extAllowed) {
+    return NextResponse.json(
+      { ok: false, error: `File type not allowed. Allowed: images, PDF, DOCX (got ${file.type || "unknown"} / .${extLower}).` },
+      { status: 400 },
+    );
+  }
+  // If mime is octet-stream, require valid extension
+  if (file.type === "application/octet-stream" && !extAllowed) {
+    return NextResponse.json({ ok: false, error: "File type not allowed for generic binary." }, { status: 400 });
   }
 
   if (file.size > MAX_SIZE) {
-    return NextResponse.json({ ok: false, error: "File too large (max 10MB)." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: `File too large (max 50MB, got ${(file.size / 1024 / 1024).toFixed(1)}MB).` }, { status: 400 });
+  }
+  if (file.size === 0) {
+    return NextResponse.json({ ok: false, error: "Empty file." }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -60,20 +77,24 @@ export async function POST(request: Request) {
     console.error("[admin/assets/upload] failed:", err);
     if (message.includes("bucket") || message.includes("Bucket")) {
       return NextResponse.json(
-        { ok: false, error: "Storage bucket not configured. Please create 'devotional-assets' bucket in Supabase." },
+        { ok: false, error: "Storage bucket not configured. Please create 'devotional-assets' bucket in Supabase (Storage → New bucket → public, name: devotional-assets)." },
         { status: 500 },
       );
     }
-    if (message.includes("policy") || message.includes("Policy") || message.includes("permission") || message.includes("Permission")) {
+    if (message.includes("row-level security") || message.includes("row-level") || message.includes("policy") || message.includes("Policy") || message.includes("permission") || message.includes("Permission")) {
       return NextResponse.json(
-        { ok: false, error: "Storage permission denied. Check Supabase storage policies for 'devotional-assets' bucket." },
+        {
+          ok: false,
+          error:
+            "Storage permission denied (RLS). Apply this policy in Supabase SQL editor: CREATE POLICY \"service_role_all\" ON storage.objects FOR ALL TO service_role USING (true) WITH CHECK (true); Ensure bucket 'devotional-assets' is public and service_role bypasses RLS.",
+        },
         { status: 500 },
       );
     }
-    if (message.includes("timeout") || message.includes("Timeout")) {
+    if (message.includes("timeout") || message.includes("Timeout") || message.includes("Payload Too Large") || message.includes("413")) {
       return NextResponse.json(
-        { ok: false, error: "Upload timeout. Please try a smaller file or check your connection." },
-        { status: 504 },
+        { ok: false, error: "Upload timeout or payload too large. Vercel free tier limits payload to ~4.5MB; for 50MB files ensure you are on Pro or use direct Supabase upload. Try a smaller file or check connection." },
+        { status: 413 },
       );
     }
     return NextResponse.json(
@@ -82,6 +103,10 @@ export async function POST(request: Request) {
     );
   }
 }
+
+// Raise Vercel payload handling: Next.js does not expose bodySizeLimit per route,
+// but `maxDuration` prevents premature timeout for large uploads.
+export const maxDuration = 60;
 
 export async function DELETE(request: Request) {
   const admin = await requireAdmin();
