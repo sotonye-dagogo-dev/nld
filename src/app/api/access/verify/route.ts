@@ -88,8 +88,62 @@ export async function POST(request: Request) {
     return null;
   }
 
+  // Purchases fallback: if no grant, check purchases table (handles webhook race / fresh purchase)
+  async function findMatchingPurchase(): Promise<typeof active> {
+    try {
+      const { purchases } = await import("@/data/db/schema");
+      const { deriveAccessPassword } = await import("@/lib/access");
+      const rows = await queryWithTimeout((db) =>
+        db.select().from(purchases).where(sql`lower(${purchases.email}) = ${normalizedEmail}`)
+      ).catch(() => []);
+      for (const p of rows) {
+        // Only consider successful or pending purchases (pending allows webhook race)
+        if (p.status !== "success" && p.status !== "pending") continue;
+        const expected = deriveAccessPassword(p.paystackReference);
+        if (verifyAccessPassword(trimmedPassword, expected)) {
+          // Lazily create grant for this devotional so future direct lookups succeed
+          try {
+            const { computeExpiry } = await import("@/lib/access");
+            const { getSiteSettings: getSettings2 } = await import("@/config/site");
+            const { value: s2 } = await getSettings2().catch(() => ({ value: null as unknown as SiteSettings }));
+            const dur2 = (s2 as unknown as SiteSettings | null)?.durationAccessDays ?? 60;
+            const mode2: AccessMode = s2?.accessMode ?? "one-time";
+            const exp2 = computeExpiry(mode2, dur2);
+            const inserted = await queryWithTimeout((db) =>
+              db.insert(accessGrants).values({
+                devotionalId: devotional!.id,
+                email: normalizedEmail,
+                paystackReference: p.paystackReference,
+                status: "active",
+                expiresAt: exp2,
+              }).returning({ id: accessGrants.id })
+            ).catch(() => [] as { id: string }[]);
+            if (inserted && inserted.length > 0) {
+              const newGrant = await queryWithTimeout((db) => db.select().from(accessGrants).where(eq(accessGrants.id, inserted[0].id)).limit(1)).catch(() => []);
+              if (newGrant[0]) return newGrant[0] as typeof active;
+            }
+          } catch {}
+          // Fallback: return pseudo-grant shaped object for audit (use existing purchase ref)
+          return {
+            id: p.id,
+            devotionalId: devotional!.id,
+            email: normalizedEmail,
+            paystackReference: p.paystackReference,
+            status: "active",
+            expiresAt: null,
+            grantedAt: new Date(),
+          } as unknown as typeof active;
+        }
+      }
+    } catch {}
+    return null;
+  }
+
   if (!active) {
     active = await findMatchingGrant();
+    if (!active) {
+      active = await findMatchingPurchase();
+    }
     if (!active) {
       return NextResponse.json(
         { ok: false, error: "No active access for that email on this devotional." },
@@ -130,17 +184,22 @@ export async function POST(request: Request) {
       if (fallback) {
         active = fallback;
       } else {
-        await recordAudit({
-          actor: normalizedEmail,
-          action: "access.verify",
-          entity: "access_grant",
-          entityId: active.id,
-          metadata: { result: "failed" },
-        });
-        return NextResponse.json(
-          { ok: false, error: "That access password did not match. Please check your email." },
-          { status: 403 },
-        );
+        const purchaseFallback = await findMatchingPurchase();
+        if (purchaseFallback) {
+          active = purchaseFallback;
+        } else {
+          await recordAudit({
+            actor: normalizedEmail,
+            action: "access.verify",
+            entity: "access_grant",
+            entityId: active.id,
+            metadata: { result: "failed" },
+          });
+          return NextResponse.json(
+            { ok: false, error: "That access password did not match. Please check your email." },
+            { status: 403 },
+          );
+        }
       }
     }
   }

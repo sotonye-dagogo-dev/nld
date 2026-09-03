@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
 import { queryWithTimeout } from "@/data/db";
@@ -94,12 +94,13 @@ export async function POST(request: Request) {
     const durationDays = (settings as SiteSettings).durationAccessDays ?? (settings as SiteSettings).bundleDurationDays ?? 60;
     const expiresAt = computeExpiry(effectiveMode, durationDays);
 
-    // Create access grant (idempotent)
+    // Create access grant (idempotent) — case-insensitive email check for robustness
+    const normalizedEmailForGrant = transfer.email.trim().toLowerCase();
     const existingGrant = await queryWithTimeout((db) =>
       db
         .select()
         .from(accessGrants)
-        .where(and(eq(accessGrants.devotionalId, devotional.id), eq(accessGrants.email, transfer.email)))
+        .where(and(eq(accessGrants.devotionalId, devotional.id), sql`lower(${accessGrants.email}) = ${normalizedEmailForGrant}`))
         .limit(1)
     );
 
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
       await queryWithTimeout((db) =>
         db.insert(accessGrants).values({
           devotionalId: devotional.id,
-          email: transfer.email,
+          email: normalizedEmailForGrant,
           paystackReference: `BT-${transfer.reference}-${transfer.id}`,
           status: "active",
           expiresAt,
@@ -140,13 +141,13 @@ export async function POST(request: Request) {
           const bundleDur = (settings as SiteSettings).bundleDurationDays ?? (settings as SiteSettings).durationAccessDays ?? 60;
           const exp = computeExpiry(bundleMode, bundleDur);
           const exists = await queryWithTimeout((db) =>
-            db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devo.id), eq(accessGrants.email, transfer.email))).limit(1),
+            db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devo.id), sql`lower(${accessGrants.email}) = ${normalizedEmailForGrant}`)).limit(1),
           ).catch(() => []);
           if (exists.length > 0) continue;
           await queryWithTimeout((db) =>
             db.insert(accessGrants).values({
               devotionalId: devo.id,
-              email: transfer.email,
+              email: normalizedEmailForGrant,
               paystackReference: `BT-${transfer.reference}-${transfer.id}__${devo.id}`,
               status: "active",
               expiresAt: exp,

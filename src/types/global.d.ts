@@ -84,6 +84,7 @@ interface SiteSettings {
   antiScreenshotEnabled: boolean;
   paymentsEnabled: boolean;
   paystackEnabled: boolean;
+  budpayEnabled: boolean;
   bankTransferEnabled: boolean;
   emailFrom: string;
   supportEmail: string;
@@ -104,7 +105,7 @@ interface SiteSettings {
   durationAccessDays: number;
 }
 
-/** A single devotional (metadata record; content lives in devotional_days). */
+/** A single devotional (metadata record; content lives in devotional_days or a single asset). */
 interface Devotional {
   id: string;
   slug: string;
@@ -112,6 +113,7 @@ interface Devotional {
   subtitle: string;
   description: string;
   coverUrl: string;
+  assetUrl: string | null;
   priceMinor: number;
   currency: string;
   accessMode: AccessMode;

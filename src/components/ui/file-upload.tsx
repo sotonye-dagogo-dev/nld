@@ -50,16 +50,9 @@ export function FileUpload({ value, onChange, label, hint, accept, type = "cover
 
   const handleUpload = useCallback(async (file: File) => {
     const MAX_CLIENT_BYTES = 50 * 1024 * 1024;
-    const VERCEL_WARN_BYTES = 4.5 * 1024 * 1024;
     if (file.size > MAX_CLIENT_BYTES) {
       toast(`File too large — max 50MB (got ${(file.size / 1024 / 1024).toFixed(1)}MB).`, "error");
       return;
-    }
-    if (file.size > VERCEL_WARN_BYTES) {
-      toast(
-        `File is ${(file.size / 1024 / 1024).toFixed(1)}MB — Vercel hobby plan caps uploads at ~4.5MB. The upload may fail; compress the file or upgrade to Pro / use direct Supabase upload if needed.`,
-        "info",
-      );
     }
     if (file.size === 0) {
       toast("Empty file.", "error");
@@ -67,50 +60,89 @@ export function FileUpload({ value, onChange, label, hint, accept, type = "cover
     }
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", type);
-
-      const res = await fetch("/api/admin/assets", {
-        method: "POST",
-        body: formData,
-      });
-
-      let data: { ok: boolean; publicUrl?: string; error?: string };
-      const ct = res.headers.get("content-type") ?? "";
-      if (ct.includes("application/json")) {
-        try {
-          data = (await res.json()) as typeof data;
-        } catch {
-          const text = await res.text().catch(() => "");
-          throw new Error(text.slice(0, 400) || `Upload failed (${res.status}).`);
-        }
-      } else {
-        const text = await res.text().catch(() => "");
-        if (!res.ok) {
-          if (res.status === 413 || text.toLowerCase().includes("payload") || text.toLowerCase().includes("too large") || text.includes("FUNCTION_PAYLOAD_TOO_LARGE")) {
-            throw new Error(
-              "File too large for Vercel's request limit (~4.5MB on hobby). Compress the file, use a smaller file, or upgrade to Pro / use direct Supabase upload for 50MB files.",
-            );
+      // Prefer direct-to-Supabase signed upload (bypasses Vercel 4.5MB limit)
+      let publicUrl: string | null = null;
+      let usedDirect = false;
+      try {
+        const signRes = await fetch("/api/admin/assets/sign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileName: file.name, contentType: file.type || "application/octet-stream", type }),
+        });
+        const signCt = signRes.headers.get("content-type") ?? "";
+        if (signCt.includes("application/json")) {
+          const signData = (await signRes.json()) as { ok: boolean; signedUrl?: string; token?: string; publicUrl?: string; error?: string };
+          if (signRes.ok && signData.ok && signData.signedUrl) {
+            // Upload directly to Supabase Storage (bypass Vercel)
+            // Supabase signedUrl is hosted on *.supabase.co — direct PUT bypasses Vercel payload limits
+            const putRes = await fetch(signData.signedUrl, {
+              method: "PUT",
+              headers: {
+                "Content-Type": file.type || "application/octet-stream",
+                "x-upsert": "true",
+              },
+              body: file,
+            });
+            if (!putRes.ok) {
+              const t = await putRes.text().catch(() => "");
+              throw new Error(t.slice(0, 400) || `Direct upload failed (${putRes.status}).`);
+            }
+            publicUrl = signData.publicUrl ?? null;
+            usedDirect = true;
+          } else if (signData.error && !signData.signedUrl) {
+            // Sign failed, fall through to legacy
+            console.warn("[file-upload] sign failed, falling back to legacy:", signData.error);
           }
-          throw new Error(text.slice(0, 400) || `Upload failed (${res.status} ${res.statusText}).`);
         }
-        // Non-JSON success is unexpected
-        throw new Error(text.slice(0, 400) || "Upload failed: server returned non-JSON response.");
-      }
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error ?? `Upload failed (${res.status}).`);
+      } catch (e) {
+        console.warn("[file-upload] direct path failed, falling back to legacy:", e);
       }
 
-      onChange(data.publicUrl!);
-      if (preview) setPreviewUrl(data.publicUrl ?? null);
+      if (!usedDirect) {
+        // Legacy path: proxy through Vercel (for small files or SDK fallback)
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("type", type);
+        const res = await fetch("/api/admin/assets", {
+          method: "POST",
+          body: formData,
+        });
+        let data: { ok: boolean; publicUrl?: string; error?: string };
+        const ct = res.headers.get("content-type") ?? "";
+        if (ct.includes("application/json")) {
+          try {
+            data = (await res.json()) as typeof data;
+          } catch {
+            const text = await res.text().catch(() => "");
+            throw new Error(text.slice(0, 400) || `Upload failed (${res.status}).`);
+          }
+        } else {
+          const text = await res.text().catch(() => "");
+          if (!res.ok) {
+            if (res.status === 413 || text.toLowerCase().includes("payload") || text.toLowerCase().includes("too large") || text.includes("FUNCTION_PAYLOAD_TOO_LARGE")) {
+              throw new Error(
+                "File too large for Vercel's request limit (~4.5MB on hobby). Try a smaller file or ensure direct upload is enabled (Supabase signed URL).",
+              );
+            }
+            throw new Error(text.slice(0, 400) || `Upload failed (${res.status} ${res.statusText}).`);
+          }
+          throw new Error(text.slice(0, 400) || "Upload failed: server returned non-JSON response.");
+        }
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error ?? `Upload failed (${res.status}).`);
+        }
+        publicUrl = data.publicUrl ?? null;
+      }
+
+      if (!publicUrl) throw new Error("Upload succeeded but no URL returned.");
+      onChange(publicUrl);
+      if (preview) setPreviewUrl(publicUrl);
       toast("Uploaded successfully", "success");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upload failed";
-      // Map raw Vercel 413 HTML to friendly message
       if (msg.includes("Unexpected token") && (msg.includes("Request") || msg.includes("FUNCTION_PAYLOAD"))) {
         toast(
-          "File too large for Vercel's request limit (~4.5MB on hobby). Compress the file or upgrade to Pro / use direct Supabase upload for 50MB files.",
+          "File too large for Vercel's request limit (~4.5MB on hobby). Direct upload will be used for 50MB files; if this persists check Supabase bucket and RLS.",
           "error",
         );
       } else {

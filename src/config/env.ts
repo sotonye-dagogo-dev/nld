@@ -14,6 +14,9 @@ export const env = {
   paystackPublicKey: process.env.PAYSTACK_PUBLIC_KEY ?? "",
   paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
 
+  budpayPublicKey: process.env.BUDPAY_PUBLIC_KEY ?? "",
+  budpaySecretKey: process.env.BUDPAY_SECRET_KEY ?? "",
+
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   emailFrom: process.env.EMAIL_FROM ?? "",
   emailServerHost: process.env.EMAIL_SERVER_HOST ?? "",

@@ -63,6 +63,7 @@ export default async function PurchasePage({
       subtitle: `${purchasables.length} titles`,
       description: `One purchase unlocks every published devotional (${purchasables.length} titles).`,
       coverUrl: purchasables[0].coverUrl,
+      assetUrl: null,
       priceMinor: totalMinor,
       currency,
       accessMode: settings.accessMode,

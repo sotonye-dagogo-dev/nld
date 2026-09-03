@@ -19,8 +19,13 @@ export async function GET(request: Request) {
       db.select().from(purchases).where(eq(purchases.paystackReference, reference)).limit(1)
     ).then((rows) => rows[0]);
 
-    if (!purchase || purchase.status !== "success") {
-      return NextResponse.json({ ok: false, error: "Purchase not found or not completed." }, { status: 404 });
+    if (!purchase) {
+      return NextResponse.json({ ok: false, error: "Purchase not found." }, { status: 404 });
+    }
+    // Allow pending purchases to retrieve password (webhook race) — password is derivable regardless
+    // But note status for client feedback; grant creation still handled.
+    if (purchase.status !== "success" && purchase.status !== "pending") {
+      return NextResponse.json({ ok: false, error: "Purchase not completed." }, { status: 404 });
     }
 
     // Try exact grant first, then bundle suffix variants (e.g. NL-xxx__<id>)
