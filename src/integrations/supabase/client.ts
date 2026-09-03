@@ -170,3 +170,57 @@ export async function deleteAsset(path: string): Promise<void> {
 export function getAssetPublicUrl(path: string): string {
   return `${supabaseConfig.storage.publicUrl}/${path}`;
 }
+
+/** Create a signed upload URL for direct browser-to-Supabase uploads (bypasses Vercel payload limit). */
+export async function createSignedUploadUrl(path: string): Promise<{ signedUrl: string; token: string; path: string; publicUrl: string }> {
+  const client = getAdminClient();
+  const storage = (client.storage as unknown as { from: (b: string) => unknown }).from(supabaseConfig.storage.bucket) as unknown as {
+    createSignedUploadUrl: (p: string) => Promise<{ data: { signedUrl: string; token: string; path: string } | null; error: { message: string } | null }>;
+  };
+  if (typeof storage.createSignedUploadUrl === "function") {
+    const { data, error } = await storage.createSignedUploadUrl(path);
+    if (error) throw new Error(`Storage sign failed: ${error.message}`);
+    if (!data) throw new Error("Storage sign returned no data");
+    return { signedUrl: data.signedUrl, token: data.token, path: data.path, publicUrl: getAssetPublicUrl(data.path) };
+  }
+  // Fallback: manual REST call to Supabase Storage signed upload endpoint
+  // POST https://<supabaseUrl>/storage/v1/object/upload/sign/<bucket>/<path>
+  try {
+    const url = `${supabaseConfig.url}/storage/v1/object/upload/sign/${encodeURIComponent(supabaseConfig.storage.bucket)}/${path}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${supabaseConfig.serviceRoleKey}`,
+        apikey: supabaseConfig.serviceRoleKey ?? "",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`Manual sign failed: ${res.status} ${t.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as { url?: string; signedURL?: string; signedUrl?: string; token?: string };
+    const signedUrl = json.signedUrl ?? json.signedURL ?? json.url;
+    if (!signedUrl) throw new Error("Manual sign returned no URL");
+    // Supabase may return relative path; make absolute if needed
+    const absolute = signedUrl.startsWith("http") ? signedUrl : `${supabaseConfig.url}/storage/v1${signedUrl}`;
+    return { signedUrl: absolute, token: json.token ?? "", path, publicUrl: getAssetPublicUrl(path) };
+  } catch (e) {
+    throw new Error(`createSignedUploadUrl not available: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+/** Upload to a signed URL directly (browser PUT alternative server helper - not used server-side) */
+export async function uploadToSignedUrl(path: string, token: string, file: Buffer, contentType: string): Promise<void> {
+  const client = getAdminClient();
+  const storage = (client.storage as unknown as { from: (b: string) => unknown }).from(supabaseConfig.storage.bucket) as unknown as {
+    uploadToSignedUrl: (p: string, t: string, f: unknown, opts: unknown) => Promise<{ error: unknown }>;
+  };
+  if (typeof storage.uploadToSignedUrl === "function") {
+    const { error } = await storage.uploadToSignedUrl(path, token, file, { contentType, upsert: true });
+    if (error) throw new Error(`Signed upload failed: ${(error as { message?: string })?.message ?? String(error)}`);
+    return;
+  }
+  throw new Error("uploadToSignedUrl not available");
+}

@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   antiScreenshotEnabled: true,
   paymentsEnabled: true,
   paystackEnabled: true,
+  budpayEnabled: true,
   bankTransferEnabled: false,
   emailFrom: "Next Level Devotional <devotional@example.com>",
   supportEmail: "support@example.com",

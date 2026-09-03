@@ -21,7 +21,7 @@ export const devotionalStatusEnum = pgEnum("devotional_status", ["draft", "publi
 export const adminRoleEnum = pgEnum("admin_role", ["owner", "admin", "editor"]);
 export const inviteStatusEnum = pgEnum("invite_status", ["pending", "accepted", "revoked", "expired"]);
 export const transferStatusEnum = pgEnum("transfer_status", ["pending", "verified", "rejected"]);
-export const paymentMethodEnum = pgEnum("payment_method", ["paystack", "bank_transfer"]);
+export const paymentMethodEnum = pgEnum("payment_method", ["paystack", "budpay", "bank_transfer"]);
 
 // ---------------------------------------------------------------------------
 // settings — admin-configurable platform values (name, logo, pricing, toggles)

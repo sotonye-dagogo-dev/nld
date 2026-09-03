@@ -22,6 +22,7 @@ const SETTING_KEYS: (keyof SiteSettings)[] = [
   "antiScreenshotEnabled",
   "paymentsEnabled",
   "paystackEnabled",
+  "budpayEnabled",
   "bankTransferEnabled",
   "emailFrom",
   "supportEmail",
@@ -49,6 +50,7 @@ export function coerceValue<T>(key: keyof SiteSettings, raw: unknown, fallback: 
     case "antiScreenshotEnabled":
     case "paymentsEnabled":
     case "paystackEnabled":
+    case "budpayEnabled":
     case "bankTransferEnabled":
     case "bundleEnabled":
     case "allowIndividualPurchase": {

@@ -82,8 +82,56 @@ export async function POST(
     return null;
   }
 
+  async function findMatchingPurchase(): Promise<typeof active> {
+    try {
+      const { purchases } = await import("@/data/db/schema");
+      const { deriveAccessPassword } = await import("@/lib/access");
+      const rows = await queryWithTimeout((db) =>
+        db.select().from(purchases).where(sql`lower(${purchases.email}) = ${normalizedEmail}`)
+      ).catch(() => []);
+      for (const p of rows) {
+        if (p.status !== "success" && p.status !== "pending") continue;
+        const expected = deriveAccessPassword(p.paystackReference);
+        if (verifyAccessPassword(trimmedPassword, expected)) {
+          try {
+            const { computeExpiry } = await import("@/lib/access");
+            const { getSiteSettings: getSettings2 } = await import("@/config/site");
+            const { value: s2 } = await getSettings2().catch(() => ({ value: null as unknown as SiteSettings }));
+            const dur2 = (s2 as unknown as SiteSettings | null)?.durationAccessDays ?? 60;
+            const mode2: AccessMode = s2?.accessMode ?? "one-time";
+            const exp2 = computeExpiry(mode2, dur2);
+            const inserted = await queryWithTimeout((db) =>
+              db.insert(accessGrants).values({
+                devotionalId: devotional!.id,
+                email: normalizedEmail,
+                paystackReference: p.paystackReference,
+                status: "active",
+                expiresAt: exp2,
+              }).returning({ id: accessGrants.id })
+            ).catch(() => [] as { id: string }[]);
+            if (inserted && inserted.length > 0) {
+              const ng = await queryWithTimeout((db) => db.select().from(accessGrants).where(eq(accessGrants.id, inserted[0].id)).limit(1)).catch(() => []);
+              if (ng[0]) return ng[0] as typeof active;
+            }
+          } catch {}
+          return {
+            id: p.id,
+            devotionalId: devotional!.id,
+            email: normalizedEmail,
+            paystackReference: p.paystackReference,
+            status: "active",
+            expiresAt: null,
+            grantedAt: new Date(),
+          } as unknown as typeof active;
+        }
+      }
+    } catch {}
+    return null;
+  }
+
   if (!active) {
     active = await findMatchingBundleGrant();
+    if (!active) active = await findMatchingPurchase();
     if (!active) {
       return NextResponse.json(
         { ok: false, error: "No active access for that email on this devotional." },
@@ -123,22 +171,26 @@ export async function POST(
     }
 
     if (!verifyAccessPassword(trimmedPassword, derivePasswordForGrant(active.paystackReference))) {
-      // Try bundle fallback before failing
       const fallback = await findMatchingBundleGrant();
       if (fallback) {
         active = fallback;
       } else {
-        await recordAudit({
-          actor: normalizedEmail,
-          action: "access.verify",
-          entity: "access_grant",
-          entityId: active.id,
-          metadata: { result: "failed" },
-        });
-        return NextResponse.json(
-          { ok: false, error: "That access password did not match. Please check your email." },
-          { status: 403 },
-        );
+        const purchaseFallback = await findMatchingPurchase();
+        if (purchaseFallback) {
+          active = purchaseFallback;
+        } else {
+          await recordAudit({
+            actor: normalizedEmail,
+            action: "access.verify",
+            entity: "access_grant",
+            entityId: active.id,
+            metadata: { result: "failed" },
+          });
+          return NextResponse.json(
+            { ok: false, error: "That access password did not match. Please check your email." },
+            { status: 403 },
+          );
+        }
       }
     }
   }

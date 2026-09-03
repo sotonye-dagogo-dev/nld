@@ -43,6 +43,24 @@ export async function POST(request: Request) {
   const before: Record<string, string | number | boolean> = {};
   const after: Record<string, string | number | boolean> = {};
 
+  // Server-side guard: at least one payment method must remain enabled (paystack/budpay/bank)
+  const incoming = payload.settings as Record<string, unknown>;
+  const paystackIn = incoming.paystackEnabled !== undefined ? String(incoming.paystackEnabled) === "true" : undefined;
+  const budpayIn = incoming.budpayEnabled !== undefined ? String(incoming.budpayEnabled) === "true" : undefined;
+  const bankIn = incoming.bankTransferEnabled !== undefined ? String(incoming.bankTransferEnabled) === "true" : undefined;
+  // If any of the three are explicitly set in this request, validate the resulting effective state
+  if (paystackIn !== undefined || budpayIn !== undefined || bankIn !== undefined) {
+    try {
+      const { value: cur } = await getSiteSettings().catch(() => ({ value: DEFAULT_SETTINGS as SiteSettings }));
+      const effectivePaystack = paystackIn !== undefined ? paystackIn : cur.paystackEnabled;
+      const effectiveBudpay = budpayIn !== undefined ? budpayIn : (cur as unknown as { budpayEnabled?: boolean }).budpayEnabled ?? true;
+      const effectiveBank = bankIn !== undefined ? bankIn : cur.bankTransferEnabled;
+      if (!effectivePaystack && !effectiveBudpay && !effectiveBank) {
+        return NextResponse.json({ ok: false, error: "At least one payment method (Paystack, BudPay, Bank Transfer) must be enabled." }, { status: 400 });
+      }
+    } catch {}
+  }
+
   try {
     for (const key of Object.keys(payload.settings) as (keyof SiteSettings)[]) {
       if (!SETTING_KEYS.includes(key)) continue;
