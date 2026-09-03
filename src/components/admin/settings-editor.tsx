@@ -25,6 +25,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
     accessMode: initial.accessMode,
     paymentsEnabled: initial.paymentsEnabled,
     paystackEnabled: initial.paystackEnabled,
+    budpayEnabled: (initial.budpayEnabled ?? true) as boolean,
     bankTransferEnabled: initial.bankTransferEnabled,
     antiScreenshotEnabled: initial.antiScreenshotEnabled,
     footerDevCreditName: initial.footerDevCreditName,
@@ -56,8 +57,8 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    // Validate at least one payment method is enabled
-    if (!form.paystackEnabled && !form.bankTransferEnabled) {
+    // Validate at least one payment method is enabled (among Paystack, BudPay, Bank)
+    if (!form.paystackEnabled && !form.budpayEnabled && !form.bankTransferEnabled) {
       toast("At least one payment method must be enabled.", "error");
       return;
     }
@@ -280,6 +281,18 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
               type="checkbox"
               checked={form.paystackEnabled}
               onChange={(e) => setForm({ ...form, paystackEnabled: e.target.checked })}
+              className="h-4 w-4 accent-primary"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-4 text-sm text-text-primary">
+            <span>
+              BudPay (card/bank/USSD) — new
+              <span className="block text-xs text-text-muted">Allow new purchases through BudPay (mirrored Paystack flow, config-driven).</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={form.budpayEnabled}
+              onChange={(e) => setForm({ ...form, budpayEnabled: e.target.checked })}
               className="h-4 w-4 accent-primary"
             />
           </label>

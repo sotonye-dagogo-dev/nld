@@ -40,9 +40,13 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
-  const [method, setMethod] = useState<"paystack" | "bank_transfer">(
-    settings.paystackEnabled ? "paystack" : "bank_transfer"
-  );
+  type PaymentMethod = "paystack" | "budpay" | "bank_transfer";
+  const initialMethod: PaymentMethod = settings.paystackEnabled
+    ? "paystack"
+    : settings.budpayEnabled
+      ? "budpay"
+      : "bank_transfer";
+  const [method, setMethod] = useState<PaymentMethod>(initialMethod);
   const [bankAccountId, setBankAccountId] = useState("");
   const [transferReference, setTransferReference] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -64,7 +68,8 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
     setLoading(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const res = await fetch("/api/paystack/init", {
+      const endpoint = method === "budpay" ? "/api/budpay/init" : "/api/paystack/init";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: devotional.slug, email: normalizedEmail }),
@@ -144,22 +149,61 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
     setUploadProgress(0);
 
     try {
-// Upload proof file to storage
-      const formData = new FormData();
-      formData.append("file", proofFile as File);
+      // Upload proof file: prefer direct-to-Supabase signed URL (bypasses Vercel 4.5MB limit)
+      let proofUrl: string | null = null;
+      let usedDirect = false;
+      try {
+        const signRes = await fetch("/api/bank-transfer/sign-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileName: (proofFile as File).name, contentType: (proofFile as File).type || "application/octet-stream" }),
+        });
+        const signCt = signRes.headers.get("content-type") ?? "";
+        if (signCt.includes("application/json")) {
+          const signData = (await signRes.json()) as { ok: boolean; signedUrl?: string; publicUrl?: string; error?: string };
+          if (signRes.ok && signData.ok && signData.signedUrl && signData.publicUrl) {
+            const putRes = await fetch(signData.signedUrl, {
+              method: "PUT",
+              headers: { "Content-Type": (proofFile as File).type || "application/octet-stream", "x-upsert": "true" },
+              body: proofFile as File,
+            });
+            if (!putRes.ok) {
+              const t = await putRes.text().catch(() => "");
+              throw new Error(t.slice(0, 400) || `Direct upload failed (${putRes.status}).`);
+            }
+            proofUrl = signData.publicUrl;
+            usedDirect = true;
+          }
+        }
+      } catch (e) {
+        console.warn("[bank-transfer] direct sign upload failed, falling back to legacy:", e);
+      }
 
-      const uploadRes = await fetch("/api/bank-transfer/upload-proof", {
-        method: "POST",
-        body: formData,
-      });
-      const upCt = uploadRes.headers.get("content-type") ?? "";
-      let uploadData: { ok: boolean; url?: string; error?: string };
-      if (upCt.includes("application/json")) {
-        try {
-          uploadData = (await uploadRes.json()) as typeof uploadData;
-        } catch {
+      if (!usedDirect) {
+        const formData = new FormData();
+        formData.append("file", proofFile as File);
+        const uploadRes = await fetch("/api/bank-transfer/upload-proof", {
+          method: "POST",
+          body: formData,
+        });
+        const upCt = uploadRes.headers.get("content-type") ?? "";
+        let uploadData: { ok: boolean; url?: string; error?: string };
+        if (upCt.includes("application/json")) {
+          try {
+            uploadData = (await uploadRes.json()) as typeof uploadData;
+          } catch {
+            const text = await uploadRes.text().catch(() => "");
+            const isPayload = text.toLowerCase().includes("payload") || uploadRes.status === 413;
+            setGeneralError(
+              isPayload
+                ? "File too large for Vercel's limit (~4.5MB on hobby). Compress the file or use a smaller file."
+                : text.slice(0, 400) || `Upload failed (${uploadRes.status}).`,
+            );
+            return;
+          }
+        } else {
           const text = await uploadRes.text().catch(() => "");
-          const isPayload = text.toLowerCase().includes("payload") || uploadRes.status === 413;
+          const isPayload = uploadRes.status === 413 || text.toLowerCase().includes("payload") || text.includes("FUNCTION_PAYLOAD_TOO_LARGE");
           setGeneralError(
             isPayload
               ? "File too large for Vercel's limit (~4.5MB on hobby). Compress the file or use a smaller file."
@@ -167,31 +211,26 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
           );
           return;
         }
-      } else {
-        const text = await uploadRes.text().catch(() => "");
-        const isPayload = uploadRes.status === 413 || text.toLowerCase().includes("payload") || text.includes("FUNCTION_PAYLOAD_TOO_LARGE");
-        setGeneralError(
-          isPayload
-            ? "File too large for Vercel's limit (~4.5MB on hobby). Compress the file or use a smaller file."
-            : text.slice(0, 400) || `Upload failed (${uploadRes.status}).`,
-        );
-        return;
-      }
-      if (!uploadRes.ok || !uploadData.ok) {
-        const msg = uploadData.error ?? "Failed to upload proof of payment.";
-        if (msg.toLowerCase().includes("payload") || msg.toLowerCase().includes("too large")) {
-          setGeneralError("File too large for Vercel's limit (~4.5MB on hobby). Compress the file or use a smaller file.");
+        if (!uploadRes.ok || !uploadData.ok) {
+          const msg = uploadData.error ?? "Failed to upload proof of payment.";
+          if (msg.toLowerCase().includes("payload") || msg.toLowerCase().includes("too large")) {
+            setGeneralError("File too large for Vercel's limit (~4.5MB on hobby). Compress the file or use a smaller file.");
+            return;
+          }
+          if (msg.toLowerCase().includes("proof") || msg.toLowerCase().includes("file")) setFieldErrors({ proofFile: msg });
+          else setGeneralError(msg);
           return;
         }
-        if (msg.toLowerCase().includes("proof") || msg.toLowerCase().includes("file")) setFieldErrors({ proofFile: msg });
-        else setGeneralError(msg);
+        proofUrl = uploadData.url ?? null;
+      }
+
+      if (!proofUrl) {
+        setGeneralError("Upload succeeded but no URL returned.");
         return;
       }
 
       setUploadProgress(100);
 
-      // Submit bank transfer record
-      const selectedAccount = activeBankAccounts.find((a) => a.id === bankAccountId);
       const normalizedEmail2 = email.trim().toLowerCase();
       const res = await fetch("/api/bank-transfer/upload", {
         method: "POST",
@@ -203,7 +242,7 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
           currency: devotional.currency,
           bankAccountId,
           reference: transferReference,
-          proofUrl: uploadData.url,
+          proofUrl: proofUrl as string,
         }),
       });
       const ct2 = res.headers.get("content-type") ?? "";
@@ -256,9 +295,10 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
   }
 
   const showPaystack = settings.paystackEnabled;
+  const showBudpay = (settings as unknown as { budpayEnabled?: boolean }).budpayEnabled ?? true;
   const showBankTransfer = settings.bankTransferEnabled && activeBankAccounts.length > 0;
 
-  if (!showPaystack && !showBankTransfer) {
+  if (!showPaystack && !showBudpay && !showBankTransfer) {
     return (
       <Card>
         <p className="text-sm text-text-muted">
@@ -296,36 +336,56 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
         )}
       </p>
 
-      {showPaystack && showBankTransfer && (
-        <div className="mb-4 flex gap-2" role="tablist" aria-label="Payment method">
-          <button
-            role="tab"
-            aria-selected={method === "paystack"}
-            onClick={() => setMethod("paystack")}
-            className={cn(
-              "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-              method === "paystack"
-                ? "border-primary bg-primary text-background"
-                : "border-border bg-surface text-text-primary hover:bg-background"
-            )}
-          >
-            <CreditCard className="h-4 w-4 mr-1.5 inline-block" aria-hidden />
-            Paystack
-          </button>
-          <button
-            role="tab"
-            aria-selected={method === "bank_transfer"}
-            onClick={() => setMethod("bank_transfer")}
-            className={cn(
-              "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-              method === "bank_transfer"
-                ? "border-primary bg-primary text-background"
-                : "border-border bg-surface text-text-primary hover:bg-background"
-            )}
-          >
-            <Banknote className="h-4 w-4 mr-1.5 inline-block" aria-hidden />
-            Bank Transfer
-          </button>
+      {(showPaystack || showBudpay || showBankTransfer) && (
+        <div className="mb-4 flex gap-2 flex-wrap" role="tablist" aria-label="Payment method">
+          {showPaystack && (
+            <button
+              role="tab"
+              aria-selected={method === "paystack"}
+              onClick={() => setMethod("paystack")}
+              className={cn(
+                "flex-1 min-w-[110px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                method === "paystack"
+                  ? "border-primary bg-primary text-background"
+                  : "border-border bg-surface text-text-primary hover:bg-background"
+              )}
+            >
+              <CreditCard className="h-4 w-4 mr-1.5 inline-block" aria-hidden />
+              Paystack
+            </button>
+          )}
+          {showBudpay && (
+            <button
+              role="tab"
+              aria-selected={method === "budpay"}
+              onClick={() => setMethod("budpay")}
+              className={cn(
+                "flex-1 min-w-[110px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                method === "budpay"
+                  ? "border-primary bg-primary text-background"
+                  : "border-border bg-surface text-text-primary hover:bg-background"
+              )}
+            >
+              <CreditCard className="h-4 w-4 mr-1.5 inline-block" aria-hidden />
+              BudPay
+            </button>
+          )}
+          {showBankTransfer && (
+            <button
+              role="tab"
+              aria-selected={method === "bank_transfer"}
+              onClick={() => setMethod("bank_transfer")}
+              className={cn(
+                "flex-1 min-w-[110px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                method === "bank_transfer"
+                  ? "border-primary bg-primary text-background"
+                  : "border-border bg-surface text-text-primary hover:bg-background"
+              )}
+            >
+              <Banknote className="h-4 w-4 mr-1.5 inline-block" aria-hidden />
+              Bank Transfer
+            </button>
+          )}
         </div>
       )}
 
@@ -336,7 +396,7 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
         </div>
       )}
 
-      {method === "paystack" && (
+      {(method === "paystack" || method === "budpay") && (
         <form onSubmit={startPaystackPayment} className="space-y-4" noValidate>
           <Input
             name="email"
@@ -350,7 +410,7 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
             error={fieldErrors.email}
           />
           <Button type="submit" loading={loading} className="w-full">
-            Pay with Paystack
+            {method === "budpay" ? "Pay with BudPay" : "Pay with Paystack"}
           </Button>
         </form>
       )}
@@ -509,11 +569,19 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
       )}
 
       <p className="mt-4 text-xs text-text-muted">
-        {showPaystack && showBankTransfer
-          ? "Secure payments processed by Paystack or direct bank transfer."
+        {showPaystack && showBudpay && showBankTransfer
+          ? "Secure payments via Paystack, BudPay, or bank transfer."
+          : showPaystack && showBudpay
+          ? "Secure payments via Paystack or BudPay."
+          : showPaystack && showBankTransfer
+          ? "Secure payments via Paystack or bank transfer."
+          : showBudpay && showBankTransfer
+          ? "Secure payments via BudPay or bank transfer."
           : showPaystack
-          ? "Secure payment processed by Paystack. You will also receive a receipt from Paystack by email."
-          : "Direct bank transfer. Your access password will be emailed after admin verification."}
+          ? "Secure payment via Paystack."
+          : showBudpay
+          ? "Secure payment via BudPay."
+          : "Direct bank transfer. Access password emailed after verification."}
       </p>
     </Card>
   );

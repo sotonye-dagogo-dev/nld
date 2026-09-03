@@ -84,6 +84,7 @@ interface SiteSettings {
   antiScreenshotEnabled: boolean;
   paymentsEnabled: boolean;
   paystackEnabled: boolean;
+  budpayEnabled: boolean;
   bankTransferEnabled: boolean;
   emailFrom: string;
   supportEmail: string;
