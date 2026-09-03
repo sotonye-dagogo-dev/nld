@@ -23,8 +23,17 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
 
   const visibleDays = days.slice(0, previewDays);
   const lockedDays = days.slice(previewDays);
-  const hasAccessControl = devotional.priceMinor > 0 && days.length > previewDays;
+  const devotionalAssetUrl = (devotional as Devotional & { assetUrl?: string | null }).assetUrl ?? null;
+  const hasSingleAsset = Boolean(devotionalAssetUrl && devotionalAssetUrl.trim().length > 0);
+  const assetFileType: "pdf" | "docx" = (devotionalAssetUrl ?? "").toLowerCase().endsWith(".pdf") ? "pdf" : "docx";
+  const assetFileName = devotionalAssetUrl?.split("/").pop()?.split(".").slice(0, -1).join(".") || devotional.title || "Devotional";
+  const hasLockedDays = days.length > previewDays;
+  const hasLockedAsset = hasSingleAsset && devotional.priceMinor > 0;
+  // Access gate shown when there is any locked content (days beyond preview OR a paid single-file asset)
+  const hasAccessControl = devotional.priceMinor > 0 && (hasLockedDays || hasLockedAsset);
   const isUnlocked = !!unlockedDays;
+  // Asset is considered accessible when free or after successful unlock
+  const assetHasFullAccess = !hasSingleAsset ? false : devotional.priceMinor === 0 || isUnlocked;
 
   return (
     <div className="section-gap">
@@ -45,8 +54,49 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
 
       {devotional.description && <p className="max-w-2xl text-text-muted mb-8">{devotional.description}</p>}
 
-      {days.length === 0 ? (
+      {/* Single-asset devotional (no days) or hybrid — asset viewer with optional days */}
+      {hasSingleAsset && (
+        <section className="mb-8">
+          <ContentReader
+            fileUrl={devotionalAssetUrl ?? ""}
+            fileName={assetFileName}
+            fileType={assetFileType}
+            maxPreviewChars={MAX_PREVIEW_CHARS}
+            hasFullAccess={assetHasFullAccess}
+            coverUrl={devotional.coverUrl}
+            upgradeHref={hasAccessControl && !isUnlocked ? "#access-gate" : undefined}
+          />
+          {hasLockedAsset && !isUnlocked && (
+            <p className="mt-2 text-xs text-text-muted text-center">This file is protected — purchase access or enter your access code below to unlock.</p>
+          )}
+          {isUnlocked && hasSingleAsset && (
+            <p className="mt-2 text-xs text-success text-center font-medium">Access granted — you can now read the full devotional file above.</p>
+          )}
+        </section>
+      )}
+
+      {days.length === 0 && !hasSingleAsset ? (
         <ErrorState title="No content yet" message="This devotional has not been published yet. Check back soon." />
+      ) : days.length === 0 && hasSingleAsset ? (
+        // Asset-only: gate and purchase are already handled above; still show fallback & gate
+        <div className="section-gap">
+          {reference && devotional.priceMinor > 0 && (
+            <AccessPasswordFallback reference={reference} devotionalSlug={devotional.title} />
+          )}
+          {hasAccessControl && !isUnlocked && (
+            <AccessGate id="access-gate" devotional={devotional} settings={settings} onUnlock={setUnlockedDays} />
+          )}
+          {hasAccessControl && isUnlocked && (
+            <Card className="text-center">
+              <p className="text-sm text-text-muted">You now have full access to this devotional.</p>
+            </Card>
+          )}
+          {hasAccessControl === false && (
+            <Card className="text-center">
+              <p className="text-sm text-text-muted">This devotional is available for free.</p>
+            </Card>
+          )}
+        </div>
       ) : (
         <div className="section-gap">
           <section className="space-y-6">

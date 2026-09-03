@@ -37,6 +37,11 @@ export const settings = pgTable(
 
 // ---------------------------------------------------------------------------
 // devotionals — top-level content records
+//   assetUrl holds a single-file devotional asset (PDF/DOCX) that houses all
+//   days — e.g. when the client uploads one file for the whole devotional.
+//   When assetUrl is set, days are optional (may be empty); when null the
+//   devotional uses the traditional day-by-day content in devotional_days.
+//   Both can coexist (asset used as bundle plus day entries).
 // ---------------------------------------------------------------------------
 export const devotionals = pgTable(
   "devotionals",
@@ -47,6 +52,7 @@ export const devotionals = pgTable(
     subtitle: text("subtitle").default("").notNull(),
     description: text("description").default("").notNull(),
     coverUrl: text("cover_url").default("").notNull(),
+    assetUrl: text("asset_url"),
     priceMinor: integer("price_minor").notNull().default(0),
     currency: text("currency").notNull().default("NGN"),
     accessMode: accessModeEnum("access_mode").notNull().default("one-time"),

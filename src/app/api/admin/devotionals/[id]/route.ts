@@ -18,19 +18,25 @@ const daySchema = z.object({
   contentFileUrl: z.string().max(2000).optional().or(z.literal("")),
 });
 
-const bodySchema = z.object({
-  title: z.string().min(1).max(300),
-  subtitle: z.string().max(500).optional(),
-  description: z.string().max(2000).optional(),
-  slug: z.string().max(200).optional(),
-  coverUrl: z.string().max(2000).optional(),
-  priceMinor: z.number().int().min(0),
-  currency: z.string().min(1).max(10).default("NGN"),
-  accessMode: z.enum(["one-time", "monthly", "duration"]),
-  previewDays: z.number().int().min(0).max(999),
-  status: z.enum(["draft", "published", "archived"]).default("published"),
-  days: z.array(daySchema).min(1),
-});
+const bodySchema = z
+  .object({
+    title: z.string().min(1).max(300),
+    subtitle: z.string().max(500).optional(),
+    description: z.string().max(2000).optional(),
+    slug: z.string().max(200).optional(),
+    coverUrl: z.string().max(2000).optional(),
+    assetUrl: z.string().max(2000).optional().or(z.literal("")),
+    priceMinor: z.number().int().min(0),
+    currency: z.string().min(1).max(10).default("NGN"),
+    accessMode: z.enum(["one-time", "monthly", "duration"]),
+    previewDays: z.number().int().min(0).max(999),
+    status: z.enum(["draft", "published", "archived"]).default("published"),
+    days: z.array(daySchema).min(0).default([]),
+  })
+  .refine((v) => v.days.length > 0 || (v.assetUrl && v.assetUrl.trim().length > 0), {
+    message: "Provide at least one day or a single devotional asset (assetUrl).",
+    path: ["days"],
+  });
 
 /** Update a devotional + replace its days — one transaction (§12). */
 export async function PUT(
@@ -83,6 +89,7 @@ export async function PUT(
             subtitle: payload.subtitle ?? "",
             description: payload.description ?? "",
             coverUrl: payload.coverUrl ?? "",
+            assetUrl: payload.assetUrl?.trim() || null,
             priceMinor: payload.priceMinor,
             currency: payload.currency,
             accessMode: payload.accessMode,
@@ -92,16 +99,18 @@ export async function PUT(
           })
           .where(eq(devotionals.id, id));
         await tx.delete(devotionalDays).where(eq(devotionalDays.devotionalId, id));
-        await tx.insert(devotionalDays).values(
-          payload.days.map((d) => ({
-            devotionalId: id,
-            dayNumber: d.dayNumber,
-            title: d.title,
-            content: d.content,
-            sermonUrl: d.sermonUrl || null,
-            contentFileUrl: d.contentFileUrl || null,
-          })),
-        );
+        if (payload.days.length > 0) {
+          await tx.insert(devotionalDays).values(
+            payload.days.map((d) => ({
+              devotionalId: id,
+              dayNumber: d.dayNumber,
+              title: d.title,
+              content: d.content,
+              sermonUrl: d.sermonUrl || null,
+              contentFileUrl: d.contentFileUrl || null,
+            })),
+          );
+        }
       });
     });
 
