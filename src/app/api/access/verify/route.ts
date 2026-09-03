@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { queryWithTimeout } from "@/data/db";
@@ -8,6 +8,10 @@ import { getDevotionalBySlug } from "@/lib/catalog";
 import { verifyAccessPassword, derivePasswordForGrant } from "@/lib/access";
 import { recordAudit, recordEvent } from "@/lib/audit";
 import { isEmail } from "@/lib/utils";
+
+function normalizeEmail(v: string): string {
+  return v.trim().toLowerCase();
+}
 
 export const runtime = "nodejs";
 
@@ -27,22 +31,24 @@ export async function POST(request: Request) {
   if (!isEmail(payload.email)) {
     return NextResponse.json({ ok: false, error: "A valid email address is required." }, { status: 400 });
   }
+  const normalizedEmail = normalizeEmail(payload.email);
+  const trimmedPassword = payload.password.trim();
 
   // Auto-detect mode: slug empty → scan all grants for email and match password
   const trimmedSlug = payload.slug.trim();
   if (!trimmedSlug) {
     const allGrants = await queryWithTimeout((db) =>
-      db.select().from(accessGrants).where(eq(accessGrants.email, payload.email))
+      db.select().from(accessGrants).where(sql`lower(${accessGrants.email}) = ${normalizedEmail}`)
     ).catch(() => []);
     const activeGrants = allGrants.filter((g) => g.status === "active" && (!g.expiresAt || g.expiresAt > new Date()));
     for (const g of activeGrants) {
-      if (verifyAccessPassword(payload.password, derivePasswordForGrant(g.paystackReference))) {
+      if (verifyAccessPassword(trimmedPassword, derivePasswordForGrant(g.paystackReference))) {
         const devotionalRows = await queryWithTimeout((db) => db.select().from(devotionals).where(eq(devotionals.id, g.devotionalId)).limit(1)).catch(() => []);
         const devotional = devotionalRows[0] as unknown as Devotional | undefined;
         const days = devotional ? await queryWithTimeout((db) => db.select({ n: devotionalDays.dayNumber }).from(devotionalDays).where(and(eq(devotionalDays.devotionalId, devotional.id), eq(devotionalDays.published, true)))).then((r) => r.length).catch(() => 0) : 0;
         if (devotional) {
-          await recordAudit({ actor: payload.email, action: "access.verify", entity: "access_grant", entityId: g.id, metadata: { result: "ok", autoDetect: true } });
-          await recordEvent({ eventType: "access.used", slug: devotional.slug, email: payload.email });
+          await recordAudit({ actor: normalizedEmail, action: "access.verify", entity: "access_grant", entityId: g.id, metadata: { result: "ok", autoDetect: true } });
+          await recordEvent({ eventType: "access.used", slug: devotional.slug, email: normalizedEmail });
           return NextResponse.json({ ok: true, devotional: devotional.title, days, matchedSlug: devotional.slug });
         }
       }
@@ -64,7 +70,7 @@ export async function POST(request: Request) {
   }
 
   const grant = await queryWithTimeout((db) =>
-    db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devotional.id), eq(accessGrants.email, payload.email))).limit(1)
+    db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devotional.id), sql`lower(${accessGrants.email}) = ${normalizedEmail}`)).limit(1)
   ).catch(() => []);
 
   let active = grant.find((g) => g.status === "active") ?? null;
@@ -72,12 +78,12 @@ export async function POST(request: Request) {
   // Bundle-aware fallback: scan all grants for email and see if password matches any active grant
   async function findMatchingGrant(): Promise<typeof active> {
     const all = await queryWithTimeout((db) =>
-      db.select().from(accessGrants).where(eq(accessGrants.email, payload.email))
+      db.select().from(accessGrants).where(sql`lower(${accessGrants.email}) = ${normalizedEmail}`)
     ).catch(() => []);
     for (const g of all) {
       if (g.status !== "active") continue;
       if (g.expiresAt && g.expiresAt < new Date()) continue;
-      if (verifyAccessPassword(payload.password, derivePasswordForGrant(g.paystackReference))) return g;
+      if (verifyAccessPassword(trimmedPassword, derivePasswordForGrant(g.paystackReference))) return g;
     }
     return null;
   }
@@ -104,7 +110,7 @@ export async function POST(request: Request) {
       await queryWithTimeout((db) =>
         db.insert(accessGrants).values({
           devotionalId: devotional.id,
-          email: payload.email,
+          email: normalizedEmail,
           paystackReference: `${active!.paystackReference}__lazy-${devotional.id.slice(0, 8)}`,
           status: "active",
           expiresAt: maybeExpiry,
@@ -119,13 +125,13 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!verifyAccessPassword(payload.password, derivePasswordForGrant(active.paystackReference))) {
+    if (!verifyAccessPassword(trimmedPassword, derivePasswordForGrant(active.paystackReference))) {
       const fallback = await findMatchingGrant();
       if (fallback) {
         active = fallback;
       } else {
         await recordAudit({
-          actor: payload.email,
+          actor: normalizedEmail,
           action: "access.verify",
           entity: "access_grant",
           entityId: active.id,
@@ -145,13 +151,13 @@ export async function POST(request: Request) {
   ).then((rows) => rows.length).catch(() => 0);
 
   await recordAudit({
-    actor: payload.email,
+    actor: normalizedEmail,
     action: "access.verify",
     entity: "access_grant",
     entityId: active.id,
     metadata: { result: "ok" },
   });
-  await recordEvent({ eventType: "access.used", slug: devotional.slug, email: payload.email });
+  await recordEvent({ eventType: "access.used", slug: devotional.slug, email: normalizedEmail });
 
   return NextResponse.json({ ok: true, devotional: devotional.title, days });
 }

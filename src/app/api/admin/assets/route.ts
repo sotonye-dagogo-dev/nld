@@ -5,6 +5,7 @@ import { recordAudit } from "@/lib/audit";
 import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const ALLOWED_TYPES = [
   "image/jpeg",
@@ -20,13 +21,36 @@ const ALLOWED_TYPES = [
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif", "pdf", "docx", "doc"];
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB generous
 
+export async function GET() {
+  return NextResponse.json(
+    { ok: false, error: "Method not allowed. Use POST to upload or DELETE to remove an asset." },
+    { status: 405, headers: { Allow: "POST, DELETE" } },
+  );
+}
+
 export async function POST(request: Request) {
   const admin = await requireAdmin();
   if (!admin || !can(admin, "devotionals")) {
     return NextResponse.json({ ok: false, error: "Forbidden." }, { status: 403 });
   }
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.toLowerCase().includes("payload") || msg.toLowerCase().includes("too large") || msg.toLowerCase().includes("entity")) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "File too large for the server's request limit (Vercel hobby limit ~4.5MB). Please compress the file, use a smaller file, or ask the admin to upgrade Vercel to Pro / use direct Supabase upload for 50MB files.",
+        },
+        { status: 413 },
+      );
+    }
+    return NextResponse.json({ ok: false, error: "Invalid upload request. Please try again." }, { status: 400 });
+  }
   const file = formData.get("file") as File | null;
   const type = formData.get("type") as string | null; // "cover" | "sermon" | "asset"
 

@@ -12,7 +12,8 @@ export function clampInt(value: number, min: number, max: number): number {
 }
 
 /** Normalize a string into a URL-safe slug. */
-export function slugify(input: string): string {
+export function slugify(input: string | null | undefined): string {
+  if (!input || typeof input !== "string") return "";
   return input
     .toLowerCase()
     .trim()

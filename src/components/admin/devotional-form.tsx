@@ -119,7 +119,25 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { ok: boolean; error?: string };
+      const ct = res.headers.get("content-type") ?? "";
+      let data: { ok: boolean; error?: string };
+      if (ct.includes("application/json")) {
+        try {
+          data = (await res.json()) as typeof data;
+        } catch {
+          const text = await res.text().catch(() => "");
+          toast(text.slice(0, 400) || `Server error (${res.status}).`, "error");
+          return;
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        if (res.status === 413 || text.toLowerCase().includes("payload")) {
+          toast("Payload too large — try a smaller file or compress the asset before saving.", "error");
+        } else {
+          toast(text.slice(0, 400) || `Server error (${res.status}).`, "error");
+        }
+        return;
+      }
       if (!res.ok || !data.ok) {
         if (res.status === 409) {
           setFieldErrors({ slug: "That slug is already in use. Please choose a different slug." });
@@ -135,8 +153,13 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
       }
       toast(isEdit ? "Devotional updated." : "Devotional published.", "success");
       router.push("/admin/devotionals");
-    } catch {
-      toast("Network error while saving.", "error");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("Unexpected token") || msg.includes("is not valid JSON")) {
+        toast("Server returned an unexpected response. Please try again.", "error");
+      } else {
+        toast("Network error while saving.", "error");
+      }
     } finally {
       setLoading(false);
     }

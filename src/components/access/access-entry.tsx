@@ -56,6 +56,7 @@ export function AccessEntry({
     }
     setLoading(true);
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       // If password looks like derived password but slug empty, try auto-detect via
       // the new auto endpoint that scans all grants for that email/password.
       const useAuto = !slug.trim() && password.trim().length > 0;
@@ -64,9 +65,23 @@ export function AccessEntry({
         const res = await fetch("/api/access/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug: "", email, password }),
+          body: JSON.stringify({ slug: "", email: normalizedEmail, password: password.trim() }),
         });
-        const data = (await res.json()) as { ok: boolean; error?: string; devotional?: string; days?: number; matchedSlug?: string };
+        const ct = res.headers.get("content-type") ?? "";
+        let data: { ok: boolean; error?: string; devotional?: string; days?: number; matchedSlug?: string };
+        if (ct.includes("application/json")) {
+          try {
+            data = (await res.json()) as typeof data;
+          } catch {
+            const text = await res.text().catch(() => "");
+            setFieldErrors({ _general: text.slice(0, 300) || "Verification failed. Please try again." });
+            return;
+          }
+        } else {
+          const text = await res.text().catch(() => "");
+          setFieldErrors({ _general: text.slice(0, 300) || `Server error (${res.status}).` });
+          return;
+        }
         if (!res.ok || !data.ok) {
           setFieldErrors(mapErrorToField(data.error ?? "Verification failed."));
           return;
@@ -86,19 +101,28 @@ export function AccessEntry({
       const res = await fetch("/api/access/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, email, password }),
+        body: JSON.stringify({ slug, email: normalizedEmail, password: password.trim() }),
       });
-      const data = (await res.json()) as {
-        ok: boolean;
-        error?: string;
-        devotional?: string;
-        days?: number;
-      };
-      if (!res.ok || !data.ok) {
-        setFieldErrors(mapErrorToField(data.error ?? "Verification failed."));
+      const ct2 = res.headers.get("content-type") ?? "";
+      let data2: { ok: boolean; error?: string; devotional?: string; days?: number };
+      if (ct2.includes("application/json")) {
+        try {
+          data2 = (await res.json()) as typeof data2;
+        } catch {
+          const text = await res.text().catch(() => "");
+          setFieldErrors({ _general: text.slice(0, 300) || "Verification failed. Please try again." });
+          return;
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        setFieldErrors({ _general: text.slice(0, 300) || `Server error (${res.status}).` });
         return;
       }
-      const r = { devotional: data.devotional ?? slug, days: data.days ?? 0 };
+      if (!res.ok || !data2.ok) {
+        setFieldErrors(mapErrorToField(data2.error ?? "Verification failed."));
+        return;
+      }
+      const r = { devotional: data2.devotional ?? slug, days: data2.days ?? 0 };
       setResult(r);
       toast(`Access verified for ${r.devotional}!`, "success");
       if (onSuccess) {
@@ -106,8 +130,13 @@ export function AccessEntry({
       } else {
         setTimeout(() => router.push(`/devotionals/${slug}`), 800);
       }
-    } catch {
-      setFieldErrors({ _general: "Network error. Please try again." });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("Unexpected token") || msg.includes("is not valid JSON")) {
+        setFieldErrors({ _general: "Server returned an unexpected response. Please try again shortly." });
+      } else {
+        setFieldErrors({ _general: "Network error. Please try again." });
+      }
     } finally {
       setLoading(false);
     }

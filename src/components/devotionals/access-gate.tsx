@@ -52,12 +52,27 @@ export function AccessGate({ devotional, settings, id, onUnlock, onCloseModal }:
     setFieldErrors({});
     setLoading(true);
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const res = await fetch(`/api/devotionals/${encodeURIComponent(devotional.slug)}/unlock`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password: password.trim() }),
       });
-      const data = (await res.json()) as { ok: boolean; days?: DevotionalDay[]; error?: string };
+      const ct = res.headers.get("content-type") ?? "";
+      let data: { ok: boolean; days?: DevotionalDay[]; error?: string };
+      if (ct.includes("application/json")) {
+        try {
+          data = (await res.json()) as typeof data;
+        } catch {
+          const text = await res.text().catch(() => "");
+          setFieldErrors({ _general: text.slice(0, 400) || "Verification failed. Please try again." });
+          return;
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        setFieldErrors({ _general: text.slice(0, 400) || `Server error (${res.status}).` });
+        return;
+      }
       if (!res.ok || !data.ok || !data.days) {
         setFieldErrors(mapError(data.error ?? "That password did not work."));
         return;
@@ -71,8 +86,13 @@ export function AccessGate({ devotional, settings, id, onUnlock, onCloseModal }:
       }
       setDays(data.days);
       toast("Access granted. Enjoy!", "success");
-    } catch {
-      setFieldErrors({ _general: "Something went wrong. Please try again." });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("Unexpected token") || msg.includes("is not valid JSON")) {
+        setFieldErrors({ _general: "Server returned an unexpected response. Please try again shortly." });
+      } else {
+        setFieldErrors({ _general: "Something went wrong. Please try again." });
+      }
     } finally {
       setLoading(false);
     }

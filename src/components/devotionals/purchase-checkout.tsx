@@ -63,12 +63,27 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
     }
     setLoading(true);
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const res = await fetch("/api/paystack/init", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: devotional.slug, email }),
+        body: JSON.stringify({ slug: devotional.slug, email: normalizedEmail }),
       });
-      const data = (await res.json()) as { ok: boolean; authorizationUrl?: string; error?: string };
+      const ct = res.headers.get("content-type") ?? "";
+      let data: { ok: boolean; authorizationUrl?: string; error?: string };
+      if (ct.includes("application/json")) {
+        try {
+          data = (await res.json()) as typeof data;
+        } catch {
+          const text = await res.text().catch(() => "");
+          setGeneralError(text.slice(0, 400) || `Server error (${res.status}). Please try again.`);
+          return;
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        setGeneralError(text.slice(0, 400) || `Server error (${res.status}). Please try again.`);
+        return;
+      }
       if (!res.ok || !data.ok || !data.authorizationUrl) {
         const msg = data.error ?? "Could not start payment. Please try again.";
         if (msg.toLowerCase().includes("email")) setFieldErrors({ email: msg });
@@ -76,8 +91,13 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
         return;
       }
       router.push(data.authorizationUrl);
-    } catch {
-      setGeneralError("Network error while starting payment. Please try again.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("Unexpected token") || msg.includes("is not valid JSON")) {
+        setGeneralError("Server returned an unexpected response. Please try again shortly.");
+      } else {
+        setGeneralError("Network error while starting payment. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -132,9 +152,37 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
         method: "POST",
         body: formData,
       });
- const uploadData = await uploadRes.json();
+      const upCt = uploadRes.headers.get("content-type") ?? "";
+      let uploadData: { ok: boolean; url?: string; error?: string };
+      if (upCt.includes("application/json")) {
+        try {
+          uploadData = (await uploadRes.json()) as typeof uploadData;
+        } catch {
+          const text = await uploadRes.text().catch(() => "");
+          const isPayload = text.toLowerCase().includes("payload") || uploadRes.status === 413;
+          setGeneralError(
+            isPayload
+              ? "File too large for Vercel's limit (~4.5MB on hobby). Compress the file or use a smaller file."
+              : text.slice(0, 400) || `Upload failed (${uploadRes.status}).`,
+          );
+          return;
+        }
+      } else {
+        const text = await uploadRes.text().catch(() => "");
+        const isPayload = uploadRes.status === 413 || text.toLowerCase().includes("payload") || text.includes("FUNCTION_PAYLOAD_TOO_LARGE");
+        setGeneralError(
+          isPayload
+            ? "File too large for Vercel's limit (~4.5MB on hobby). Compress the file or use a smaller file."
+            : text.slice(0, 400) || `Upload failed (${uploadRes.status}).`,
+        );
+        return;
+      }
       if (!uploadRes.ok || !uploadData.ok) {
         const msg = uploadData.error ?? "Failed to upload proof of payment.";
+        if (msg.toLowerCase().includes("payload") || msg.toLowerCase().includes("too large")) {
+          setGeneralError("File too large for Vercel's limit (~4.5MB on hobby). Compress the file or use a smaller file.");
+          return;
+        }
         if (msg.toLowerCase().includes("proof") || msg.toLowerCase().includes("file")) setFieldErrors({ proofFile: msg });
         else setGeneralError(msg);
         return;
@@ -144,12 +192,13 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
 
       // Submit bank transfer record
       const selectedAccount = activeBankAccounts.find((a) => a.id === bankAccountId);
+      const normalizedEmail2 = email.trim().toLowerCase();
       const res = await fetch("/api/bank-transfer/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           devotionalSlug: devotional.slug,
-          email,
+          email: normalizedEmail2,
           amountMinor: devotional.priceMinor,
           currency: devotional.currency,
           bankAccountId,
@@ -157,7 +206,21 @@ export function PurchaseCheckout({ devotional, settings, isBundle = false }: Pur
           proofUrl: uploadData.url,
         }),
       });
-      const data = (await res.json()) as { ok: boolean; transferId?: string; error?: string };
+      const ct2 = res.headers.get("content-type") ?? "";
+      let data: { ok: boolean; transferId?: string; error?: string };
+      if (ct2.includes("application/json")) {
+        try {
+          data = (await res.json()) as typeof data;
+        } catch {
+          const text = await res.text().catch(() => "");
+          setGeneralError(text.slice(0, 400) || `Server error (${res.status}).`);
+          return;
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        setGeneralError(text.slice(0, 400) || `Server error (${res.status}).`);
+        return;
+      }
       if (!res.ok || !data.ok) {
         const msg = data.error ?? "Could not submit transfer. Please try again.";
         const low = msg.toLowerCase();

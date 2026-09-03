@@ -56,9 +56,23 @@ export function InviteManager({ initialInvites }: { initialInvites: AdminInvite[
       const res = await fetch("/api/admin/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), role }),
       });
-      const data = (await res.json()) as { ok: boolean; error?: string; token?: string; inviteUrl?: string; emailSent?: boolean };
+      const ct = res.headers.get("content-type") ?? "";
+      let data: { ok: boolean; error?: string; token?: string; inviteUrl?: string; emailSent?: boolean };
+      if (ct.includes("application/json")) {
+        try {
+          data = (await res.json()) as typeof data;
+        } catch {
+          const text = await res.text().catch(() => "");
+          toast(text.slice(0, 400) || `Server error (${res.status}).`, "error");
+          return;
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        toast(text.slice(0, 400) || `Server error (${res.status}).`, "error");
+        return;
+      }
       if (!res.ok || !data.ok) {
         toast(data.error ?? "Could not send the invitation.", "error");
         return;
@@ -71,10 +85,21 @@ export function InviteManager({ initialInvites }: { initialInvites: AdminInvite[
       }
       toast(data.emailSent ? "Invitation sent by email." : "Invitation created (email delivery failed — link shown below).", data.emailSent ? "success" : "info");
       setEmail("");
-      const list = (await fetch("/api/admin/invites").then((r) => r.json())) as {
-        ok: boolean;
-        invites?: AdminInvite[];
-      };
+      let list: { ok: boolean; invites?: AdminInvite[] };
+      try {
+        const listRes = await fetch("/api/admin/invites");
+        const ct2 = listRes.headers.get("content-type") ?? "";
+        if (ct2.includes("application/json")) {
+          list = (await listRes.json()) as typeof list;
+        } else {
+          const text = await listRes.text().catch(() => "");
+          toast(text.slice(0, 400) || `Could not refresh invites (${listRes.status}).`, "error");
+          return;
+        }
+      } catch {
+        toast("Could not refresh invites.", "error");
+        return;
+      }
       if (list.ok && list.invites) {
         setInvites(
           list.invites.map((i) => ({
@@ -108,16 +133,32 @@ export function InviteManager({ initialInvites }: { initialInvites: AdminInvite[
       const res = await fetch("/api/admin/invites/resend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email }),
+        body: JSON.stringify({ token, email: email.trim().toLowerCase() }),
       });
-      const data = (await res.json()) as { ok: boolean; error?: string };
+      const ct = res.headers.get("content-type") ?? "";
+      let data: { ok: boolean; error?: string };
+      if (ct.includes("application/json")) {
+        try {
+          data = (await res.json()) as typeof data;
+        } catch {
+          const text = await res.text().catch(() => "");
+          toast(text.slice(0, 400) || `Server error (${res.status}).`, "error");
+          return;
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        toast(text.slice(0, 400) || `Server error (${res.status}).`, "error");
+        return;
+      }
       if (!res.ok || !data.ok) {
         toast(data.error ?? "Could not resend invitation.", "error");
         return;
       }
       toast("Invitation email resent.", "success");
-    } catch {
-      toast("Network error while resending.", "error");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("Unexpected token")) toast("Server returned an unexpected response.", "error");
+      else toast("Network error while resending.", "error");
     }
   }
 
