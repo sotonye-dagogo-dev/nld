@@ -132,7 +132,7 @@ export interface UploadResult {
   publicUrl: string;
 }
 
-const UPLOAD_TIMEOUT_MS = 15000;
+const UPLOAD_TIMEOUT_MS = 60000;
 
 /** Upload a file to Supabase Storage (devotional-assets bucket). */
 export async function uploadAsset(
@@ -146,11 +146,11 @@ export async function uploadAsset(
   try {
     const { data, error } = await client.storage
       .from(supabaseConfig.storage.bucket)
-      .upload(path, file, { contentType, upsert: true });
+      .upload(path, file, { contentType: contentType || "application/octet-stream", upsert: true, duplex: "half" as unknown as string });
     if (error) throw new Error(`Storage upload failed: ${error.message}`);
     return { path: data.path, publicUrl: `${supabaseConfig.storage.publicUrl}/${data.path}` };
   } catch (err) {
-    if (err instanceof Error && (err.name === "AbortError" || err.name === "CancellationError" || err.message.includes("timeout"))) {
+    if (err instanceof Error && (err.name === "AbortError" || err.name === "CancellationError" || err.message.toLowerCase().includes("timeout"))) {
       throw new Error("Upload timeout - file too large or network slow");
     }
     throw err;

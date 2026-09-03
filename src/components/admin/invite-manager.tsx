@@ -32,6 +32,7 @@ interface InviteRow {
 export function InviteManager({ initialInvites }: { initialInvites: AdminInvite[] }) {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"admin" | "owner">("admin");
   const [loading, setLoading] = useState(false);
   const [invites, setInvites] = useState<InviteRow[]>(
     initialInvites.map((i) => ({
@@ -55,7 +56,7 @@ export function InviteManager({ initialInvites }: { initialInvites: AdminInvite[
       const res = await fetch("/api/admin/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, role }),
       });
       const data = (await res.json()) as { ok: boolean; error?: string; token?: string; inviteUrl?: string; emailSent?: boolean };
       if (!res.ok || !data.ok) {
@@ -143,6 +144,17 @@ export function InviteManager({ initialInvites }: { initialInvites: AdminInvite[
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-text-primary min-w-[140px]">
+            Role
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as "admin" | "owner")}
+              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <option value="admin">Admin</option>
+              <option value="owner">Owner</option>
+            </select>
+          </label>
           <Button type="submit" loading={loading}>
             Send invitation
           </Button>

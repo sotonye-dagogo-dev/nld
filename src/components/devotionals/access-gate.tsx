@@ -108,18 +108,16 @@ export function AccessGate({ devotional, settings, id, onUnlock, onCloseModal }:
                 />
               </div>
             )}
-            {day.contentFileUrl && (
-              <div className="mt-4">
-                <ContentReader
-                  fileUrl={day.contentFileUrl}
-                  fileName={day.contentFileUrl.split("/").pop()?.split(".").slice(0, -1).join(".") || "Content"}
-                  fileType={day.contentFileUrl.toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
-                  maxPreviewChars={MAX_PREVIEW_CHARS}
-                  hasFullAccess={true}
-                  coverUrl={devotional.coverUrl}
-                />
-              </div>
-            )}
+            <div className="mt-4">
+              <ContentReader
+                fileUrl={day.contentFileUrl ?? ""}
+                fileName={day.contentFileUrl?.split("/").pop()?.split(".").slice(0, -1).join(".") || `${day.title || "Content"} — Day ${day.dayNumber}`}
+                fileType={(day.contentFileUrl ?? "").toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
+                maxPreviewChars={MAX_PREVIEW_CHARS}
+                hasFullAccess={true}
+                coverUrl={devotional.coverUrl}
+              />
+            </div>
           </article>
         ))}
       </div>

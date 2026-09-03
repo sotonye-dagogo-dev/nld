@@ -41,7 +41,8 @@ export function ContentReader({
   coverUrl,
   className,
 }: ContentReaderProps) {
-  const [isLoading, setIsLoading] = useState(true);
+  const hasFile = Boolean(fileUrl && fileUrl.trim().length > 0);
+  const [isLoading, setIsLoading] = useState(hasFile);
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -63,6 +64,10 @@ export function ContentReader({
   // For DOCX, we convert to HTML on the client (limited) or show a placeholder
 
   useEffect(() => {
+    if (!hasFile) {
+      setIsLoading(false);
+      return;
+    }
     // Only attempt to load content if user has full access
     // For preview mode, we don't fetch the actual file to protect assets
     if (!hasFullAccess) {
@@ -82,7 +87,7 @@ export function ContentReader({
         } else if (fileType === "docx") {
           // For DOCX, we'd need a library like mammoth.js to convert
           // For now, show a placeholder with truncation notice
-          setContent("[DOCX content preview — upgrade for full access]");
+          setContent("[DOCX content — viewer ready]");
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load content");
@@ -92,7 +97,7 @@ export function ContentReader({
     }
 
     loadContent();
-  }, [fileUrl, fileType, hasFullAccess]);
+  }, [fileUrl, fileType, hasFullAccess, hasFile]);
 
   // Truncate content for preview
   const displayContent = hasFullAccess || showFullContent
@@ -129,6 +134,21 @@ export function ContentReader({
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <p>Loading {fileType.toUpperCase()} preview…</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!hasFile) {
+    return (
+      <div className={cn("rounded-xl border border-dashed border-border bg-surface p-8 flex flex-col items-center justify-center text-center gap-3", className)}>
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-background border border-border">
+          <FileText className="h-6 w-6 text-text-muted" aria-hidden="true" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-text-primary">No file attached</p>
+          <p className="text-xs text-text-muted max-w-sm">This day has no uploaded document yet. The text content above is the full devotional for this day. If you expected a PDF or DOCX, the admin has not attached one.</p>
+        </div>
+        {hasFullAccess && <p className="text-xs text-text-muted">Contact support if this is unexpected.</p>}
       </div>
     );
   }
