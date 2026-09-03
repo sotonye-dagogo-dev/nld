@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 import { queryWithTimeout } from "@/data/db";
 import { purchases, accessGrants, devotionals } from "@/data/db/schema";
@@ -53,12 +53,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 404 });
   }
 
+  const normalizedPurchaseEmail = purchase.email.trim().toLowerCase();
+  const email = (customer.email || purchase.email).trim().toLowerCase();
+
   if (purchase.status !== "success") {
     await queryWithTimeout((db) =>
       db.update(purchases).set({ status: "success", updatedAt: new Date() }).where(eq(purchases.paystackReference, reference)),
     ).catch(() => {});
     await recordAudit({
-      actor: purchase.email,
+      actor: normalizedPurchaseEmail,
       action: "purchase.verify",
       entity: "purchase",
       entityId: reference,
@@ -69,7 +72,6 @@ export async function POST(request: Request) {
   }
 
   const accessPassword = deriveAccessPassword(reference);
-  const email = customer.email || purchase.email;
 
   // Check existing grant(s) for idempotency
   const existingGrant = await queryWithTimeout((db) =>
@@ -110,9 +112,9 @@ export async function POST(request: Request) {
       // Bundle purchase respects bundleAccessMode; fallback to per-devotional if bundle mode is one-time? Use bundle mode for bundle buys.
       const mode: AccessMode = bundleModeFromConfig;
       const expiresAt = computeExpiry(mode, bundleDuration);
-      // Check if grant already exists for this email+devotional (admin manual etc)
+      // Check if grant already exists for this email+devotional (case-insensitive)
       const already = await queryWithTimeout((db) =>
-        db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devo.id), eq(accessGrants.email, email))).limit(1),
+        db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devo.id), sql`lower(${accessGrants.email}) = ${email}`)).limit(1),
       ).catch(() => []);
       if (already.length > 0) continue;
       await queryWithTimeout((db) =>

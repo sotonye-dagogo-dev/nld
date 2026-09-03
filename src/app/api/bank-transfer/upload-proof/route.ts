@@ -3,6 +3,14 @@ import { uploadAsset } from "@/integrations/supabase/client";
 import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  return NextResponse.json(
+    { ok: false, error: "Method not allowed. Use POST to upload proof." },
+    { status: 405, headers: { Allow: "POST" } },
+  );
+}
 
 const ALLOWED_TYPES = [
   "image/jpeg",
@@ -15,7 +23,23 @@ const ALLOWED_TYPES = [
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.toLowerCase().includes("payload") || msg.toLowerCase().includes("too large")) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "File too large for the server's request limit (Vercel hobby limit ~4.5MB). Please compress the file or use a smaller file.",
+        },
+        { status: 413 },
+      );
+    }
+    return NextResponse.json({ ok: false, error: "Invalid upload request." }, { status: 400 });
+  }
   const file = formData.get("file") as File | null;
 
   if (!file) {
