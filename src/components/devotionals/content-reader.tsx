@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 // that prevents downloading, printing, and text selection. Includes preview
 // truncation with character limits for asset protection.
 
-function isOptimizedImageHost(url: string): boolean {
+function isOptimizedImageHost(url: string | null | undefined): boolean {
+  if (!url || typeof url !== "string") return false;
   try {
     const host = new URL(url).hostname.toLowerCase();
     return host.endsWith(".supabase.co") || host.endsWith(".supabase.in");

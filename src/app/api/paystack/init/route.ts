@@ -37,6 +37,7 @@ export async function POST(request: Request) {
   if (!isEmail(payload.email)) {
     return NextResponse.json({ ok: false, error: "A valid email address is required." }, { status: 400 });
   }
+  const normalizedEmail = payload.email.trim().toLowerCase();
 
   // Respect platform payment config end-to-end
   let settings: SiteSettings;
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const init = await initializeTransaction({
-        email: payload.email,
+        email: normalizedEmail,
         amountMinor,
         currency,
         reference,
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
         await queryWithTimeout((db) =>
           db.insert(purchases).values({
             devotionalId,
-            email: payload.email,
+            email: normalizedEmail,
             amountMinor,
             currency,
             paystackReference: reference,
@@ -157,13 +158,13 @@ export async function POST(request: Request) {
       }
 
       await recordAudit({
-        actor: payload.email,
+        actor: normalizedEmail,
         action: "purchase.init",
         entity: "purchase",
         entityId: reference,
         after: { devotionalId, amountMinor, currency, isBundle },
       });
-      await recordEvent({ eventType: "purchase.started", slug: callbackSlug, email: payload.email });
+      await recordEvent({ eventType: "purchase.started", slug: callbackSlug, email: normalizedEmail });
 
       return NextResponse.json({ ok: true, authorizationUrl: init.authorization_url, reference });
     } catch (err) {

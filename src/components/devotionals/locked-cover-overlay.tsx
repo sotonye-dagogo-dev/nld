@@ -5,7 +5,8 @@ import Image from "next/image";
 import { Lock, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-function isOptimizedImageHost(url: string): boolean {
+function isOptimizedImageHost(url: string | null | undefined): boolean {
+  if (!url || typeof url !== "string") return false;
   try {
     const host = new URL(url).hostname.toLowerCase();
     return host.endsWith(".supabase.co") || host.endsWith(".supabase.in");

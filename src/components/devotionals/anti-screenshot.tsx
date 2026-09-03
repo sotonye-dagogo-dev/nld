@@ -34,9 +34,9 @@ export function AntiScreenshot({ enabled, children }: AntiScreenshotProps) {
       e.preventDefault();
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
+      const key = (e.key ?? "").toLowerCase();
       const modifier = e.ctrlKey || e.metaKey;
-      if (e.key === "F12") {
+      if ((e.key ?? "") === "F12") {
         e.preventDefault();
         return;
       }

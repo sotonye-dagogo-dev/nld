@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { queryWithTimeout } from "@/data/db";
@@ -9,6 +9,10 @@ import { verifyAccessPassword, derivePasswordForGrant } from "@/lib/access";
 import { getSiteSettings } from "@/config/site";
 import { recordAudit, recordEvent } from "@/lib/audit";
 import { clampInt, isEmail } from "@/lib/utils";
+
+function normalizeEmail(v: string): string {
+  return v.trim().toLowerCase();
+}
 
 export const runtime = "nodejs";
 
@@ -38,6 +42,8 @@ export async function POST(
   if (!isEmail(payload.email)) {
     return NextResponse.json({ ok: false, error: "A valid email address is required." }, { status: 400 });
   }
+  const normalizedEmail = normalizeEmail(payload.email);
+  const trimmedPassword = payload.password.trim();
 
   let devotional: Devotional | null = null;
   try {
@@ -52,9 +58,9 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Devotional not found." }, { status: 404 });
   }
 
-  // Primary lookup: direct grant for this devotional + email
+  // Primary lookup: direct grant for this devotional + email (case-insensitive)
   const grant = await queryWithTimeout((db) =>
-    db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devotional.id), eq(accessGrants.email, payload.email))).limit(1)
+    db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devotional.id), sql`lower(${accessGrants.email}) = ${normalizedEmail}`)).limit(1)
   ).catch(() => []);
 
   let active = grant.find((g) => g.status === "active") ?? null;
@@ -66,12 +72,12 @@ export async function POST(
   // If a matching bundle grant is found we lazily ensure a per-devotional grant exists.
   async function findMatchingBundleGrant(): Promise<typeof active> {
     const all = await queryWithTimeout((db) =>
-      db.select().from(accessGrants).where(eq(accessGrants.email, payload.email))
+      db.select().from(accessGrants).where(sql`lower(${accessGrants.email}) = ${normalizedEmail}`)
     ).catch(() => []);
     for (const g of all) {
       if (g.status !== "active") continue;
       if (g.expiresAt && g.expiresAt < new Date()) continue;
-      if (verifyAccessPassword(payload.password, derivePasswordForGrant(g.paystackReference))) return g;
+      if (verifyAccessPassword(trimmedPassword, derivePasswordForGrant(g.paystackReference))) return g;
     }
     return null;
   }
@@ -98,7 +104,7 @@ export async function POST(
       await queryWithTimeout((db) =>
         db.insert(accessGrants).values({
           devotionalId: devotional.id,
-          email: payload.email,
+          email: normalizedEmail,
           paystackReference: `${active!.paystackReference}__lazy-${devotional.id.slice(0, 8)}`,
           status: "active",
           expiresAt: maybeExpiry,
@@ -116,14 +122,14 @@ export async function POST(
       );
     }
 
-    if (!verifyAccessPassword(payload.password, derivePasswordForGrant(active.paystackReference))) {
+    if (!verifyAccessPassword(trimmedPassword, derivePasswordForGrant(active.paystackReference))) {
       // Try bundle fallback before failing
       const fallback = await findMatchingBundleGrant();
       if (fallback) {
         active = fallback;
       } else {
         await recordAudit({
-          actor: payload.email,
+          actor: normalizedEmail,
           action: "access.verify",
           entity: "access_grant",
           entityId: active.id,
@@ -150,13 +156,13 @@ export async function POST(
   const lockedDays = days.slice(previewDays);
 
   await recordAudit({
-    actor: payload.email,
+    actor: normalizedEmail,
     action: "access.verify",
     entity: "access_grant",
     entityId: active.id,
     metadata: { result: "ok", daysReturned: lockedDays.length },
   });
-  await recordEvent({ eventType: "access.used", slug: devotional.slug, email: payload.email });
+  await recordEvent({ eventType: "access.used", slug: devotional.slug, email: normalizedEmail });
 
   return NextResponse.json({ ok: true, days: lockedDays });
 }

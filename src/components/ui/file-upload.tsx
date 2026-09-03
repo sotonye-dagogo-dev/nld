@@ -50,9 +50,16 @@ export function FileUpload({ value, onChange, label, hint, accept, type = "cover
 
   const handleUpload = useCallback(async (file: File) => {
     const MAX_CLIENT_BYTES = 50 * 1024 * 1024;
+    const VERCEL_WARN_BYTES = 4.5 * 1024 * 1024;
     if (file.size > MAX_CLIENT_BYTES) {
       toast(`File too large — max 50MB (got ${(file.size / 1024 / 1024).toFixed(1)}MB).`, "error");
       return;
+    }
+    if (file.size > VERCEL_WARN_BYTES) {
+      toast(
+        `File is ${(file.size / 1024 / 1024).toFixed(1)}MB — Vercel hobby plan caps uploads at ~4.5MB. The upload may fail; compress the file or upgrade to Pro / use direct Supabase upload if needed.`,
+        "info",
+      );
     }
     if (file.size === 0) {
       toast("Empty file.", "error");
@@ -69,16 +76,46 @@ export function FileUpload({ value, onChange, label, hint, accept, type = "cover
         body: formData,
       });
 
-      const data = await res.json();
+      let data: { ok: boolean; publicUrl?: string; error?: string };
+      const ct = res.headers.get("content-type") ?? "";
+      if (ct.includes("application/json")) {
+        try {
+          data = (await res.json()) as typeof data;
+        } catch {
+          const text = await res.text().catch(() => "");
+          throw new Error(text.slice(0, 400) || `Upload failed (${res.status}).`);
+        }
+      } else {
+        const text = await res.text().catch(() => "");
+        if (!res.ok) {
+          if (res.status === 413 || text.toLowerCase().includes("payload") || text.toLowerCase().includes("too large") || text.includes("FUNCTION_PAYLOAD_TOO_LARGE")) {
+            throw new Error(
+              "File too large for Vercel's request limit (~4.5MB on hobby). Compress the file, use a smaller file, or upgrade to Pro / use direct Supabase upload for 50MB files.",
+            );
+          }
+          throw new Error(text.slice(0, 400) || `Upload failed (${res.status} ${res.statusText}).`);
+        }
+        // Non-JSON success is unexpected
+        throw new Error(text.slice(0, 400) || "Upload failed: server returned non-JSON response.");
+      }
       if (!res.ok || !data.ok) {
-        throw new Error(data.error ?? "Upload failed");
+        throw new Error(data.error ?? `Upload failed (${res.status}).`);
       }
 
-      onChange(data.publicUrl);
-      if (preview) setPreviewUrl(data.publicUrl);
+      onChange(data.publicUrl!);
+      if (preview) setPreviewUrl(data.publicUrl ?? null);
       toast("Uploaded successfully", "success");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Upload failed", "error");
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      // Map raw Vercel 413 HTML to friendly message
+      if (msg.includes("Unexpected token") && (msg.includes("Request") || msg.includes("FUNCTION_PAYLOAD"))) {
+        toast(
+          "File too large for Vercel's request limit (~4.5MB on hobby). Compress the file or upgrade to Pro / use direct Supabase upload for 50MB files.",
+          "error",
+        );
+      } else {
+        toast(msg, "error");
+      }
     } finally {
       setUploading(false);
     }

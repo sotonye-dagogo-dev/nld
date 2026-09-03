@@ -89,14 +89,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Bank transfer payments are not currently enabled." }, { status: 400 });
   }
 
-  // Create bank transfer record
+  // Create bank transfer record (normalize email)
+  const normalizedEmail = payload.email.trim().toLowerCase();
   const transferId = randomUUID();
   try {
     await queryWithTimeout((db) =>
       db.insert(bankTransfers).values({
         id: transferId,
         devotionalId: devotional.id,
-        email: payload.email,
+        email: normalizedEmail,
         amountMinor: payload.amountMinor,
         currency: payload.currency,
         bankAccountId: payload.bankAccountId,
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
   }
 
   await recordAudit({
-    actor: payload.email,
+    actor: normalizedEmail,
     action: "bank_transfer.submit",
     entity: "bank_transfer",
     entityId: transferId,
@@ -125,7 +126,7 @@ export async function POST(request: Request) {
       reference: payload.reference,
     },
   });
-  await recordEvent({ eventType: "bank_transfer.submitted", slug: devotional.slug, email: payload.email });
+  await recordEvent({ eventType: "bank_transfer.submitted", slug: devotional.slug, email: normalizedEmail });
 
   // Notify admins
   try {
@@ -138,7 +139,7 @@ export async function POST(request: Request) {
       variables: {
         platformName: settings.platformName,
         devotionalTitle: devotional.title,
-        email: payload.email,
+        email: normalizedEmail,
         amount: amountDisplay,
         bankName: bankAccount.bankName,
         accountName: bankAccount.accountName,
@@ -150,7 +151,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[bank-transfer/upload] admin notification failed:", err);
     await recordAudit({
-      actor: payload.email,
+      actor: normalizedEmail,
       action: "bank_transfer.submit",
       entity: "bank_transfer_email",
       entityId: transferId,
