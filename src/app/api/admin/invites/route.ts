@@ -18,6 +18,7 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const bodySchema = z.object({
   email: z.string().email(),
+  role: z.enum(["admin", "owner"]).optional().default("admin"),
 });
 
 /** List invites — superadmin only. */
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "A valid email address is required." }, { status: 400 });
   }
   const email = payload.email.trim().toLowerCase();
+  const role = payload.role === "owner" ? "owner" : "admin";
   if (!isEmail(email)) {
     return NextResponse.json({ ok: false, error: "A valid email address is required." }, { status: 400 });
   }
@@ -80,7 +82,7 @@ export async function POST(request: Request) {
     db.insert(adminInvites).values({
       email,
       token,
-      role: "admin",
+      role,
       invitedBy: admin.id,
       status: "pending",
       expiresAt,
@@ -92,7 +94,7 @@ export async function POST(request: Request) {
     action: "admin.invite",
     entity: "admin_invite",
     entityId: token,
-    after: { email, role: "admin", expiresAt: expiresAt.toISOString() },
+    after: { email, role, expiresAt: expiresAt.toISOString() },
   });
 
   // Deliver the invitation email. Failure is audited but non-fatal — the

@@ -49,7 +49,6 @@ export function GrantsTable({
     { key: "email", header: "Email" },
     { key: "devotional", header: "Devotional" },
     { key: "status", header: "Status" },
-    { key: "password", header: "Access password", cellClass: "font-mono" },
     { key: "granted", header: "Granted" },
     { key: "expires", header: "Expires" },
     {
