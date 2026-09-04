@@ -147,9 +147,9 @@ export function Navbar({ platformName, logoUrl, links = [], trailing }: NavbarPr
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <ThemeToggle />
-          <div className="hidden md:block">{trailing}</div>
+          <div className="flex items-center gap-1.5 sm:gap-2">{trailing}</div>
           {links.length > 0 && (
             <button
               type="button"
