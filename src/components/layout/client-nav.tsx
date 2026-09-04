@@ -47,7 +47,7 @@ export function ClientNav({ platformName, logoUrl, settings, devotionals, purcha
             </button>
             <Link
               href="/admin"
-              className="hidden sm:inline-flex rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text-muted hover:bg-background"
+              className="inline-flex rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text-muted hover:bg-background"
             >
               Admin
             </Link>

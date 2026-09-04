@@ -32,10 +32,11 @@ export default async function DevotionalPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ reference?: string }>;
+  searchParams: Promise<{ reference?: string; trxref?: string; trxRef?: string }>;
 }) {
   const { slug } = await params;
-  const { reference } = await searchParams;
+  const sp = await searchParams;
+  const reference = sp.reference ?? sp.trxref ?? sp.trxRef;
   const { value: settings } = await getSiteSettings();
 
   let devotional: Devotional | null = null;
