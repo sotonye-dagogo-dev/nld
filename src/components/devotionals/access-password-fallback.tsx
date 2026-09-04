@@ -18,27 +18,48 @@ export function AccessPasswordFallback({ reference, devotionalSlug }: AccessPass
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+
+  async function verifyAndFetch() {
+    setLoading(true);
+    setError(null);
+    setIsPending(false);
+    try {
+      const verifyOne = async (path: string) => {
+        try {
+          const r = await fetch(`${path}?reference=${encodeURIComponent(reference)}`);
+          await r.json().catch(() => null);
+        } catch {}
+      };
+      await verifyOne("/api/paystack/verify");
+      await verifyOne("/api/budpay/verify");
+
+      const res = await fetch(`/api/access/password?reference=${encodeURIComponent(reference)}`);
+      const data = await res.json().catch(() => null);
+      if (res.status === 202) {
+        setIsPending(true);
+        setError(data?.error ?? "Payment pending — awaiting verification. Please wait a moment and refresh.");
+        return;
+      }
+      if (!res.ok || !data?.ok) {
+        if (res.status === 403) {
+          setError(data?.error ?? "Purchase not completed — payment was cancelled or failed. Please try again.");
+        } else {
+          setError(data?.error ?? "Could not retrieve access password.");
+        }
+        return;
+      }
+      setPassword(data.accessPassword);
+    } catch {
+      setError("Network error while fetching access password.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let mounted = true;
-    async function fetchPassword() {
-      try {
-        const res = await fetch(`/api/access/password?reference=${encodeURIComponent(reference)}`);
-        const data = await res.json();
-        if (!mounted) return;
-        if (!res.ok || !data.ok) {
-          setError(data.error ?? "Could not retrieve access password.");
-          return;
-        }
-        setPassword(data.accessPassword);
-      } catch {
-        if (mounted) setError("Network error while fetching access password.");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-    fetchPassword();
-    return () => { mounted = false; };
+    verifyAndFetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reference]);
 
   if (loading) {
@@ -54,11 +75,16 @@ export function AccessPasswordFallback({ reference, devotionalSlug }: AccessPass
 
   if (error || !password) {
     return (
-      <Card className="border-danger/40 bg-danger/5">
-        <div className="flex items-center gap-2 text-sm text-danger">
-          <AlertCircle aria-hidden className="h-4 w-4 shrink-0" />
-          <span>{error ?? "Access password not available yet. Check your email."}</span>
+      <Card className={isPending ? "border-warning/40 bg-warning/5" : "border-danger/40 bg-danger/5"}>
+        <div className="flex items-center gap-2 text-sm">
+          <AlertCircle aria-hidden className={isPending ? "h-4 w-4 shrink-0 text-warning" : "h-4 w-4 shrink-0 text-danger"} />
+          <span className={isPending ? "text-warning" : "text-danger"}>{error ?? "Access password not available yet. Check your email."}</span>
         </div>
+        {isPending && (
+          <Button variant="secondary" size="sm" className="mt-3" onClick={verifyAndFetch}>
+            Retry verification
+          </Button>
+        )}
       </Card>
     );
   }
