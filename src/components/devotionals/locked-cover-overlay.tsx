@@ -140,7 +140,7 @@ export function LockedCoverOverlay({
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link
             href={unlockHref}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-background shadow-md hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
           >
             <Lock className="h-4 w-4" aria-hidden="true" />
             {unlockLabel}
