@@ -26,7 +26,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** Initialize a BudPay Standard transaction (redirect flow). */
+/** Initialize a BudPay Standard transaction (redirect flow).
+ *  NOTE: BudPay docs claim `amount` is smallest unit, but live behavior observed
+ *  is that it charges the literal Naira value (e.g. 50000 → ₦50,000 instead of ₦500).
+ *  Paystack correctly uses kobo (smallest) while BudPay live expects major units.
+ *  We therefore send major units (Naira) derived from amountMinor.
+ */
 export async function initializeTransaction(input: {
   email: string;
   amountMinor: number;
@@ -35,9 +40,17 @@ export async function initializeTransaction(input: {
   callbackUrl: string;
   metadata?: Json;
 }): Promise<BudpayInitializeData> {
+  // BudPay live expects amount in major units (Naira), not kobo. Divide by 100.
+  // For non-round amounts (e.g. 50050 kobo = 500.50 NGN), preserve decimals as needed.
+  const amountMajor = (() => {
+    const major = input.amountMinor / 100;
+    // Use integer string if divisible, else fixed 2 decimals without trailing zeros
+    if (Number.isInteger(major)) return String(major);
+    return major.toFixed(2).replace(/\.?0+$/, "");
+  })();
   const body: Record<string, unknown> = {
     email: input.email,
-    amount: String(input.amountMinor), // BudPay expects string amount in smallest unit
+    amount: amountMajor,
     currency: input.currency,
     reference: input.reference,
     callback: input.callbackUrl,
