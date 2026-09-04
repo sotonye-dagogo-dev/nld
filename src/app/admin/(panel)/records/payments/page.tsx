@@ -91,7 +91,7 @@ export default async function PaymentsPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Payments</h1>
-        <p className="text-sm text-text-muted">All Paystack purchase records, newest first.</p>
+        <p className="text-sm text-text-muted">All purchase records across payment handlers (Paystack, BudPay, bank transfer), newest first.</p>
       </div>
       {error ? (
         <ErrorState title="Could not load payments" message="Records could not be fetched." />

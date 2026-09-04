@@ -54,7 +54,9 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
 
       {devotional.description && <p className="max-w-2xl text-text-muted mb-8">{devotional.description}</p>}
 
-      {/* Single-asset devotional (no days) or hybrid — asset viewer with optional days */}
+      {/* Single-asset devotional (no days) or hybrid — asset viewer with optional days
+          The ContentReader's locked overlay is the single protected view (cover + watermark);
+          no second blurred cover block is rendered when an asset is present. */}
       {hasSingleAsset && (
         <section className="mb-8">
           <ContentReader
@@ -68,9 +70,6 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
           />
           {hasLockedAsset && !isUnlocked && (
             <p className="mt-2 text-xs text-text-muted text-center">This file is protected — purchase access or enter your access code below to unlock.</p>
-          )}
-          {isUnlocked && hasSingleAsset && (
-            <p className="mt-2 text-xs text-success text-center font-medium">Access granted — you can now read the full devotional file above.</p>
           )}
         </section>
       )}
@@ -111,7 +110,9 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
                     <iframe src={day.sermonUrl} title={`Day ${day.dayNumber} sermon`} className="h-full w-full" loading="lazy" />
                   </div>
                 )}
-                {day.contentFileUrl ? (
+                {/* Per-day file viewer suppressed when a single asset houses the full devotional
+                    (avoid duplicate PDF viewers and second cover-blur block) */}
+                {day.contentFileUrl && !hasSingleAsset ? (
                   <div className="mt-4">
                     <ContentReader
                       fileUrl={day.contentFileUrl}
@@ -179,11 +180,13 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
             </section>
           )}
 
-          {/* Render unlocked locked-days directly with full access */}
+          {/* Render unlocked locked-days directly with full access — single success banner (no duplicate) */}
           {isUnlocked && unlockedDays!.length > 0 && (
             <div className="section-gap animate-fade-in">
               <Card variant="glass" className="border-success/40 bg-success/5">
-                <p className="text-sm text-success font-medium">Access unlocked — {unlockedDays!.length} additional day{unlockedDays!.length === 1 ? "" : "s"} available.</p>
+                <p className="text-sm text-success font-medium">
+                  Access granted — you can now read the full devotional{hasSingleAsset ? " file above" : ""} and {unlockedDays!.length} additional day{unlockedDays!.length === 1 ? "" : "s"} below.
+                </p>
               </Card>
               {unlockedDays!.map((day) => (
                 <article key={day.id} className="rounded-xl border border-border bg-surface p-6 animate-slide-up">
@@ -196,16 +199,18 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
                       <iframe src={day.sermonUrl} title={`Day ${day.dayNumber} sermon`} className="h-full w-full" loading="lazy" />
                     </div>
                   )}
-                  <div className="mt-4">
-                    <ContentReader
-                      fileUrl={day.contentFileUrl ?? ""}
-                      fileName={day.contentFileUrl?.split("/").pop()?.split(".").slice(0, -1).join(".") || `${day.title || "Content"} — Day ${day.dayNumber}`}
-                      fileType={(day.contentFileUrl ?? "").toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
-                      maxPreviewChars={MAX_PREVIEW_CHARS}
-                      hasFullAccess={true}
-                      coverUrl={devotional.coverUrl}
-                    />
-                  </div>
+                  {day.contentFileUrl && !hasSingleAsset ? (
+                    <div className="mt-4">
+                      <ContentReader
+                        fileUrl={day.contentFileUrl}
+                        fileName={day.contentFileUrl?.split("/").pop()?.split(".").slice(0, -1).join(".") || `${day.title || "Content"} — Day ${day.dayNumber}`}
+                        fileType={(day.contentFileUrl ?? "").toLowerCase().endsWith(".pdf") ? "pdf" : "docx"}
+                        maxPreviewChars={MAX_PREVIEW_CHARS}
+                        hasFullAccess={true}
+                        coverUrl={devotional.coverUrl}
+                      />
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>
