@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Download, FileText, Maximize2, Minimize2, AlertCircle, ExternalLink, Lock, EyeOff, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Maximize2, Minimize2, AlertCircle, Lock, EyeOff, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// On-platform PDF/DOCX reader — renders uploaded content in a secure viewer
-// that prevents downloading, printing, and text selection. Includes preview
-// truncation with character limits for asset protection.
+// On-platform PDF/DOCX reader — secure viewer using pdf.js for true multi-page PDFs.
+// Locked mode shows cover + watermark over blurred backdrop; unlocked mode uses
+// pdf.js canvas rendering with correct page count, zoom, pagination and fullscreen.
 
 function isOptimizedImageHost(url: string | null | undefined): boolean {
   if (!url || typeof url !== "string") return false;
@@ -43,17 +43,16 @@ export function ContentReader({
   className,
 }: ContentReaderProps) {
   const hasFile = Boolean(fileUrl && fileUrl.trim().length > 0);
-  const [isLoading, setIsLoading] = useState(hasFile);
+  const [isLoading, setIsLoading] = useState(hasFile && hasFullAccess && fileType === "pdf");
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [isTruncated, setIsTruncated] = useState(false);
-  const [showFullContent, setShowFullContent] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pdfDocRef = useRef<unknown | null>(null);
 
   useEffect(() => {
     const handler = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -61,57 +60,117 @@ export function ContentReader({
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  // For PDF files, we use an iframe with PDF.js or native browser viewer
-  // For DOCX, we convert to HTML on the client (limited) or show a placeholder
-
+  // DOCX placeholder and reset when not pdf or no access
   useEffect(() => {
     if (!hasFile) {
       setIsLoading(false);
       return;
     }
-    // Only attempt to load content if user has full access
-    // For preview mode, we don't fetch the actual file to protect assets
     if (!hasFullAccess) {
       setIsLoading(false);
+      setError(null);
       return;
     }
+    if (fileType === "docx") {
+      setContent("[DOCX content — viewer ready]");
+      setIsLoading(false);
+    }
+  }, [hasFile, hasFullAccess, fileType]);
 
-    async function loadContent() {
+  // PDF.js loading: fetch document to get true page count and prepare rendering
+  useEffect(() => {
+    if (!hasFile || !hasFullAccess || fileType !== "pdf") return;
+    let cancelled = false;
+    async function loadPdf() {
       setIsLoading(true);
       setError(null);
-
+      setCurrentPage(1);
       try {
-        if (fileType === "pdf") {
-          // For PDF, iframe handles loading; HEAD check is skipped to avoid CSP
-          // connect-src blocks (supabase host) and false "Unable to load content" errors.
-          setTotalPages(1);
-        } else if (fileType === "docx") {
-          // For DOCX, we'd need a library like mammoth.js to convert
-          // For now, show a placeholder with truncation notice
-          setContent("[DOCX content — viewer ready]");
+        // Dynamic import keeps server bundle clean and ensures client-only execution
+        const pdfjsLib: typeof import("pdfjs-dist") = await import("pdfjs-dist");
+        // Ensure worker matches API version (4.10.38) — fixes "API version ... does not match worker" error
+        if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+          // Use CDN matching installed version to avoid bundling worker
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs`;
         }
+        const loadingTask = pdfjsLib.getDocument({
+          url: fileUrl,
+          withCredentials: false,
+        });
+        const pdf = await loadingTask.promise;
+        if (cancelled) return;
+        pdfDocRef.current = pdf as unknown;
+        setTotalPages((pdf as unknown as { numPages: number }).numPages || 1);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load content");
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : "Failed to load PDF";
+        // Fallback: if pdf.js fails due to CSP/fetch, keep totalPages=1 and allow iframe fallback via error handling
+        // But we prefer to show error with hint to try again
+        if (msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("failed")) {
+          setError("Unable to load PDF. Please check your connection or try again.");
+        } else {
+          setError(msg.slice(0, 300));
+        }
+        setTotalPages(1);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
-
-    loadContent();
+    loadPdf();
+    return () => {
+      cancelled = true;
+      // Cleanup pdf doc
+      const doc = pdfDocRef.current as unknown as { destroy?: () => void } | null;
+      try { doc?.destroy?.(); } catch {}
+      pdfDocRef.current = null;
+    };
   }, [fileUrl, fileType, hasFullAccess, hasFile]);
 
-  // Truncate content for preview
-  const displayContent = hasFullAccess || showFullContent
-    ? content
-    : content.length > maxPreviewChars
-      ? (setIsTruncated(true), content.slice(0, maxPreviewChars) + "…")
-      : content;
+  // Render current page to canvas when pdf doc, page, or zoom changes
+  useEffect(() => {
+    if (!hasFullAccess || fileType !== "pdf" || !hasFile) return;
+    const pdfMaybe = pdfDocRef.current as unknown as {
+      getPage: (n: number) => Promise<{
+        getViewport: (o: { scale: number }) => { width: number; height: number };
+        render: (o: { canvasContext: CanvasRenderingContext2D; viewport: unknown }) => { promise: Promise<void> };
+      }>;
+    } | null;
+    if (!pdfMaybe || !canvasRef.current) return;
+    const pdf = pdfMaybe;
+    let cancelled = false;
+    async function render() {
+      try {
+        const page = await pdf.getPage(currentPage);
+        if (cancelled) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        // Base scale 1.5 gives good readability; multiplied by zoom factor
+        const viewport = page.getViewport({ scale: 1.5 * zoom });
+        const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+        canvas.width = Math.floor(viewport.width * dpr);
+        canvas.height = Math.floor(viewport.height * dpr);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        // Clear
+        ctx.clearRect(0, 0, viewport.width, viewport.height);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+      } catch {
+        // silent — keep previous frame
+      }
+    }
+    render();
+    return () => { cancelled = true; };
+  }, [currentPage, zoom, hasFullAccess, fileType, hasFile, totalPages]);
+
+  // Truncate content for preview (docx only)
+  const displayContent = content;
 
   const handlePageChange = (delta: number) => {
     const nextPage = currentPage + delta;
-    if (nextPage >= 1 && nextPage <= totalPages) {
-      setCurrentPage(nextPage);
-    }
+    if (nextPage >= 1 && nextPage <= totalPages) setCurrentPage(nextPage);
   };
 
   if (error) {
@@ -167,7 +226,6 @@ export function ContentReader({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Page navigation for PDF — always show when hasFullAccess so user has counter + nav */}
           {fileType === "pdf" && hasFullAccess && (
             <div className="flex items-center gap-1 border border-border rounded-lg p-1">
               <button
@@ -178,7 +236,7 @@ export function ContentReader({
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="px-2 text-sm font-mono text-text-primary min-w-[56px] text-center">
+              <span className="px-2 text-sm font-mono text-text-primary min-w-[64px] text-center">
                 {currentPage} / {totalPages}
               </span>
               <button
@@ -192,8 +250,7 @@ export function ContentReader({
             </div>
           )}
 
-          {/* Zoom controls — only when unlocked */}
-          {hasFullAccess && (
+          {hasFullAccess && fileType === "pdf" && (
             <div className="flex items-center gap-1 border border-border rounded-lg p-1">
               <button
                 onClick={() => setZoom((z) => Math.max(0.6, Number((z - 0.15).toFixed(2))))}
@@ -213,26 +270,12 @@ export function ContentReader({
             </div>
           )}
 
-          {/* Upgrade prompt for truncated content */}
-          {isTruncated && !hasFullAccess && upgradeHref && (
-            <a
-              href={upgradeHref}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover transition-colors"
-            >
-              <Lock className="h-4 w-4" aria-hidden="true" />
-              Unlock Full Content
-            </a>
-          )}
-
-          {/* Fullscreen toggle — now reflects state and actually works */}
+          {/* Fullscreen toggle */}
           <button
             onClick={() => {
               if (containerRef.current) {
-                if (document.fullscreenElement) {
-                  document.exitFullscreen();
-                } else {
-                  containerRef.current.requestFullscreen().catch(() => undefined);
-                }
+                if (document.fullscreenElement) document.exitFullscreen();
+                else containerRef.current.requestFullscreen().catch(() => undefined);
               }
             }}
             className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
@@ -244,25 +287,22 @@ export function ContentReader({
         </div>
       </div>
 
-      {/* Content viewer — full width/height, no clipping */}
-      <div ref={containerRef} className={cn("relative w-full bg-background flex-1", hasFullAccess ? "min-h-[560px] h-[68vh] max-h-[85vh] overflow-auto" : "min-h-[400px] overflow-hidden")}>
+      {/* Content viewer — full width/height, no clipping; pdf canvas occupies entire container */}
+      <div ref={containerRef} className={cn("relative w-full bg-background flex-1 flex flex-col", hasFullAccess ? "min-h-[560px] h-[68vh] max-h-[85vh] overflow-auto" : "min-h-[400px] overflow-hidden")}>
         {fileType === "pdf" ? (
-          <div className="w-full h-full relative min-h-[inherit]">
+          <div className="w-full h-full relative flex-1 flex flex-col min-h-[inherit]">
             {hasFullAccess ? (
-              <div className="w-full h-full min-h-[560px]" style={{ transform: `scale(${zoom})`, transformOrigin: "top left", width: `${100 / zoom}%`, height: `${100 / zoom}%` }}>
-                <iframe
-                  ref={iframeRef}
-                  src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
-                  title={`${fileName} preview`}
-                  className="w-full h-full min-h-[560px] border-0"
-                  sandbox="allow-scripts allow-same-origin"
-                  loading="lazy"
+              <div className="w-full flex-1 flex items-start justify-center bg-background p-4 overflow-auto">
+                <canvas
+                  ref={canvasRef}
+                  className="shadow-lg border border-border bg-white max-w-full"
+                  style={{ display: "block" }}
+                  aria-label={`${fileName} page ${currentPage} of ${totalPages}`}
                 />
               </div>
             ) : (
-              // Locked mode — blurred PDF backdrop + cover + watermark unlock
-              <div className="relative w-full h-full min-h-[400px] overflow-hidden bg-surface">
-                {/* Blurred backdrop — faint PDF icon pattern */}
+              // Locked mode — blurred backdrop + cover + watermark unlock (covers reader itself)
+              <div className="relative w-full h-full min-h-[400px] flex-1 overflow-hidden bg-surface">
                 <div aria-hidden="true" className="absolute inset-0 flex flex-col items-center justify-center gap-3 blur-[7px] opacity-30 select-none pointer-events-none p-8">
                   <FileText className="h-20 w-20 text-text-muted/50" aria-hidden="true" />
                   <div className="h-3 w-3/4 rounded bg-text-muted/40" />
@@ -270,7 +310,6 @@ export function ContentReader({
                   <div className="h-3 w-2/3 rounded bg-text-muted/30" />
                   <p className="text-sm text-text-muted">PDF preview blurred — unlock to read</p>
                 </div>
-                {/* Tiled watermark */}
                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden opacity-[0.06]">
                   <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-6 p-6 rotate-[-12deg] scale-110">
                     {Array.from({ length: 10 }).map((_, i) => (
@@ -280,7 +319,6 @@ export function ContentReader({
                     ))}
                   </div>
                 </div>
-                {/* Center: cover photo + unlock */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/45 backdrop-blur-[2px] p-6 text-center">
                   {coverUrl ? (
                     <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-border shadow-lg">
@@ -321,9 +359,9 @@ export function ContentReader({
             )}
           </div>
         ) : (
-          <div className="w-full h-full relative min-h-[inherit]">
+          <div className="w-full h-full relative min-h-[inherit] flex-1 flex flex-col">
             {hasFullAccess ? (
-              <div className="w-full min-h-[560px] p-6 overflow-auto bg-background">
+              <div className="w-full min-h-[560px] flex-1 p-6 overflow-auto bg-background">
                 <div style={{ transform: `scale(${zoom})`, transformOrigin: "top left", width: `${100 / zoom}%` }}>
                   <div className="prose-devotional max-w-none">
                     <div className="whitespace-pre-wrap text-text-primary select-none">
@@ -333,8 +371,7 @@ export function ContentReader({
                 </div>
               </div>
             ) : (
-              // Locked DOCX — blurred text + cover overlay
-              <div className="relative w-full h-full min-h-[400px] overflow-hidden bg-surface">
+              <div className="relative w-full h-full min-h-[400px] flex-1 overflow-hidden bg-surface">
                 <div aria-hidden="true" className="pointer-events-none select-none blur-[7px] opacity-30 p-6 space-y-3">
                   <div className="h-4 w-3/4 rounded bg-text-muted/50" />
                   <div className="h-4 w-full rounded bg-text-muted/40" />
@@ -393,7 +430,6 @@ export function ContentReader({
         )}
       </div>
 
-      {/* Footer with copyright/protection notice */}
       <div className="border-t border-border px-4 py-2 text-xs text-text-muted flex items-center justify-between">
         <span>Content protected — no download, copy, or print permitted</span>
         <span className="flex items-center gap-1">
@@ -405,49 +441,13 @@ export function ContentReader({
   );
 }
 
-// Secure PDF viewer component for full access users
-interface SecurePDFViewerProps {
-  fileUrl: string;
-  fileName: string;
-  className?: string;
+// Secure PDF viewer kept for backward compat — now delegates to canvas mode via ContentReader
+export function SecurePDFViewer({ fileUrl, fileName, className }: { fileUrl: string; fileName: string; className?: string }) {
+  return <ContentReader fileUrl={fileUrl} fileName={fileName} fileType="pdf" hasFullAccess coverUrl={null} className={className} />;
 }
 
-export function SecurePDFViewer({ fileUrl, fileName, className }: SecurePDFViewerProps) {
-  return (
-    <div className={cn("rounded-xl border border-border bg-surface overflow-hidden", className)}>
-      <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-background/50">
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5 text-text-muted" aria-hidden="true" />
-          <p className="text-sm font-medium text-text-primary truncate max-w-[300px]">{fileName}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => window.open(fileUrl, "_blank", "noopener,noreferrer")}
-            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
-            aria-label="Open in new tab"
-          >
-            <ExternalLink className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-      <div className="w-full h-[70vh]">
-        <iframe
-          src={`${fileUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
-          title={fileName}
-          className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin allow-forms"
-        />
-      </div>
-    </div>
-  );
-}
-
-// Preview truncation utility for text content
 export function truncateForPreview(text: string, maxChars: number): { truncated: string; isTruncated: boolean } {
-  if (text.length <= maxChars) {
-    return { truncated: text, isTruncated: false };
-  }
-  // Try to truncate at a word boundary
+  if (text.length <= maxChars) return { truncated: text, isTruncated: false };
   const truncated = text.slice(0, maxChars);
   const lastSpace = truncated.lastIndexOf(" ");
   const finalText = lastSpace > maxChars * 0.8 ? truncated.slice(0, lastSpace) : truncated;

@@ -50,7 +50,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
     slug: devotional?.slug ?? "",
     coverUrl: devotional?.coverUrl ?? "",
     assetUrl: (devotional as Devotional & { assetUrl?: string | null })?.assetUrl ?? "",
-    priceMinor: devotional ? String(devotional.priceMinor) : "500000",
+    priceMinor: devotional ? String(Math.round(devotional.priceMinor / 100)) : "5000",
     currency: devotional?.currency ?? "NGN",
     previewDays: devotional ? String(devotional.previewDays) : "3",
     accessMode: (devotional?.accessMode ?? "one-time") as AccessMode,
@@ -104,7 +104,7 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
         slug: form.slug,
         coverUrl: form.coverUrl,
         assetUrl: form.assetUrl || undefined,
-        priceMinor: Number(form.priceMinor) || 0,
+        priceMinor: Math.round((Number(form.priceMinor) || 0) * 100),
         currency: form.currency || "NGN",
         accessMode: form.accessMode,
         previewDays: Number(form.previewDays) || 0,
@@ -224,8 +224,9 @@ export function DevotionalForm({ devotional, days }: DevotionalFormProps) {
               name="priceMinor"
               type="number"
               min={0}
-              step={100}
-              label="Price (minor units, e.g. kobo)"
+              step={1}
+              label="Price (₦)"
+              hint="Amount in Naira (e.g. 5000 = ₦5,000)"
               value={form.priceMinor}
               onChange={(e) => setForm({ ...form, priceMinor: e.target.value })}
             />
