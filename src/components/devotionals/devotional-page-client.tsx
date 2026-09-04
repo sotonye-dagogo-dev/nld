@@ -127,8 +127,10 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
             ))}
           </section>
 
-          {/* Locked days — blurred preview with cover + watermark unlock (shown until unlocked) */}
-          {hasAccessControl && !isUnlocked && lockedDays.length > 0 && (
+          {/* Locked days — blurred preview with cover + watermark unlock (shown until unlocked)
+              Suppressed when devotional has a single asset (PDF/DOCX housing all days) to avoid
+              redundant cover-with-blur blocks: asset's ContentReader already shows the locked overlay. */}
+          {hasAccessControl && !isUnlocked && lockedDays.length > 0 && !hasSingleAsset && (
             <section className="space-y-6" aria-label="Locked devotional days">
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-border" />
@@ -162,6 +164,18 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
                   </article>
                 </LockedCoverOverlay>
               ))}
+            </section>
+          )}
+          {hasSingleAsset && hasAccessControl && !isUnlocked && lockedDays.length > 0 && (
+            <section className="space-y-2" aria-label="Locked days notice">
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <p className="text-xs font-semibold tracking-widest text-text-muted uppercase">
+                  {lockedDays.length} additional day{lockedDays.length === 1 ? "" : "s"} included in file — unlock to access
+                </p>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <p className="text-center text-xs text-text-muted">The full devotional content is contained in the protected file above. Unlock to read all {days.length} days.</p>
             </section>
           )}
 

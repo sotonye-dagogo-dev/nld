@@ -20,7 +20,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
     emailFrom: initial.emailFrom,
     supportEmail: initial.supportEmail,
     currency: initial.currency,
-    defaultPriceMinor: String(initial.defaultPriceMinor),
+    defaultPriceMinor: String(Math.round(initial.defaultPriceMinor / 100)),
     freePreviewDays: String(initial.freePreviewDays),
     accessMode: initial.accessMode,
     paymentsEnabled: initial.paymentsEnabled,
@@ -32,7 +32,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
     footerDevCreditUrl: initial.footerDevCreditUrl,
     footerDevCreditEnabled: initial.footerDevCreditEnabled,
     bundleEnabled: (initial.bundleEnabled ?? true) as boolean,
-    bundlePriceMinor: String(initial.bundlePriceMinor ?? 0),
+    bundlePriceMinor: String(Math.round((initial.bundlePriceMinor ?? 0) / 100)),
     bundleAccessMode: (initial.bundleAccessMode ?? initial.accessMode ?? "one-time") as AccessMode,
     bundleDurationDays: String(initial.bundleDurationDays ?? 60),
     allowIndividualPurchase: (initial.allowIndividualPurchase ?? true) as boolean,
@@ -75,9 +75,9 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
         body: JSON.stringify({
           settings: {
             ...form,
-            defaultPriceMinor: Number(form.defaultPriceMinor) || 0,
+            defaultPriceMinor: Math.round((Number(form.defaultPriceMinor) || 0) * 100),
             freePreviewDays: Number(form.freePreviewDays) || 0,
-            bundlePriceMinor: Number(form.bundlePriceMinor) || 0,
+            bundlePriceMinor: Math.round((Number(form.bundlePriceMinor) || 0) * 100),
             bundleDurationDays: Number(form.bundleDurationDays) || 60,
             durationAccessDays: Number(form.durationAccessDays) || 60,
           },
@@ -210,8 +210,9 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
             name="defaultPriceMinor"
             type="number"
             min={0}
-            step={100}
-            label="Default price (minor units)"
+            step={1}
+            label="Default price (₦)"
+            hint="Amount in Naira (e.g. 5000 = ₦5,000)"
             value={form.defaultPriceMinor}
             onChange={(e) => setForm({ ...form, defaultPriceMinor: e.target.value })}
             autoComplete="off"
@@ -255,7 +256,7 @@ export function SettingsEditor({ initial }: { initial: SiteSettings }) {
               <span>Enable bundle<span className="block text-xs text-text-muted">One fee for all devotionals / set</span></span>
               <input type="checkbox" checked={form.bundleEnabled} onChange={(e) => setForm({ ...form, bundleEnabled: e.target.checked })} className="h-4 w-4 accent-primary" />
             </label>
-            <Input name="bundlePriceMinor" type="number" min={0} step={100} label="Bundle price (minor units)" hint="Fee for all devotionals when bundle enabled (0 = use Default price or sum)" value={form.bundlePriceMinor} onChange={(e) => setForm({ ...form, bundlePriceMinor: e.target.value })} autoComplete="off" />
+            <Input name="bundlePriceMinor" type="number" min={0} step={1} label="Bundle price (₦)" hint="Fee in Naira for all devotionals when bundle enabled (0 = use Default price or sum)" value={form.bundlePriceMinor} onChange={(e) => setForm({ ...form, bundlePriceMinor: e.target.value })} autoComplete="off" />
             <label className="flex flex-col gap-1.5 text-sm font-medium text-text-primary">
               Bundle access mode
               <select name="bundleAccessMode" value={form.bundleAccessMode} onChange={(e) => setForm({ ...form, bundleAccessMode: e.target.value as AccessMode })} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
