@@ -107,7 +107,9 @@ export function AccessGate({ devotional, settings, id, onUnlock, onCloseModal }:
             <div>
               <h2 className="text-lg font-semibold text-success">Access unlocked</h2>
               <p className="text-sm text-text-muted">
-                You now have access to the remaining {days.length} day{days.length === 1 ? "" : "s"} of {devotional.title}.
+                {days.length === 0
+                  ? `You now have full access to ${devotional.title} — the complete content is available.`
+                  : `You now have full access to ${devotional.title} — ${days.length} day${days.length === 1 ? "" : "s"} unlocked.`}
               </p>
             </div>
           </div>

@@ -54,16 +54,77 @@ export function ContentReader({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pseudoFullscreen, setPseudoFullscreen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfDocRef = useRef<unknown | null>(null);
 
+  const isExpanded = isFullscreen || pseudoFullscreen;
+
   useEffect(() => {
-    const handler = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const handler = () => {
+      const el = (document as unknown as { fullscreenElement?: Element; webkitFullscreenElement?: Element }).fullscreenElement
+        ?? (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement;
+      setIsFullscreen(Boolean(el));
+      if (Boolean(el)) setPseudoFullscreen(false);
+    };
     document.addEventListener("fullscreenchange", handler);
-    return () => document.removeEventListener("fullscreenchange", handler);
+    document.addEventListener("webkitfullscreenchange" as unknown as keyof DocumentEventMap, handler as EventListener);
+    return () => {
+      document.removeEventListener("fullscreenchange", handler);
+      document.removeEventListener("webkitfullscreenchange" as unknown as keyof DocumentEventMap, handler as EventListener);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!pseudoFullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPseudoFullscreen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [pseudoFullscreen]);
+
+  async function toggleFullscreen() {
+    const el = containerRef.current;
+    if (!el) return;
+    // If already in any fullscreen mode, exit
+    if (document.fullscreenElement || (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement) {
+      try {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else {
+          const wExit = (document as unknown as { webkitExitFullscreen?: () => Promise<void> }).webkitExitFullscreen;
+          if (wExit) await wExit.call(document);
+        }
+      } catch {}
+      setPseudoFullscreen(false);
+      return;
+    }
+    if (pseudoFullscreen) {
+      setPseudoFullscreen(false);
+      return;
+    }
+    // Try native fullscreen with webkit fallback
+    const anyEl = el as unknown as {
+      requestFullscreen?: () => Promise<void>;
+      webkitRequestFullscreen?: () => Promise<void>;
+    };
+    try {
+      if (anyEl.requestFullscreen) {
+        await anyEl.requestFullscreen();
+        return;
+      }
+      if (anyEl.webkitRequestFullscreen) {
+        await anyEl.webkitRequestFullscreen();
+        return;
+      }
+    } catch {
+      // fall through to pseudo
+    }
+    // Native not available / blocked (common on iOS) — use CSS pseudo-fullscreen
+    setPseudoFullscreen(true);
+  }
 
   // DOCX placeholder and reset when not pdf or no access
   useEffect(() => {
@@ -290,35 +351,35 @@ export function ContentReader({
   }
 
   return (
-    <div className={cn("rounded-xl border border-border bg-surface overflow-hidden flex flex-col", className)}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 bg-background/50">
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5 text-text-muted" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-medium text-text-primary truncate max-w-[200px]">{fileName}</p>
+    <div className={cn("rounded-xl border border-border bg-surface overflow-hidden flex flex-col", className, pseudoFullscreen && "fixed inset-0 z-[65] rounded-none")}>
+      {/* Toolbar — horizontally scrollable on small screens so no control is clipped */}
+      <div className="flex items-center gap-2 border-b border-border bg-background/50 px-3 py-2.5 sm:px-4 sm:py-3 overflow-x-auto scrollbar-thin overscroll-x-contain [-webkit-overflow-scrolling:touch] flex-nowrap">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 shrink">
+          <FileText className="h-5 w-5 text-text-muted shrink-0" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-text-primary truncate max-w-[150px] sm:max-w-[200px]">{fileName}</p>
             <p className="text-xs text-text-muted">{fileType.toUpperCase()} • {totalPages} page{totalPages !== 1 ? "s" : ""}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0 flex-nowrap">
           {fileType === "pdf" && hasFullAccess && (
-            <div className="flex items-center gap-1 border border-border rounded-lg p-1">
+            <div className="flex items-center gap-1 border border-border rounded-lg p-1 shrink-0">
               <button
                 onClick={() => handlePageChange(-1)}
                 disabled={currentPage === 1}
-                className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1 sm:p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Previous page"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="px-2 text-sm font-mono text-text-primary min-w-[64px] text-center">
+              <span className="px-1.5 sm:px-2 text-xs sm:text-sm font-mono text-text-primary min-w-[56px] sm:min-w-[64px] text-center">
                 {currentPage} / {totalPages}
               </span>
               <button
                 onClick={() => handlePageChange(1)}
                 disabled={currentPage === totalPages}
-                className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1 sm:p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Next page"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -327,18 +388,18 @@ export function ContentReader({
           )}
 
           {hasFullAccess && fileType === "pdf" && (
-            <div className="flex items-center gap-1 border border-border rounded-lg p-1">
+            <div className="flex items-center gap-1 border border-border rounded-lg p-1 shrink-0">
               <button
                 onClick={() => setZoom((z) => Math.max(0.6, Number((z - 0.15).toFixed(2))))}
-                className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
+                className="p-1 sm:p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
                 aria-label="Zoom out"
               >
                 <ZoomOut className="h-4 w-4" />
               </button>
-              <span className="px-1.5 text-xs font-mono text-text-primary min-w-[42px] text-center">{Math.round(zoom * 100)}%</span>
+              <span className="px-1 sm:px-1.5 text-xs font-mono text-text-primary min-w-[38px] sm:min-w-[42px] text-center">{Math.round(zoom * 100)}%</span>
               <button
                 onClick={() => setZoom((z) => Math.min(2.2, Number((z + 0.15).toFixed(2))))}
-                className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
+                className="p-1 sm:p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
                 aria-label="Zoom in"
               >
                 <ZoomIn className="h-4 w-4" />
@@ -346,25 +407,20 @@ export function ContentReader({
             </div>
           )}
 
-          {/* Fullscreen toggle */}
+          {/* Fullscreen toggle — native with CSS fallback for iOS/mobile */}
           <button
-            onClick={() => {
-              if (containerRef.current) {
-                if (document.fullscreenElement) document.exitFullscreen();
-                else containerRef.current.requestFullscreen().catch(() => undefined);
-              }
-            }}
-            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background"
-            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            title={isFullscreen ? "Collapse" : "Expand"}
+            onClick={toggleFullscreen}
+            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-background shrink-0"
+            aria-label={isExpanded ? "Exit fullscreen" : "Enter fullscreen"}
+            title={isExpanded ? "Collapse" : "Expand"}
           >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
       {/* Content viewer — full width/height, no clipping; pdf canvas occupies entire container */}
-      <div ref={containerRef} className={cn("relative w-full bg-background flex-1 flex flex-col", hasFullAccess ? "min-h-[560px] h-[68vh] max-h-[85vh] overflow-auto" : "min-h-[400px] overflow-hidden")}>
+      <div ref={containerRef} className={cn("relative w-full bg-background flex-1 flex flex-col", hasFullAccess ? "min-h-[560px] h-[68vh] max-h-[85vh] overflow-auto" : "min-h-[400px] overflow-hidden", isExpanded && "h-[100dvh] max-h-[100dvh] min-h-0 overflow-auto")}>
         {fileType === "pdf" ? (
           <div className="w-full h-full relative flex-1 flex flex-col min-h-[inherit]">
             {hasFullAccess ? (

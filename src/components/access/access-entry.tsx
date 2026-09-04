@@ -19,7 +19,7 @@ export function AccessEntry({
   devotionals?: { slug: string; title: string }[];
   initialSlug?: string;
   initialPassword?: string;
-  onSuccess?: (result: { devotional: string; days: number; matchedSlug?: string }) => void;
+  onSuccess?: (result: { devotional: string; days: number; matchedSlug?: string; email?: string; password?: string }) => void;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -87,9 +87,15 @@ export function AccessEntry({
           return;
         }
         if (data.matchedSlug) setSlug(data.matchedSlug);
-        const r = { devotional: data.devotional ?? data.matchedSlug ?? slug, days: data.days ?? 0, matchedSlug: data.matchedSlug };
+        const r = { devotional: data.devotional ?? data.matchedSlug ?? slug, days: data.days ?? 0, matchedSlug: data.matchedSlug, email: normalizedEmail, password: password.trim() };
         setResult(r);
         toast(`Access verified for ${r.devotional} — opening devotional!`, "success");
+        // Broadcast for any devotional page already in view so its reader unlocks without a second form submit
+        try {
+          const detail = { slug: data.matchedSlug ?? slug, email: normalizedEmail, password: password.trim(), devotional: r.devotional, days: r.days };
+          window.dispatchEvent(new CustomEvent("nld:access-unlocked", { detail }));
+          sessionStorage.setItem("nld:lastUnlock", JSON.stringify({ ...detail, ts: Date.now() }));
+        } catch {}
         if (onSuccess) {
           setTimeout(() => onSuccess(r), 400);
         } else if (data.matchedSlug) {
@@ -122,9 +128,14 @@ export function AccessEntry({
         setFieldErrors(mapErrorToField(data2.error ?? "Verification failed."));
         return;
       }
-      const r = { devotional: data2.devotional ?? slug, days: data2.days ?? 0 };
+      const r = { devotional: data2.devotional ?? slug, days: data2.days ?? 0, matchedSlug: slug, email: normalizedEmail, password: password.trim() };
       setResult(r);
       toast(`Access verified for ${r.devotional}!`, "success");
+      try {
+        const detail = { slug, email: normalizedEmail, password: password.trim(), devotional: r.devotional, days: r.days };
+        window.dispatchEvent(new CustomEvent("nld:access-unlocked", { detail }));
+        sessionStorage.setItem("nld:lastUnlock", JSON.stringify({ ...detail, ts: Date.now() }));
+      } catch {}
       if (onSuccess) {
         setTimeout(() => onSuccess({ ...r, matchedSlug: slug }), 400);
       } else {
