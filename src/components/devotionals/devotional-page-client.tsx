@@ -24,9 +24,9 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
   const visibleDays = days.slice(0, previewDays);
   const lockedDays = days.slice(previewDays);
   const devotionalAssetUrl = (devotional as Devotional & { assetUrl?: string | null }).assetUrl ?? null;
-  const hasSingleAsset = Boolean(devotionalAssetUrl && devotionalAssetUrl.trim().length > 0);
-  const assetFileType: "pdf" | "docx" = (devotionalAssetUrl ?? "").toLowerCase().endsWith(".pdf") ? "pdf" : "docx";
-  const assetFileName = devotionalAssetUrl?.split("/").pop()?.split(".").slice(0, -1).join(".") || devotional.title || "Devotional";
+  const hasSingleAsset = Boolean(devotionalAssetUrl && typeof devotionalAssetUrl === "string" && devotionalAssetUrl.trim().length > 0);
+  const assetFileType: "pdf" | "docx" = typeof devotionalAssetUrl === "string" && devotionalAssetUrl.toLowerCase().endsWith(".pdf") ? "pdf" : "docx";
+  const assetFileName = (typeof devotionalAssetUrl === "string" ? devotionalAssetUrl.split("/").pop()?.split(".").slice(0, -1).join(".") : "") || devotional.title || "Devotional";
   const hasLockedDays = days.length > previewDays;
   const hasLockedAsset = hasSingleAsset && devotional.priceMinor > 0;
   // Access gate shown when there is any locked content (days beyond preview OR a paid single-file asset)
@@ -79,7 +79,7 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
       ) : days.length === 0 && hasSingleAsset ? (
         // Asset-only: gate and purchase are already handled above; still show fallback & gate
         <div className="section-gap">
-          {reference && devotional.priceMinor > 0 && (
+          {reference && devotional.priceMinor > 0 && !isUnlocked && (
             <AccessPasswordFallback reference={reference} devotionalSlug={devotional.title} />
           )}
           {hasAccessControl && !isUnlocked && (
@@ -216,7 +216,7 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
             </div>
           )}
 
-          {reference && devotional.priceMinor > 0 && (
+          {reference && devotional.priceMinor > 0 && !isUnlocked && (
             <AccessPasswordFallback reference={reference} devotionalSlug={devotional.title} />
           )}
 

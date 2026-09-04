@@ -88,7 +88,8 @@ export async function POST(request: Request) {
     return null;
   }
 
-  // Purchases fallback: if no grant, check purchases table (handles webhook race / fresh purchase)
+  // Purchases fallback: only success-verified purchases may grant access.
+  // Pending/failed/canceled never grant or leak a password — webhook must have set success.
   async function findMatchingPurchase(): Promise<typeof active> {
     try {
       const { purchases } = await import("@/data/db/schema");
@@ -97,8 +98,7 @@ export async function POST(request: Request) {
         db.select().from(purchases).where(sql`lower(${purchases.email}) = ${normalizedEmail}`)
       ).catch(() => []);
       for (const p of rows) {
-        // Only consider successful or pending purchases (pending allows webhook race)
-        if (p.status !== "success" && p.status !== "pending") continue;
+        if (p.status !== "success") continue;
         const expected = deriveAccessPassword(p.paystackReference);
         if (verifyAccessPassword(trimmedPassword, expected)) {
           // Lazily create grant for this devotional so future direct lookups succeed

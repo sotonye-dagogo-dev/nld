@@ -90,7 +90,8 @@ export async function POST(
         db.select().from(purchases).where(sql`lower(${purchases.email}) = ${normalizedEmail}`)
       ).catch(() => []);
       for (const p of rows) {
-        if (p.status !== "success" && p.status !== "pending") continue;
+        // Only success-verified purchases may grant access; pending/failed never do.
+        if (p.status !== "success") continue;
         const expected = deriveAccessPassword(p.paystackReference);
         if (verifyAccessPassword(trimmedPassword, expected)) {
           try {
