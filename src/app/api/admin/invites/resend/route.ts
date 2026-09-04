@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { queryWithTimeout } from "@/data/db";
 import { adminInvites } from "@/data/db/schema";
 import { requireAdmin, isSuperAdmin } from "@/lib/admin-auth";
-import { sendTemplateEmail } from "@/integrations/resend/client";
+import { sendTemplateEmail } from "@/integrations/email-client";
 import { getSiteSettings } from "@/config/site";
 import { env } from "@/config/env";
 import { recordAudit } from "@/lib/audit";
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     const { value: settings } = await getSiteSettings();
     await sendTemplateEmail({
       to: row.email,
-      key: "admin_invite",
+      templateKey: "admin_invite",
       variables: {
         platformName: settings.platformName,
         inviteUrl: `${env.appUrl}/admin/invite/${row.token}`,

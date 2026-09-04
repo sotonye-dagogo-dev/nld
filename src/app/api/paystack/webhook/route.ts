@@ -5,7 +5,7 @@ import { queryWithTimeout } from "@/data/db";
 import { purchases, accessGrants, devotionals } from "@/data/db/schema";
 import { verifyWebhookSignature } from "@/integrations/paystack/client";
 import { deriveAccessPassword, computeExpiry } from "@/lib/access";
-import { sendAccessEmail } from "@/integrations/resend/client";
+import { sendAccessEmail } from "@/integrations/email-client";
 import { getSiteSettings } from "@/config/site";
 import { recordAudit, recordEvent } from "@/lib/audit";
 

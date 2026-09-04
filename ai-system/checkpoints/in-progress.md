@@ -2,8 +2,8 @@
 
 > **Metadata**
 >
-> - last-updated-by: merge (2026-09-02 Session 13)
-> - last-verified-against-code: 2026-09-02
+> - last-updated-by: fix-build (pdf-reader polyfill + devotional dedup + gateway labeling + email audit)
+> - last-verified-against-code: 2026-09-04
 > - staleness-policy: this file is overwritten every session — always current
 
 > **Overview:** Tracks work that is currently in progress but not yet complete. Written _before_ starting risky multi-step work, cleared on clean completion. This is the first file `resume-session.md` reads on interruption — it is the single source of truth for "what was half-done."
@@ -12,29 +12,24 @@
 
 ## Current State
 
-**Status:** Complete — merged and cleared.
+**Status:** Complete — fix-build (pdf-reader + devotional dedup + gateway labeling + email audit)
 
-**What was completed (Session 12 upstream — routing lag + secure viewer overhaul + protection):**
-- Routing lag & analytics navigation: withLayoutTimeout(2500), resilient analytics, loading skeletons, admin layout de-dupe
-- Secure viewer: full rewrite content-reader.tsx (height/expand/zoom/page counter), useProtectionBlur + anti-screenshot blank overlay
+**What was completed (fix-build 2026-09-04):**
+- PDF reader: added `src/lib/polyfills.ts` for `Promise.withResolvers`, imported in `content-reader.tsx` before `pdfjs-dist` (fixes iOS 16 Safari crash → "Unable to load content")
+- Devotional slug de-duplication: asset viewer is single protected view, per-day file viewers + LockedCoverOverlay suppressed when `hasSingleAsset`, unified success banner, no second cover-blur block
+- Admin payments labeling: `records/payments` page now "payment handlers (Paystack, BudPay, bank transfer)", package description updated
+- Email compliance audit: migrated Paystack/BudPay webhooks + admin invites from direct `resend/client` to `email-client` abstraction, verified BudPay mirrors Paystack end-to-end (init → webhook re-verify → idempotent grant → sendAccessEmail + copy-to-clipboard fallback)
 
-**What was completed (Session 13 merge — reader lock overlay + early deterrent on top of upstream):**
-- Created LockedCoverOverlay (cover photo + tiled watermark + blur + unlock CTA)
-- Integrated into DevotionalPageClient: lockedDays now shown as LockedCoverOverlay cards when not unlocked
-- Merged layout early inline style/script (gated by antiScreenshotEnabled) with upstream ClientNav/withLayoutTimeout
-- Kept upstream superior content-reader & anti-screenshot, added globals protected-content rules
-
-**Files affected (merged):**
-- New: src/components/devotionals/locked-cover-overlay.tsx, src/app/loading.tsx, src/app/admin/(panel)/loading.tsx
-- Modified: src/components/devotionals/devotional-page-client.tsx, src/app/layout.tsx, src/app/globals.css, src/components/devotionals/content-reader.tsx (kept upstream), src/components/devotionals/anti-screenshot.tsx (kept upstream)
+**Files affected:**
+- New: src/lib/polyfills.ts
+- Modified: src/components/devotionals/content-reader.tsx, src/components/devotionals/devotional-page-client.tsx, src/app/admin/(panel)/records/payments/page.tsx, src/app/api/paystack/webhook/route.ts, src/app/api/budpay/webhook/route.ts, src/app/api/admin/invites/route.ts, src/app/api/admin/invites/resend/route.ts, package.json, ai-system docs (repo-map, system-architecture, project-decisions, summaries/dev-history, memory/lessons-learned)
 
 **QA Gate Results:**
-- Merge resolved via stash → pull --ff-only → stash apply → checkout per file + manual DevotionalPageClient merge
-- Pending final typecheck/build/lint/tests post-merge (to be run now)
+- `npm run build` + `npm test` + `npm run typecheck` to be verified before merge (see verification below)
 
 ---
 
 ## Next up (queued in `planning/task-queue.md`):
-1. Verify in production that cover overlay renders and locked days appear blurred
-2. Live-key verification pass with real Paystack/Cloudflare/Supabase keys
-3. Browser pass over viewer (fullscreen + overlay), analytics nav, and reader lock interaction
+1. Browser pass on iOS 16 real device: polyfilled viewer loads multi-page PDF after unlock (zoom/page/expand)
+2. Live-key verification with Resend-verified domain: Paystack + BudPay → webhook → grant → email → /devotionals/[slug]/unlock → reader; bank-transfer verify similarly
+3. Monitor Vercel logs for `sendAccessEmail` success across providers (EMAIL_PROVIDER=resend|cloudflare)

@@ -1,5 +1,6 @@
 "use client";
 
+import "@/lib/polyfills";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, FileText, Maximize2, Minimize2, AlertCircle, Lock, EyeOff, ZoomIn, ZoomOut } from "lucide-react";
@@ -86,6 +87,8 @@ export function ContentReader({
       setError(null);
       setCurrentPage(1);
       try {
+        // Ensure Promise.withResolvers polyfill is evaluated before pdfjs-dist loads
+        await import("@/lib/polyfills");
         // Dynamic import keeps server bundle clean and ensures client-only execution
         const pdfjsLib: typeof import("pdfjs-dist") = await import("pdfjs-dist");
         // Ensure worker matches API version (4.10.38) — fixes "API version ... does not match worker" error
