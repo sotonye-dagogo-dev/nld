@@ -70,8 +70,13 @@ export function ClientNav({ platformName, logoUrl, settings, devotionals, purcha
           devotionals={devotionals}
           onSuccess={(r) => {
             setAccessOpen(false);
-            // global toast already triggered inside AccessEntry; navigate to matched devotional if available
-            if (r.matchedSlug) window.location.href = `/devotionals/${r.matchedSlug}`;
+            // AccessEntry already broadcasts nld:access-unlocked so the current devotional page can
+            // reveal the reader without a second form submit. Only navigate when the matched
+            // devotional differs from the current location to avoid a redundant reload.
+            if (r.matchedSlug) {
+              const current = typeof window !== "undefined" ? window.location.pathname : "";
+              if (current !== `/devotionals/${r.matchedSlug}`) window.location.href = `/devotionals/${r.matchedSlug}`;
+            }
           }}
         />
       </Modal>
