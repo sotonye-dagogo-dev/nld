@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { AccessGate } from "@/components/devotionals/access-gate";
@@ -9,6 +9,7 @@ import { ContentReader, MAX_PREVIEW_CHARS } from "@/components/devotionals/conte
 import { DevotionalPurchaseModal } from "@/components/devotionals/devotional-purchase-modal";
 import { LockedCoverOverlay } from "@/components/devotionals/locked-cover-overlay";
 import { formatPrice } from "@/config/defaults";
+import { useToast } from "@/components/ui/toast";
 
 interface Props {
   devotional: Devotional;
@@ -19,7 +20,69 @@ interface Props {
 }
 
 export function DevotionalPageClient({ devotional, days, settings, reference, previewDays }: Props) {
+  const { toast } = useToast();
   const [unlockedDays, setUnlockedDays] = useState<DevotionalDay[] | null>(null);
+
+  // Sync global Unlock modal (AccessEntry → /api/access/verify) with this page's reader:
+  // when a password is verified in the navbar modal, the devotional page listener
+  // auto-fetches the locked days via the devotional unlock endpoint and reveals the reader
+  // without requiring a second form submission. Also hydrates from sessionStorage on mount
+  // so a redirect from the modal still unlocks.
+  useEffect(() => {
+    if (unlockedDays !== null) return;
+    async function doUnlock(email: string, password: string) {
+      try {
+        const res = await fetch(`/api/devotionals/${encodeURIComponent(devotional.slug)}/unlock`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim().toLowerCase(), password: password.trim() }),
+        });
+        const ct = res.headers.get("content-type") ?? "";
+        let data: { ok: boolean; days?: DevotionalDay[]; error?: string } | null = null;
+        if (ct.includes("application/json")) {
+          try {
+            data = (await res.json()) as { ok: boolean; days?: DevotionalDay[]; error?: string };
+          } catch {
+            return;
+          }
+        } else return;
+        if (!res.ok || !data?.ok || !Array.isArray((data as { days?: unknown }).days)) return;
+        setUnlockedDays((data as { days?: DevotionalDay[] }).days ?? []);
+        toast("Access granted — opening your devotional!", "success");
+        // clear one-time pending entry
+        try {
+          const raw = sessionStorage.getItem("nld:lastUnlock");
+          if (raw) {
+            const j = JSON.parse(raw) as { slug?: string };
+            if (j.slug === devotional.slug) sessionStorage.removeItem("nld:lastUnlock");
+          }
+        } catch {}
+      } catch {}
+    }
+
+    const onUnlockEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ slug: string; email: string; password: string }>).detail;
+      if (!detail || typeof detail.slug !== "string" || typeof detail.email !== "string" || typeof detail.password !== "string") return;
+      if (detail.slug !== devotional.slug) return;
+      void doUnlock(detail.email, detail.password);
+    };
+    window.addEventListener("nld:access-unlocked" as unknown as keyof WindowEventMap, onUnlockEvent as EventListener);
+
+    // Hydrate from sessionStorage (covers modal → navigation without event propagation)
+    try {
+      const raw = sessionStorage.getItem("nld:lastUnlock");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { slug: string; email: string; password: string; ts: number };
+        if (parsed.slug === devotional.slug && typeof parsed.email === "string" && typeof parsed.password === "string") {
+          const age = Date.now() - (parsed.ts ?? 0);
+          if (age >= 0 && age < 10 * 60 * 1000) void doUnlock(parsed.email, parsed.password);
+          else sessionStorage.removeItem("nld:lastUnlock");
+        }
+      }
+    } catch {}
+
+    return () => window.removeEventListener("nld:access-unlocked" as unknown as keyof WindowEventMap, onUnlockEvent as EventListener);
+  }, [devotional.slug, unlockedDays, toast]);
 
   const visibleDays = days.slice(0, previewDays);
   const lockedDays = days.slice(previewDays);
@@ -185,7 +248,9 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
             <div className="section-gap animate-fade-in">
               <Card variant="glass" className="border-success/40 bg-success/5">
                 <p className="text-sm text-success font-medium">
-                  Access granted — you can now read the full devotional{hasSingleAsset ? " file above" : ""} and {unlockedDays!.length} additional day{unlockedDays!.length === 1 ? "" : "s"} below.
+                  {hasSingleAsset
+                    ? "Access granted — you can now read the full devotional file above."
+                    : `Access granted — you can now read ${unlockedDays!.length} additional day${unlockedDays!.length === 1 ? "" : "s"} below.`}
                 </p>
               </Card>
               {unlockedDays!.map((day) => (
@@ -224,8 +289,10 @@ export function DevotionalPageClient({ devotional, days, settings, reference, pr
             <AccessGate id="access-gate" devotional={devotional} settings={settings} onUnlock={setUnlockedDays} />
           )}
           {hasAccessControl && isUnlocked && unlockedDays!.length === 0 && (
-            <Card className="text-center">
-              <p className="text-sm text-text-muted">All unlocked content is now visible above.</p>
+            <Card className="text-center border-success/30 bg-success/5">
+              <p className="text-sm text-success font-medium">
+                {hasSingleAsset ? "Access granted — you can now read the full devotional file above." : "All unlocked content is now visible above."}
+              </p>
             </Card>
           )}
           {hasAccessControl === false && !isUnlocked && (
