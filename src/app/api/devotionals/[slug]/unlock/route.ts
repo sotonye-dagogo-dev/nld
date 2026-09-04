@@ -59,9 +59,18 @@ export async function POST(
   }
 
   // Primary lookup: direct grant for this devotional + email (case-insensitive)
-  const grant = await queryWithTimeout((db) =>
-    db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devotional.id), sql`lower(${accessGrants.email}) = ${normalizedEmail}`)).limit(1)
-  ).catch(() => []);
+  let grant: typeof accessGrants.$inferSelect[] = [];
+  try {
+    grant = await queryWithTimeout((db) =>
+      db.select().from(accessGrants).where(and(eq(accessGrants.devotionalId, devotional.id), sql`lower(${accessGrants.email}) = ${normalizedEmail}`)).limit(1)
+    );
+  } catch (e) {
+    const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+    if (msg.includes("timeout") || msg.includes("connection") || msg.includes("57014")) {
+      return NextResponse.json({ ok: false, error: "Service temporarily unavailable. Please try again shortly." }, { status: 503 });
+    }
+    grant = [];
+  }
 
   let active = grant.find((g) => g.status === "active") ?? null;
 
@@ -71,9 +80,14 @@ export async function POST(
   // (b) future devotionals not present at bundle time, (c) paystack reference suffix copies.
   // If a matching bundle grant is found we lazily ensure a per-devotional grant exists.
   async function findMatchingBundleGrant(): Promise<typeof active> {
-    const all = await queryWithTimeout((db) =>
-      db.select().from(accessGrants).where(sql`lower(${accessGrants.email}) = ${normalizedEmail}`)
-    ).catch(() => []);
+    let all: typeof accessGrants.$inferSelect[] = [];
+    try {
+      all = await queryWithTimeout((db) =>
+        db.select().from(accessGrants).where(sql`lower(${accessGrants.email}) = ${normalizedEmail}`)
+      );
+    } catch {
+      return null;
+    }
     for (const g of all) {
       if (g.status !== "active") continue;
       if (g.expiresAt && g.expiresAt < new Date()) continue;
@@ -82,49 +96,102 @@ export async function POST(
     return null;
   }
 
+  // Attempt to recover from pending purchases that have actually succeeded on the gateway
+  // but whose webhook/verify has not yet flipped status to success. We verify via the
+  // gateway before rejecting with 403.
+  async function tryVerifyPendingPurchase(p: { paystackReference: string; status: string }): Promise<boolean> {
+    if ((p.status as string) !== "pending") return false;
+    const ref = p.paystackReference;
+    try {
+      const { fulfillSuccessfulPurchase } = await import("@/lib/payment-helpers");
+      // Try Paystack first, then BudPay — whichever gateway holds the reference will succeed.
+      for (const verifier of [
+        async () => {
+          const { verifyTransaction } = await import("@/integrations/paystack/client");
+          const v = await verifyTransaction(ref);
+          return (v.status ?? "").toLowerCase() === "success";
+        },
+        async () => {
+          const { verifyTransaction } = await import("@/integrations/budpay/client");
+          const v = await verifyTransaction(ref);
+          return (v.status ?? "").toLowerCase() === "success";
+        },
+      ]) {
+        try {
+          const isSuccess = await verifier();
+          if (isSuccess) {
+            await fulfillSuccessfulPurchase(ref, { source: "unlock-verify-pending" });
+            return true;
+          }
+        } catch {
+          // try next gateway
+        }
+      }
+    } catch {}
+    return false;
+  }
+
   async function findMatchingPurchase(): Promise<typeof active> {
     try {
       const { purchases } = await import("@/data/db/schema");
       const { deriveAccessPassword } = await import("@/lib/access");
-      const rows = await queryWithTimeout((db) =>
-        db.select().from(purchases).where(sql`lower(${purchases.email}) = ${normalizedEmail}`)
-      ).catch(() => []);
+      let rows: typeof purchases.$inferSelect[] = [];
+      try {
+        rows = await queryWithTimeout((db) =>
+          db.select().from(purchases).where(sql`lower(${purchases.email}) = ${normalizedEmail}`)
+        );
+      } catch {
+        return null;
+      }
       for (const p of rows) {
-        // Only success-verified purchases may grant access; pending/failed never do.
-        if (p.status !== "success") continue;
         const expected = deriveAccessPassword(p.paystackReference);
-        if (verifyAccessPassword(trimmedPassword, expected)) {
+        if (!verifyAccessPassword(trimmedPassword, expected)) continue;
+        // If pending, try to verify and promote to success before granting.
+        if (p.status === "pending") {
+          const promoted = await tryVerifyPendingPurchase(p as unknown as typeof grant[0] & { paystackReference: string; status: string });
+          if (!promoted) continue;
+          // Re-fetch to confirm status flipped
           try {
-            const { computeExpiry } = await import("@/lib/access");
-            const { getSiteSettings: getSettings2 } = await import("@/config/site");
-            const { value: s2 } = await getSettings2().catch(() => ({ value: null as unknown as SiteSettings }));
-            const dur2 = (s2 as unknown as SiteSettings | null)?.durationAccessDays ?? 60;
-            const mode2: AccessMode = s2?.accessMode ?? "one-time";
-            const exp2 = computeExpiry(mode2, dur2);
-            const inserted = await queryWithTimeout((db) =>
-              db.insert(accessGrants).values({
-                devotionalId: devotional!.id,
-                email: normalizedEmail,
-                paystackReference: p.paystackReference,
-                status: "active",
-                expiresAt: exp2,
-              }).returning({ id: accessGrants.id })
-            ).catch(() => [] as { id: string }[]);
-            if (inserted && inserted.length > 0) {
-              const ng = await queryWithTimeout((db) => db.select().from(accessGrants).where(eq(accessGrants.id, inserted[0].id)).limit(1)).catch(() => []);
-              if (ng[0]) return ng[0] as typeof active;
-            }
-          } catch {}
-          return {
-            id: p.id,
-            devotionalId: devotional!.id,
-            email: normalizedEmail,
-            paystackReference: p.paystackReference,
-            status: "active",
-            expiresAt: null,
-            grantedAt: new Date(),
-          } as unknown as typeof active;
+            const fresh = await queryWithTimeout((db) =>
+              db.select().from(purchases).where(eq(purchases.paystackReference, p.paystackReference)).limit(1)
+            );
+            if (fresh[0]?.status !== "success") continue;
+          } catch {
+            continue;
+          }
+        } else if (p.status !== "success") {
+          continue;
         }
+        try {
+          const { computeExpiry } = await import("@/lib/access");
+          const { getSiteSettings: getSettings2 } = await import("@/config/site");
+          const { value: s2 } = await getSettings2().catch(() => ({ value: null as unknown as SiteSettings }));
+          const dur2 = (s2 as unknown as SiteSettings | null)?.durationAccessDays ?? 60;
+          const mode2: AccessMode = s2?.accessMode ?? "one-time";
+          const exp2 = computeExpiry(mode2, dur2);
+          const inserted = await queryWithTimeout((db) =>
+            db.insert(accessGrants).values({
+              devotionalId: devotional!.id,
+              email: normalizedEmail,
+              paystackReference: p.paystackReference,
+              status: "active",
+              expiresAt: exp2,
+            }).returning({ id: accessGrants.id })
+          ).catch(() => [] as { id: string }[]);
+          if (inserted && inserted.length > 0) {
+            const ng = await queryWithTimeout((db) => db.select().from(accessGrants).where(eq(accessGrants.id, inserted[0].id)).limit(1)).catch(() => []);
+            if (ng[0]) return ng[0] as typeof active;
+          }
+        } catch {}
+        return {
+          id: p.id,
+          devotionalId: devotional!.id,
+          email: normalizedEmail,
+          paystackReference: p.paystackReference,
+          status: "active",
+          expiresAt: null,
+          grantedAt: new Date(),
+        } as unknown as typeof active;
       }
     } catch {}
     return null;
