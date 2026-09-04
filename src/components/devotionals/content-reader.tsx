@@ -92,8 +92,6 @@ export function ContentReader({
       setCurrentPage(1);
       try {
         // Ensure Promise.withResolvers polyfill is evaluated before pdfjs-dist loads
-        // Side-effect import covers main-thread; worker thread is disabled to avoid
-        // separate polyfill requirement ("Promise.withResolvers is not a function" in worker).
         await import("@/lib/polyfills");
         if (typeof Promise !== "undefined" && typeof (Promise as unknown as { withResolvers?: unknown }).withResolvers !== "function") {
           // Fallback inline polyfill if static import was tree-shaken
@@ -105,16 +103,20 @@ export function ContentReader({
           };
         }
         const pdfjsLib: typeof import("pdfjs-dist") = await import("pdfjs-dist");
-        // Disable worker to avoid "API version ... does not match worker" and
-        // worker-side Promise.withResolvers missing (worker runs in isolated scope).
-        // Main-thread rendering still yields correct pagination/zoom with our canvas path.
+        // Configure worker — pdfjs 4.x requires GlobalWorkerOptions.workerSrc even for
+        // fake-worker fallback (imported via `import(workerSrc)`). Pin to the exact
+        // installed version to avoid "API version ... does not match worker" errors.
+        // CSP in next.config.mjs allow-lists https://cdn.jsdelivr.net for worker/script/connect.
+        const expectedWorkerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs`;
+        try {
+          const gwo = (pdfjsLib as unknown as { GlobalWorkerOptions?: { workerSrc?: string } }).GlobalWorkerOptions;
+          if (gwo && gwo.workerSrc !== expectedWorkerSrc) {
+            gwo.workerSrc = expectedWorkerSrc;
+          }
+        } catch {}
         const loadingTask = pdfjsLib.getDocument({
           url: fileUrl,
           withCredentials: false,
-          // @ts-expect-error — disableWorker not in types for some versions but supported at runtime
-          disableWorker: true,
-          isEvalSupported: false,
-          useWorkerFetch: false,
         });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
