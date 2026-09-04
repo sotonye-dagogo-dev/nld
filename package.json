@@ -2,7 +2,7 @@
   "name": "next-level-devotional",
   "version": "0.1.0",
   "private": true,
-  "description": "Config-driven devotional hosting + paid access webapp (Next.js + Supabase + Paystack + Resend).",
+  "description": "Config-driven devotional hosting + paid access webapp (Next.js + Supabase + Paystack/BudPay + Resend).",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

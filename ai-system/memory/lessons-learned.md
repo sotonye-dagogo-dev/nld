@@ -1,8 +1,8 @@
 # Lessons Learned
 
 > **Metadata**
-> - last-updated-by: update-ai-system (post-session 12)
-> - last-verified-against-code: 2026-09-02
+> - last-updated-by: fix-build (pdf-reader polyfill + devotional dedup + gateway labeling)
+> - last-verified-against-code: 2026-09-04
 > - staleness-policy: each entry has its own staleness — check supersedes links
 
 > **Overview:** Practical knowledge accumulated during development — things that worked well, things that didn't, and patterns worth repeating. Different from `repair-system.md` (tracks errors); this file tracks development process insights and architectural wisdom. Uses supersedes/superseded-by links for evolving practices.
@@ -230,6 +230,53 @@ The platform needs to scale to 100k+ users with proper health checks, rate limit
 - Preparing for horizontal scaling with load balancers
 - Implementing rate limiting for public APIs
 - Verifying transaction integrity in critical paths
+
+**Supersedes:** None
+**Superseded by:** None
+---
+
+### Promise.withResolvers polyfill before any pdfjs-dist dynamic import
+
+**Context:**
+pdfjs-dist 4.10.38 and later call `Promise.withResolvers` at import/worker time. Older iOS Safari 16 / WebViews don't have the ES2024 API, so the viewer threw "Promise.withResolvers is not a function" and rendered two "Unable to load content" error blocks (one per asset viewer on same page).
+
+**What We Learned:**
+Create `src/lib/polyfills.ts` that shims `Promise.withResolvers` if `Promise.withResolvers === undefined`, import it statically at the top of the viewer and also `await import("@/lib/polyfills")` right before the dynamic `import("pdfjs-dist")` so the polyfill is guaranteed to be evaluated in the same tick as the heavy import. The fix is client-only, adds ~15 LOC, and doesn't affect SSR.
+
+**Apply When:**
+Any dynamic import of a library that assumes ES2024+ globals (Promise.withResolvers, etc.) on mobile WebViews that lag behind Chrome.
+
+**Supersedes:** None
+**Superseded by:** None
+---
+
+### Payment handler copy should be generic, not single-provider
+
+**Context:**
+The platform supports Paystack, BudPay (mirrored flow), and bank transfer, all config-driven. Admin payments list still said "Paystack purchase records" and emails were wired directly to Resend, bypassing the `EMAIL_PROVIDER` abstraction.
+
+**What We Learned:**
+- Admin copy uses "payment handlers / gateways" with handler list in parentheses (`Paystack, BudPay, bank transfer`) — toggles in settings stay per-handler for specificity, column headers stay `Reference` (not `Paystack reference`).
+- `grep "from.*resend/client"` should return 0 hits outside `email-client.ts`; webhooks and invite routes must go via `sendAccessEmail`/`sendTemplateEmail` from `integrations/email-client` so `EMAIL_PROVIDER=resend|cloudflare` is respected. BudPay webhook pattern mirrors Paystack (re-verify via API, idempotent grant, audit + email best-effort, UI copy-to-clipboard fallback).
+
+**Apply When:**
+Adding a new payment gateway or email provider: update UI copy to include the new handler, keep DB column names internal, and never import Resend/Cloudflare clients directly outside the abstraction.
+
+**Supersedes:** None
+**Superseded by:** None
+---
+
+### Single protected view beats duplicated blur blocks
+
+**Context:**
+When a devotional's single PDF houses all days, the slug page rendered both the asset ContentReader's locked overlay (cover + watermark + blur) and per-day locked previews (`LockedCoverOverlay`) plus per-day file viewers, producing two cover-blur blocks and two error blocks on failure and two success banners on unlock.
+
+**What We Learned:**
+- The asset ContentReader locked overlay is the canonical single protected view. Suppress `LockedCoverOverlay` and per-day `ContentReader` instances when `hasSingleAsset` is true; keep per-day text previews and the day-divider notice ("X additional days included in file — unlock to access").
+- Unify success banners into one `Card` ("Access granted — you can now read the full devotional file above and X additional days below") instead of rendering both "Access granted…" and "Access unlocked…".
+
+**Apply When:**
+Building hybrid content models (single-file vs per-day). Never render two viewers for the same bytes; choose one canonical protected view and keep the other branch as text/preview only.
 
 **Supersedes:** None
 **Superseded by:** None

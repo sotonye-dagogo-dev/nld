@@ -268,3 +268,27 @@ Merged local reader-lock work (stashed before pull) on top of 12 upstream commit
 **Next Sprint Focus:**
 Verify in production cover overlay and lockedDays blur, browser pass over deterrent timing, then live-key verification.
 
+---
+
+## 2026-09-04 — Fix-build: PDF Promise.withResolvers, devotional slug de-duplication, payment handler labeling + BudPay email compliance
+
+**Summary:**
+Fixed the "Unable to load content — Promise.withResolvers is not a function" reader crash on older Safari/WebView (iOS 16), removed the duplicate protected-view / success-banner clutter from the devotional slug page when a single asset houses all days, made admin payment copy gateway-agnostic (Paystack/BudPay/bank transfer), and audited email delivery so Paystack, BudPay and bank-transfer all go via the `email-client` abstraction with copy-to-clipboard fallbacks.
+
+**Completed:**
+- Created `src/lib/polyfills.ts` shimming `Promise.withResolvers` when missing and wired it into `src/components/devotionals/content-reader.tsx` (top import + before dynamic `pdfjs-dist` import) — pdfjs-dist 4.10.38 no longer crashes on ES2024-less runtimes
+- Devotional slug de-duplication in `src/components/devotionals/devotional-page-client.tsx`: asset ContentReader is now the single locked view (cover + watermark + blur), per-day `ContentReader` and `LockedCoverOverlay` suppressed when `hasSingleAsset`, unified success banner ("Access granted — you can now read…" single Card), kept `hasSingleAsset` → per-day file viewers hidden to avoid double PDF loads
+- Admin payment labeling: `src/app/admin/(panel)/records/payments/page.tsx` now says "purchase records across payment handlers (Paystack, BudPay, bank transfer)" instead of "Paystack purchase records"; package description updated to Paystack/BudPay
+- Email compliance: migrated `src/app/api/paystack/webhook/route.ts`, `src/app/api/budpay/webhook/route.ts`, `src/app/api/admin/invites/route.ts`, `src/app/api/admin/invites/resend/route.ts` from direct `integrations/resend/client` to `integrations/email-client` so `EMAIL_PROVIDER` (Resend vs Cloudflare Worker + MailChannels) is respected; verified BudPay webhook mirrors Paystack (re-verify → idempotent grant → sendAccessEmail best-effort + audit → copy-to-clipboard UI fallback) and bank-transfer verify/upload already use email-client
+- Updated `ai-system` docs: `index/repo-map.md`, `system-architecture.md`, `memory/project-decisions.md` (added polyfill, gateway labeling, single protected view, email-client decisions), this history entry; bumped freshness to 2026-09-04
+
+**Key Changes:**
+- Older iOS/Safari users no longer see two "Unable to load content" walls on the same devotional page
+- Hybrid devotionals (single PDF for all days + per-day text) render one protected viewer, not two, and one success banner
+- Payments admin page accurately reflects multi-gateway reality; future gateways only need UI copy list updates (DB column `paystackReference` stays internal)
+- `grep "from.*resend/client"` now returns 0 hits outside the abstraction, so EMAIL_PROVIDER switching works end-to-end
+
+**Next Sprint Focus:**
+Live-key verification with Resend-verified domain (Paystack + BudPay → webhook → grant → email → /access unlock e2e, plus bank-transfer verify), browser pass over polyfilled viewer on real iOS 16 device, monitor Vercel logs for `sendAccessEmail` success.
+
+

@@ -1,8 +1,8 @@
 # Project Decisions
 
 > **Metadata**
-> - last-updated-by: update-ai-system (post-session 12)
-> - last-verified-against-code: 2026-09-02
+> - last-updated-by: fix-build (pdf-reader polyfill + devotional dedup + gateway labeling)
+> - last-verified-against-code: 2026-09-04
 > - staleness-policy: each entry has its own staleness — check supersedes links
 
 > **Overview:** Log of significant architectural, technical, and product decisions. Agents consult this before proposing changes to avoid contradicting prior reasoning. Uses supersedes/superseded-by links so contradictory entries are explicitly resolved rather than both appearing equally valid.
@@ -383,4 +383,87 @@ Expand button did nothing because it toggled truncation truthiness that was fals
 
 **Implications:**
 - Future viewer work should keep toolbar controls (paging + zoom + expand + fullscreen) as a unit.
+
+---
+
+### Promise.withResolvers polyfill for pdfjs-dist on older WebViews
+
+**Decision:** Ship a tiny `src/lib/polyfills.ts` that defines `Promise.withResolvers` if missing, and import it at the top of `src/components/devotionals/content-reader.tsx` plus again inside the dynamic `pdfjs-dist` load effect before `import("pdfjs-dist")`. All gateways and viewers remain unchanged; the polyfill adds zero config.
+**Date:** 2026-09-04
+**Made by:** fix-build (pdf-reader Promise.withResolvers crash)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+pdfjs-dist 4.10.38 calls `Promise.withResolvers` unguarded (ES2024). Older Safari/iOS 16 WebViews do not have it, producing "Promise.withResolvers is not a function. In 'Promise.withResolvers()', 'Promise.withResolvers' is undefined" and an "Unable to load content" error wall. The viewer loaded via CDN CSP `https://cdn.jsdelivr.net` already handled worker version pinning; the missing polyfill was the sole runtime gap.
+
+**Alternatives Considered:**
+- Pin pdfjs-dist to <4.4 — rejected: loses API+worker fix and canvas features, still needs future upgrade.
+- Load polyfill only via next.config polyfill script tag — rejected: viewer is client-only dynamic import, scoped polyfill before import is more precise and avoids global side-effects on SSR.
+
+**Implications:**
+- Any future code that dynamically imports a lib that expects ES2024 globals should ensure polyfills are evaluated first (pattern: `await import("@/lib/polyfills")` before the heavy import).
+
+---
+
+### Payment gateway naming: admin uses "payment handlers / gateways", not single Paystack label
+
+**Decision:** Admin-facing copy (especially `src/app/admin/(panel)/records/payments/page.tsx`) now says "purchase records across payment handlers (Paystack, BudPay, bank transfer)" instead of "Paystack purchase records". Token/code labels stay generic (`Reference` rather than `Paystack reference`). Per-handler toggles remain named per provider in settings (Paystack / BudPay / Bank Transfer) — that's correct specificity. Package description updated to `Paystack/BudPay`.
+
+**Date:** 2026-09-04
+**Made by:** fix-build (admin labeling audit)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Platform now mirrors Paystack and BudPay flows (config-driven) plus bank transfer. Single-provider copy is drift and confuses admins/clients about what's available.
+
+**Alternatives Considered:**
+- Keep "Paystack" label and add parenthetical — rejected: still reads as Paystack-primary.
+- Rename DB column `paystackReference` to `paymentReference` — rejected: migration/size vs value; the column is internal, UI should just be generic.
+
+**Implications:**
+- New gateways should be added to the handler list in copy (no rename of DB column needed, only UI copy).
+
+---
+
+### Devotional slug single protected view (de-duplication)
+
+**Decision:** The single-asset ContentReader locked overlay is the canonical protected view (cover + watermark + blur). `DevotionalPageClient` no longer shows a second blocked cover block: per-day `ContentReader` instances are suppressed when `hasSingleAsset` (PDF housing all days) and the "Access granted" banner is unified into one `Card` (`Access unlocked — X additional days…` / `Access granted — you can now read…`). `LockedCoverOverlay` is suppressed when an asset exists.
+**Date:** 2026-09-04
+**Made by:** fix-build (devotional slug redundancy)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Page text dumped from production showed two "Unable to load content / Promise.withResolvers…" blocks stacked plus two success banners ("Access granted…" + "Access unlocked…") and two cover-with-blur blocks — the asset's ContentReader already shows the locked overlay, so per-day locked previews and per-day file viewers double the UI and double the failed PDF loads.
+
+**Alternatives Considered:**
+- Keep per-day viewers when asset present — rejected: asset already contains all days, double PDF loads double failure surface.
+- Keep both success banners — rejected: redundant, user sees same state twice.
+
+**Implications:**
+- When `hasSingleAsset` is true, per-day file viewers and locked-cover overlays are deliberately not rendered; only the top asset viewer + per-day text previews + one unlock banner remain.
+
+---
+
+### Email delivery via `email-client` abstraction (BudPay compliance)
+
+**Decision:** All email send sites now go via `src/integrations/email-client.ts` (`getEmailClient().sendAccessEmail/sendTemplateEmail`) which dispatches to Resend or Cloudflare per `EMAIL_PROVIDER`. Paystack/BudPay webhooks and admin invite routes were migrated off direct `src/integrations/resend/client` imports; bank-transfer verify/upload already used the abstraction. BudPay webhook mirrors Paystack: webhook → `verifyTransaction` re-check → idempotent grant creation → `sendAccessEmail` (best-effort, audited on failure) + copy-to-clipboard UI fallback.
+**Date:** 2026-09-04
+**Made by:** fix-build (email audit with BudPay integration)
+**Supersedes:** None
+**Superseded by:** None
+
+**Reason:**
+Direct resend imports bypassed the `EMAIL_PROVIDER` abstraction (introduced when Cloudflare MailChannels was added) and would silently use the wrong provider/domain. BudPay integration must mirror Paystack end-to-end (init → verify/webhook → grant → email) or access passwords don't arrive.
+
+**Alternatives Considered:**
+- Keep direct resend imports and add conditional — rejected: duplicates abstraction already provided.
+- Add a third mailer — not needed; abstraction already supports adding providers by implementing `EmailClient`.
+
+**Implications:**
+- `grep "from.*resend/client"` should return 0 hits outside `email-client.ts` and the wrapper choice module.
+- New gateways copy the webhook pattern: idempotency guard on `paystackReference`, config-driven expiry via `computeExpiry`, audit/email with fallback, `EMAIL_PROVIDER` stays respected.
+
 
