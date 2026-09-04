@@ -138,6 +138,7 @@ export async function POST(request: Request) {
               bundleDevotionalIds: isBundle ? bundleDevotionals?.map((d) => d.id) : undefined,
               slug: callbackSlug,
               title: isBundle ? "All Devotionals Bundle" : devotional?.title,
+              processor: "paystack",
             },
           }),
         );
@@ -162,7 +163,7 @@ export async function POST(request: Request) {
         action: "purchase.init",
         entity: "purchase",
         entityId: reference,
-        after: { devotionalId, amountMinor, currency, isBundle },
+        after: { devotionalId, amountMinor, currency, isBundle, processor: "paystack" },
       });
       await recordEvent({ eventType: "purchase.started", slug: callbackSlug, email: normalizedEmail });
 
