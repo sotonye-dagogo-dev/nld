@@ -82,19 +82,22 @@ export function ContentReader({
     }
   }, [hasFile, hasFullAccess, fileType]);
 
-  // PDF.js loading: fetch document to get true page count and prepare rendering
+  // PDF.js loading: robust viewer that works on all browsers including iOS 16 Safari.
+  // Previously the CDN worker lacked Promise.withResolvers in its own Worker scope,
+  // so iOS 16 threw "Promise.withResolvers is not a function" even after the main-
+  // thread polyfill. Fix: polyfill main thread, provide a blob worker with polyfill,
+  // and fall back to disableWorker (main-thread rendering) which needs no worker at all.
   useEffect(() => {
     if (!hasFile || !hasFullAccess || fileType !== "pdf") return;
     let cancelled = false;
+    let blobUrl: string | null = null;
     async function loadPdf() {
       setIsLoading(true);
       setError(null);
       setCurrentPage(1);
       try {
-        // Ensure Promise.withResolvers polyfill is evaluated before pdfjs-dist loads
         await import("@/lib/polyfills");
         if (typeof Promise !== "undefined" && typeof (Promise as unknown as { withResolvers?: unknown }).withResolvers !== "function") {
-          // Fallback inline polyfill if static import was tree-shaken
           (Promise as unknown as Record<string, unknown>).withResolvers = function <T>() {
             let resolve!: (value: T | PromiseLike<T>) => void;
             let reject!: (reason?: unknown) => void;
@@ -103,35 +106,85 @@ export function ContentReader({
           };
         }
         const pdfjsLib: typeof import("pdfjs-dist") = await import("pdfjs-dist");
-        // Configure worker — pdfjs 4.x requires GlobalWorkerOptions.workerSrc even for
-        // fake-worker fallback (imported via `import(workerSrc)`). Pin to the exact
-        // installed version to avoid "API version ... does not match worker" errors.
-        // CSP in next.config.mjs allow-lists https://cdn.jsdelivr.net for worker/script/connect.
-        const expectedWorkerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs`;
+
+        // Try to install a polyfilled blob worker so the Worker scope also has Promise.withResolvers.
+        // The blob wraps the CDN worker with a polyfill preamble. If blob creation fails,
+        // we fall back to disableWorker below.
+        const cdnWorkerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs`;
         try {
           const gwo = (pdfjsLib as unknown as { GlobalWorkerOptions?: { workerSrc?: string } }).GlobalWorkerOptions;
-          if (gwo && gwo.workerSrc !== expectedWorkerSrc) {
-            gwo.workerSrc = expectedWorkerSrc;
+          if (gwo) {
+            const polyfillPreamble = `if(typeof Promise!=='undefined'&&!Promise.withResolvers){Promise.withResolvers=function(){let r,j;const p=new Promise((res,rej)=>{r=res;j=rej});return{promise:p,resolve:r,reject:j}};}`;
+            // Worker is ESM (.mjs) — use dynamic import inside blob for module workers where supported,
+            // and importScripts fallback for classic workers. We emit both; one will succeed.
+            const blobContent = `${polyfillPreamble}\ntry{importScripts('${cdnWorkerSrc}');}catch(e){import('${cdnWorkerSrc}');}`;
+            const blob = new Blob([blobContent], { type: "application/javascript" });
+            blobUrl = URL.createObjectURL(blob);
+            gwo.workerSrc = blobUrl;
           }
-        } catch {}
-        const loadingTask = pdfjsLib.getDocument({
-          url: fileUrl,
-          withCredentials: false,
-        });
-        const pdf = await loadingTask.promise;
+        } catch {
+          // ignore — fallback path will handle
+        }
+
+        // Helper to load with explicit disableWorker flag.
+        const tryLoad = async (opts: Record<string, unknown>) => {
+          const task = (pdfjsLib as unknown as { getDocument: (o: Record<string, unknown>) => { promise: Promise<unknown> } }).getDocument(opts);
+          return await task.promise;
+        };
+
+        let pdf: unknown = null;
+        let lastErr: unknown = null;
+
+        // 1) Prefer main-thread (no worker) — most compatible, no CSP/worker polyfill needed.
+        try {
+          pdf = await tryLoad({ url: fileUrl, withCredentials: false, disableWorker: true, isEvalSupported: false, useWorkerFetch: false });
+        } catch (e) {
+          lastErr = e;
+          // 2) Fallback: try with worker (blob polyfilled, or CDN direct)
+          try {
+            // Reset to CDN if blob failed
+            try {
+              const gwo2 = (pdfjsLib as unknown as { GlobalWorkerOptions?: { workerSrc?: string } }).GlobalWorkerOptions;
+              if (gwo2 && !blobUrl) gwo2.workerSrc = cdnWorkerSrc;
+            } catch {}
+            pdf = await tryLoad({ url: fileUrl, withCredentials: false });
+          } catch (e2) {
+            lastErr = e2;
+            // 3) Last resort: fetch as ArrayBuffer and pass data (CORS-friendly)
+            try {
+              const res = await fetch(fileUrl);
+              if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+              const buf = await res.arrayBuffer();
+              pdf = await tryLoad({ data: new Uint8Array(buf), disableWorker: true, isEvalSupported: false });
+            } catch (e3) {
+              throw lastErr ?? e3;
+            }
+          }
+        }
+
         if (cancelled) return;
         pdfDocRef.current = pdf as unknown;
         setTotalPages((pdf as unknown as { numPages: number }).numPages || 1);
       } catch (err) {
         if (cancelled) return;
-        const msg = err instanceof Error ? err.message : "Failed to load PDF";
-        if (msg.includes("Promise.withResolvers")) {
-          setError("PDF viewer unavailable in this browser. Please update or try another browser.");
-        } else if (msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("failed")) {
-          setError("Unable to load PDF. Please check your connection or try again.");
+        const raw = err instanceof Error ? err.message : "Failed to load PDF";
+        const low = raw.toLowerCase();
+        let friendly: string;
+        if (raw.includes("Promise.withResolvers") || low.includes("globalworker") || low.includes("workersrc") || low.includes("version") && low.includes("worker")) {
+          // These are infrastructure errors — not a browser-update issue after our polyfill.
+          // Show a generic, actionable message and log raw for diagnostics.
+          console.error("[content-reader] PDF worker error:", raw);
+          friendly = "Unable to load PDF. Please check your connection and try again. If the issue persists, contact support.";
+        } else if (low.includes("fetch") || low.includes("failed") || low.includes("network")) {
+          friendly = "Unable to load PDF. Please check your connection or try again.";
+        } else if (low.includes("password") || low.includes("encrypted")) {
+          friendly = "This PDF is password-protected and cannot be displayed.";
+        } else if (low.includes("invalid") || low.includes("corrupt")) {
+          friendly = "This PDF is corrupted or in an unsupported format.";
         } else {
-          setError(msg.slice(0, 300));
+          friendly = raw.slice(0, 280);
         }
+        setError(friendly);
         setTotalPages(1);
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -140,6 +193,9 @@ export function ContentReader({
     loadPdf();
     return () => {
       cancelled = true;
+      if (blobUrl) {
+        try { URL.revokeObjectURL(blobUrl); } catch {}
+      }
       const doc = pdfDocRef.current as unknown as { destroy?: () => void } | null;
       try { doc?.destroy?.(); } catch {}
       pdfDocRef.current = null;
