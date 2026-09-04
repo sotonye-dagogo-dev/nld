@@ -31,6 +31,9 @@ export function AccessPasswordFallback({ reference, devotionalSlug }: AccessPass
           await r.json().catch(() => null);
         } catch {}
       };
+      // Preferred: unified verify that dispatch by stored processor (avoids wrong-gateway 502 noise)
+      await verifyOne("/api/payment/verify");
+      // Legacy fallback: keep both processor endpoints for resilience (now processor-aware, so cheap)
       await verifyOne("/api/paystack/verify");
       await verifyOne("/api/budpay/verify");
 
