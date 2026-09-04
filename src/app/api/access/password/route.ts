@@ -22,10 +22,14 @@ export async function GET(request: Request) {
     if (!purchase) {
       return NextResponse.json({ ok: false, error: "Purchase not found." }, { status: 404 });
     }
-    // Allow pending purchases to retrieve password (webhook race) — password is derivable regardless
-    // But note status for client feedback; grant creation still handled.
-    if (purchase.status !== "success" && purchase.status !== "pending") {
-      return NextResponse.json({ ok: false, error: "Purchase not completed." }, { status: 404 });
+    // Only successful purchases may retrieve / reveal an access password.
+    // Failed, canceled, or pending (webhook race / blocked CSP) must not leak a password
+    // or create an access grant. Pending callers receive 202 so the UI can poll or show pending.
+    if (purchase.status !== "success") {
+      if (purchase.status === "pending") {
+        return NextResponse.json({ ok: false, error: "Payment pending — awaiting verification. Please wait or try again shortly." }, { status: 202 });
+      }
+      return NextResponse.json({ ok: false, error: "Purchase not completed." }, { status: 403 });
     }
 
     // Try exact grant first, then bundle suffix variants (e.g. NL-xxx__<id>)
@@ -40,11 +44,12 @@ export async function GET(request: Request) {
       grant = (prefixed[0] as typeof grant | undefined) ?? undefined;
     }
 
-    // Even if no grant row yet (webhook race / partial failure), the password is derivable from base reference
+    // Even if no grant row yet, derive only after success is confirmed above.
+    // Do not lazily create grants for non-success purchases (would bypass webhook verification).
     const accessPassword = grant ? derivePasswordForGrant(grant.paystackReference) : deriveAccessPassword(reference);
 
-    // Ensure a grant exists for future verify flows — lazily create if missing
-    if (!grant) {
+    // Lazily create grant only for success-verified purchases; skip otherwise.
+    if (!grant && purchase.status === "success") {
       try {
         const { getSiteSettings } = await import("@/config/site");
         const { computeExpiry } = await import("@/lib/access");

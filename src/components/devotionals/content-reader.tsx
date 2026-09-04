@@ -11,13 +11,17 @@ import { cn } from "@/lib/utils";
 // pdf.js canvas rendering with correct page count, zoom, pagination and fullscreen.
 
 function isOptimizedImageHost(url: string | null | undefined): boolean {
-  if (!url || typeof url !== "string") return false;
+  if (!url || typeof url !== "string" || url.trim() === "") return false;
   try {
     const host = new URL(url).hostname.toLowerCase();
     return host.endsWith(".supabase.co") || host.endsWith(".supabase.in");
   } catch {
     return false;
   }
+}
+function safeFileType(url: string | null | undefined): "pdf" | "docx" {
+  if (!url || typeof url !== "string") return "pdf";
+  return url.toLowerCase().endsWith(".pdf") ? "pdf" : "docx";
 }
 
 interface ContentReaderProps {
@@ -43,7 +47,7 @@ export function ContentReader({
   coverUrl,
   className,
 }: ContentReaderProps) {
-  const hasFile = Boolean(fileUrl && fileUrl.trim().length > 0);
+  const hasFile = Boolean(fileUrl && typeof fileUrl === "string" && fileUrl.trim().length > 0);
   const [isLoading, setIsLoading] = useState(hasFile && hasFullAccess && fileType === "pdf");
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<string>("");
@@ -88,17 +92,29 @@ export function ContentReader({
       setCurrentPage(1);
       try {
         // Ensure Promise.withResolvers polyfill is evaluated before pdfjs-dist loads
+        // Side-effect import covers main-thread; worker thread is disabled to avoid
+        // separate polyfill requirement ("Promise.withResolvers is not a function" in worker).
         await import("@/lib/polyfills");
-        // Dynamic import keeps server bundle clean and ensures client-only execution
-        const pdfjsLib: typeof import("pdfjs-dist") = await import("pdfjs-dist");
-        // Ensure worker matches API version (4.10.38) — fixes "API version ... does not match worker" error
-        if (typeof window !== "undefined" && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-          // Use CDN matching installed version to avoid bundling worker
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs`;
+        if (typeof Promise !== "undefined" && typeof (Promise as unknown as { withResolvers?: unknown }).withResolvers !== "function") {
+          // Fallback inline polyfill if static import was tree-shaken
+          (Promise as unknown as Record<string, unknown>).withResolvers = function <T>() {
+            let resolve!: (value: T | PromiseLike<T>) => void;
+            let reject!: (reason?: unknown) => void;
+            const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+            return { promise, resolve, reject };
+          };
         }
+        const pdfjsLib: typeof import("pdfjs-dist") = await import("pdfjs-dist");
+        // Disable worker to avoid "API version ... does not match worker" and
+        // worker-side Promise.withResolvers missing (worker runs in isolated scope).
+        // Main-thread rendering still yields correct pagination/zoom with our canvas path.
         const loadingTask = pdfjsLib.getDocument({
           url: fileUrl,
           withCredentials: false,
+          // @ts-expect-error — disableWorker not in types for some versions but supported at runtime
+          disableWorker: true,
+          isEvalSupported: false,
+          useWorkerFetch: false,
         });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
@@ -107,9 +123,9 @@ export function ContentReader({
       } catch (err) {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : "Failed to load PDF";
-        // Fallback: if pdf.js fails due to CSP/fetch, keep totalPages=1 and allow iframe fallback via error handling
-        // But we prefer to show error with hint to try again
-        if (msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("failed")) {
+        if (msg.includes("Promise.withResolvers")) {
+          setError("PDF viewer unavailable in this browser. Please update or try another browser.");
+        } else if (msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("failed")) {
           setError("Unable to load PDF. Please check your connection or try again.");
         } else {
           setError(msg.slice(0, 300));
@@ -122,7 +138,6 @@ export function ContentReader({
     loadPdf();
     return () => {
       cancelled = true;
-      // Cleanup pdf doc
       const doc = pdfDocRef.current as unknown as { destroy?: () => void } | null;
       try { doc?.destroy?.(); } catch {}
       pdfDocRef.current = null;
@@ -351,7 +366,7 @@ export function ContentReader({
                   {upgradeHref && (
                     <a
                       href={upgradeHref}
-                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-background shadow-md hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       <Lock className="h-4 w-4" aria-hidden="true" />
                       Unlock Full Content
@@ -420,7 +435,7 @@ export function ContentReader({
                   {upgradeHref && (
                     <a
                       href={upgradeHref}
-                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-background shadow-md hover:bg-primary-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     >
                       <Lock className="h-4 w-4" aria-hidden="true" />
                       Unlock Full Content
